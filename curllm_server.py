@@ -12,6 +12,7 @@ import logging
 import os
 import sys
 import tempfile
+import random
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -73,6 +74,10 @@ class Config:
     num_predict: int = int(os.getenv("CURLLM_NUM_PREDICT", "512"))
     temperature: float = float(os.getenv("CURLLM_TEMPERATURE", "0.3"))
     top_p: float = float(os.getenv("CURLLM_TOP_P", "0.9"))
+    headless: bool = os.getenv("CURLLM_HEADLESS", "true").lower() == "true"
+    locale: str = os.getenv("CURLLM_LOCALE", os.getenv("LOCALE", "pl-PL"))
+    timezone_id: str = os.getenv("CURLLM_TIMEZONE", os.getenv("TIMEZONE", "Europe/Warsaw"))
+    proxy: Optional[str] = (os.getenv("CURLLM_PROXY") or os.getenv("HTTPS_PROXY") or os.getenv("HTTP_PROXY") or None)
     
     def __post_init__(self):
         self.screenshot_dir.mkdir(exist_ok=True)
@@ -204,7 +209,10 @@ class CurllmExecutor:
                 run_logger.log_code("text", instruction)
             
             # Setup browser context
-            browser_context = await self._setup_browser(stealth_mode)
+            host = urlparse(url).hostname if url else None
+            if host and any(h in host for h in ["allegro.pl", "allegro.com"]):
+                stealth_mode = True
+            browser_context = await self._setup_browser(stealth_mode, storage_key=host)
             run_logger.log_text("Browser context initialized.")
             
             # Create agent (supports browser_use.Agent if available; else LocalAgent)
@@ -220,6 +228,7 @@ class CurllmExecutor:
                 instruction=instruction,
                 url=url,
                 visual_mode=visual_mode,
+                stealth_mode=stealth_mode,
                 captcha_solver=captcha_solver,
                 run_logger=run_logger
             )
@@ -227,6 +236,12 @@ class CurllmExecutor:
             # Cleanup
             if browser_context is not None:
                 try:
+                    try:
+                        storage_path = getattr(browser_context, "_curllm_storage_path", None)
+                        if storage_path:
+                            await browser_context.storage_state(path=storage_path)
+                    except Exception as e:
+                        logger.warning(f"Unable to persist storage state: {e}")
                     await browser_context.close()
                 except Exception as e:
                     logger.warning(f"Error during browser close: {e}")
@@ -259,6 +274,12 @@ class CurllmExecutor:
             run_logger.log_code("text", str(e))
             if browser_context is not None:
                 try:
+                    try:
+                        storage_path = getattr(browser_context, "_curllm_storage_path", None)
+                        if storage_path:
+                            await browser_context.storage_state(path=storage_path)
+                    except Exception:
+                        pass
                     await browser_context.close()
                 except Exception as ce:
                     logger.warning(f"Error during browser close after failure: {ce}")
@@ -296,33 +317,56 @@ class CurllmExecutor:
                 logger.warning(f"browser_use.Agent init failed: {e}. Falling back to LocalAgent.")
         return LocalAgent(browser_context, self.llm, config.max_steps, visual_mode, task=instruction)
     
-    async def _setup_browser(self, stealth_mode: bool):
+    async def _setup_browser(self, stealth_mode: bool, storage_key: Optional[str] = None):
         """Setup browser with optional stealth mode"""
         if config.use_browserless:
             return await self._setup_browserless()
         else:
-            return await self._setup_playwright(stealth_mode)
+            return await self._setup_playwright(stealth_mode, storage_key)
     
-    async def _setup_playwright(self, stealth_mode: bool):
+    async def _setup_playwright(self, stealth_mode: bool, storage_key: Optional[str] = None):
         """Setup Playwright browser and return context with attached resources"""
         playwright = await async_playwright().start()
         launch_args = {
-            "headless": True,
+            "headless": bool(config.headless),
             "args": ["--no-sandbox", "--disable-dev-shm-usage"]
         }
         if stealth_mode:
             launch_args["args"].extend(self.stealth_config.get_chrome_args())
+        if config.proxy:
+            launch_args["proxy"] = {"server": config.proxy}
         browser = await playwright.chromium.launch(**launch_args)
+        # Storage state per-domain
+        storage_path = None
+        if storage_key:
+            storage_dir = Path(os.getenv("CURLLM_STORAGE_DIR", "./workspace/storage"))
+            try:
+                storage_dir.mkdir(parents=True, exist_ok=True)
+            except Exception:
+                alt = Path("/tmp/curllm_workspace/storage")
+                alt.mkdir(parents=True, exist_ok=True)
+                storage_dir = alt
+            storage_path = storage_dir / f"{storage_key}.json"
+        # Human-like viewport and headers
+        vw = 1366 + int(random.random() * 700)
+        vh = 768 + int(random.random() * 400)
         context_args = {
-            "viewport": {"width": 1920, "height": 1080},
-            "user_agent": self.stealth_config.get_user_agent() if stealth_mode else None
+            "viewport": {"width": vw, "height": vh},
+            "user_agent": self.stealth_config.get_user_agent() if stealth_mode else None,
+            "locale": config.locale,
+            "timezone_id": config.timezone_id,
+            "extra_http_headers": {"Accept-Language": f"{config.locale},en;q=0.8"}
         }
+        if storage_path and storage_path.exists():
+            context_args["storage_state"] = str(storage_path)
         context = await browser.new_context(**context_args)
         if stealth_mode:
             await self.stealth_config.apply_to_context(context)
         # Attach resources for later cleanup
         setattr(context, "_curllm_browser", browser)
         setattr(context, "_curllm_playwright", playwright)
+        if storage_path:
+            setattr(context, "_curllm_storage_path", str(storage_path))
         return context
     
     async def _setup_browserless(self):
@@ -339,6 +383,7 @@ class CurllmExecutor:
         instruction: str,
         url: Optional[str],
         visual_mode: bool,
+        stealth_mode: bool,
         captcha_solver: bool,
         run_logger: RunLogger
     ) -> Dict:
@@ -362,6 +407,37 @@ class CurllmExecutor:
                 pass
         else:
             page = await agent.browser.new_page()
+        
+        # Detect block page and auto-retry with stealth once
+        try:
+            if await self._is_block_page(page) and not stealth_mode:
+                if run_logger:
+                    run_logger.log_text("Block page detected; retrying with stealth mode...")
+                try:
+                    await page.close()
+                except Exception:
+                    pass
+                host = None
+                try:
+                    host = await page.evaluate("() => window.location.hostname")
+                except Exception:
+                    try:
+                        if url:
+                            host = urlparse(url).hostname
+                    except Exception:
+                        pass
+                new_ctx = await self._setup_playwright(True, host)
+                agent.browser = new_ctx
+                page = await agent.browser.new_page()
+                await page.goto(url)
+                try:
+                    await page.wait_for_load_state("domcontentloaded")
+                    await page.wait_for_load_state("networkidle")
+                except Exception:
+                    pass
+                stealth_mode = True
+        except Exception:
+            pass
         
         # Determine domain-specific screenshot directory (after navigation/redirects)
         domain_dir = config.screenshot_dir
@@ -518,7 +594,7 @@ class CurllmExecutor:
                     except Exception:
                         pass
                     items = await page.evaluate(
-                        """
+                        r"""
                         (thr) => {
                           const asNumber = (t) => {
                             const m = (t||'').replace(/\s/g,'').match(/(\d+[\.,]\d{2}|\d+)(?=\s*(?:zł|PLN|\$|€)?)/i);
@@ -593,6 +669,23 @@ class CurllmExecutor:
                     text = await page.evaluate("() => document.body.innerText")
                     emails = list(set(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", text)))
                     fallback["emails"] = emails[:100]
+                if "phone" in lower_instr or "tel" in lower_instr or "telefon" in lower_instr:
+                    text = await page.evaluate("() => document.body.innerText")
+                    phones_text = list(set(re.findall(r"(?:\+\d{1,3}[\s-]?)?(?:\(?\d{2,4}\)?[\s-]?)?\d[\d\s-]{6,}\d", text)))
+                    phones_tel = await page.evaluate(
+                        """
+                            () => Array.from(document.querySelectorAll('a[href^=\"tel:\"]'))
+                                .map(a => (a.getAttribute('href')||'')
+                                    .replace(/^tel:/,'')
+                                    .split('?')[0]
+                                    .trim())
+                                .filter(Boolean)
+                        """
+                    )
+                    def _norm(p: str) -> str:
+                        return p.replace(" ", "").replace("-", "")
+                    phones = list(sorted(set([_norm(p) for p in (phones_text + phones_tel) if p])))
+                    fallback["phones"] = phones[:100]
                 if not fallback:
                     ctx = await self._extract_page_context(page)
                     fallback = {"title": ctx.get("title"), "url": ctx.get("url")}
@@ -698,13 +791,23 @@ class CurllmExecutor:
         action_type = action.get("type")
         
         if action_type == "click":
-            await page.click(action["selector"])
+            try:
+                await page.wait_for_timeout(200 + int(random.random()*400))
+            except Exception:
+                pass
+            await page.click(action["selector"], timeout=5000)
         elif action_type == "fill":
             await page.fill(action["selector"], action["value"])
+            await page.wait_for_timeout(150 + int(random.random()*350))
         elif action_type == "scroll":
-            await page.evaluate("window.scrollBy(0, 500)")
+            dy = 300 + int(random.random()*700)
+            try:
+                await page.mouse.wheel(0, dy)
+            except Exception:
+                await page.evaluate(f"window.scrollBy(0, {dy})")
+            await page.wait_for_timeout(500 + int(random.random()*800))
         elif action_type == "wait":
-            await page.wait_for_timeout(1000)
+            await page.wait_for_timeout(800 + int(random.random()*1200))
     
     async def _detect_honeypot(self, page) -> bool:
         """Detect honeypot fields"""
@@ -729,6 +832,22 @@ class CurllmExecutor:
             }
         """)
         return honeypots
+
+    async def _is_block_page(self, page) -> bool:
+        """Detect common block/anti-bot pages"""
+        try:
+            txt = await page.evaluate("() => (document.body && document.body.innerText || '').slice(0, 4000).toLowerCase()")
+            markers = [
+                "you have been blocked",
+                "access denied",
+                "robot",
+                "are you human",
+                "verify you are human",
+                "captcha"
+            ]
+            return any(m in txt for m in markers)
+        except Exception:
+            return False
     
     async def _accept_cookies(self, page):
         """Attempt to accept cookie banners on common sites (best effort)"""

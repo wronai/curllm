@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-# Install system dependencies
+# Install minimal system dependencies; Playwright will install browser deps
 RUN apt-get update && apt-get install -y \
     curl \
     wget \
@@ -8,17 +8,7 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     tesseract-ocr \
     libtesseract-dev \
-    libglib2.0-0 \
-    libnss3 \
-    libgconf-2-4 \
-    libfontconfig1 \
-    libxss1 \
-    libappindicator3-1 \
-    libasound2 \
-    libxtst6 \
-    xdg-utils \
     fonts-liberation \
-    libgbm1 \
     jq \
     && rm -rf /var/lib/apt/lists/*
 
@@ -41,14 +31,15 @@ COPY curllm /usr/local/bin/curllm
 RUN chmod +x /usr/local/bin/curllm
 
 # Create necessary directories
-RUN mkdir -p ./screenshots /var/log/curllm
+RUN mkdir -p /app/screenshots /app/logs /app/workspace/storage
 
 # Expose port
 EXPOSE 8000
 
 # Set environment variables
-ENV PYTHONUNBUFFERED=1
-ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+ENV PYTHONUNBUFFERED=1 \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
+    CURLLM_SCREENSHOT_DIR=/app/screenshots
 
 # Run the server
 CMD ["python", "curllm_server.py"]

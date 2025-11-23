@@ -250,19 +250,39 @@ example-bql:
 
 # Release
 
+version-bump:
+    @echo "Bumping patch version in pyproject.toml..."
+    @python3 - <<'PY'
+import re, sys
+p = 'pyproject.toml'
+with open(p, 'r', encoding='utf-8') as f:
+    s = f.read()
+m = re.search(r'(?m)^version\s*=\s*"(\d+)\.(\d+)\.(\d+)"', s)
+if not m:
+    print("Could not find version in pyproject.toml", file=sys.stderr)
+    sys.exit(1)
+major, minor, patch = map(int, m.groups())
+new = f"{major}.{minor}.{patch+1}"
+s = re.sub(r'(?m)^version\s*=\s*".*?"', f'version = "{new}"', s, count=1)
+with open(p, 'w', encoding='utf-8') as f:
+    f.write(s)
+print(new)
+PY
+
 release:
-	@echo "Preparing release..."
-	@python3 -m pip install -U build twine >/dev/null 2>&1 || true
-	@python3 -m build
-	@python3 -m twine check dist/*
+    @echo "Preparing release..."
+    @rm -rf dist build 2>/dev/null || true
+    @python3 -m pip install -U build twine >/dev/null 2>&1 || true
+    @python3 -m build
+    @python3 -m twine check dist/*
 
-publish: release
-	@echo "Publishing to PyPI..."
-	python3 -m twine upload --non-interactive dist/*
+publish: version-bump release
+    @echo "Publishing to PyPI..."
+    @TWINE_USERNAME=$${TWINE_USERNAME:-__token__} python3 -m twine upload --non-interactive dist/*
 
-publish-test: release
-	@echo "Publishing to TestPyPI..."
-	python3 -m twine upload --repository testpypi --non-interactive dist/*
+publish-test: version-bump release
+    @echo "Publishing to TestPyPI..."
+    @TWINE_USERNAME=$${TWINE_USERNAME:-__token__} python3 -m twine upload --repository testpypi --non-interactive dist/*
 
 # Installation from scratch
 bootstrap:
