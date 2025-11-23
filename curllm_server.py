@@ -7,6 +7,7 @@ Supports visual analysis, CAPTCHA solving, and stealth mode
 import asyncio
 import base64
 import json
+import re
 import logging
 import os
 import sys
@@ -21,16 +22,20 @@ from flask_cors import CORS
 import aiohttp
 from dotenv import load_dotenv
 
-# Browser automation imports
+import inspect
+
+# Browser automation imports (optional) with robust fallback
 try:
-    from browser_use import Agent
+    from browser_use import Agent as BrowserUseAgent
 except Exception:
-    class Agent:
-        def __init__(self, browser, llm, max_steps, visual_mode):
-            self.browser = browser
-            self.llm = llm
-            self.max_steps = max_steps
-            self.visual_mode = visual_mode
+    BrowserUseAgent = None
+
+class LocalAgent:
+    def __init__(self, browser, llm, max_steps, visual_mode, task=None):
+        self.browser = browser
+        self.llm = llm
+        self.max_steps = max_steps
+        self.visual_mode = visual_mode
 from langchain_ollama import OllamaLLM
 from playwright.async_api import async_playwright
 from PIL import Image
@@ -117,11 +122,10 @@ class CurllmExecutor:
             # Setup browser context
             browser_context = await self._setup_browser(stealth_mode)
             
-            # Create agent
-            agent = Agent(
-                browser=browser_context,
-                llm=self.llm,
-                max_steps=config.max_steps,
+            # Create agent (supports browser_use.Agent if available; else LocalAgent)
+            agent = self._create_agent(
+                browser_context=browser_context,
+                instruction=instruction,
                 visual_mode=visual_mode
             )
             
@@ -152,6 +156,24 @@ class CurllmExecutor:
                 "error": str(e),
                 "timestamp": datetime.now().isoformat()
             }
+
+    def _create_agent(self, browser_context, instruction: str, visual_mode: bool):
+        """Instantiate an Agent compatible with different browser_use versions."""
+        if BrowserUseAgent is not None:
+            try:
+                params = inspect.signature(BrowserUseAgent.__init__).parameters
+                kwargs = {
+                    "browser": browser_context,
+                    "llm": self.llm,
+                    "max_steps": config.max_steps,
+                    "visual_mode": visual_mode,
+                }
+                if "task" in params:
+                    kwargs["task"] = instruction
+                return BrowserUseAgent(**kwargs)
+            except Exception as e:
+                logger.warning(f"browser_use.Agent init failed: {e}. Falling back to LocalAgent.")
+        return LocalAgent(browser_context, self.llm, config.max_steps, visual_mode, task=instruction)
     
     async def _setup_browser(self, stealth_mode: bool):
         """Setup browser with optional stealth mode"""
@@ -254,6 +276,29 @@ class CurllmExecutor:
             if await self._detect_honeypot(page):
                 logger.warning("Honeypot detected, skipping field")
         
+        # Fallback extraction if no result produced
+        if result.get("data") is None:
+            try:
+                lower_instr = (instruction or "").lower()
+                fallback = {}
+                if "link" in lower_instr:
+                    anchors = await agent.browser.evaluate("""
+                        () => Array.from(document.querySelectorAll('a')).map(a => ({
+                            text: (a.innerText||'').trim(),
+                            href: a.href
+                        }))
+                    """)
+                    fallback["links"] = anchors[:100]
+                if "email" in lower_instr or "mail" in lower_instr:
+                    text = await agent.browser.evaluate("() => document.body.innerText")
+                    emails = list(set(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", text)))
+                    fallback["emails"] = emails[:100]
+                if not fallback:
+                    ctx = await self._extract_page_context(page)
+                    fallback = {"title": ctx.get("title"), "url": ctx.get("url")}
+                result["data"] = fallback
+            except Exception as _:
+                pass
         await page.close()
         return result
     

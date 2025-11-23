@@ -24,6 +24,10 @@ help:
 	@echo "  make dev          - Start in development mode"
 	@echo "  make lint         - Run code linting"
 	@echo "  make format       - Format code"
+	@echo "  make examples     - Generate runnable scripts in examples/"
+	@echo "  make release      - Build sdist/wheel into dist/"
+	@echo "  make publish      - Upload dist/* to PyPI using TWINE env token"
+	@echo "  make publish-test - Upload dist/* to TestPyPI using TWINE env token"
 
 # Installation targets
 install:
@@ -168,6 +172,13 @@ format:
 	@python3 -m black *.py --line-length=120
 	@python3 -m isort *.py
 
+# Docs & examples
+examples:
+	@echo "Generating example scripts..."
+	@chmod +x tools/generate_examples.sh || true
+	@bash tools/generate_examples.sh
+	@echo "Done. See examples/curllm-*.sh"
+
 # Utilities
 clean:
 	@echo "Cleaning temporary files..."
@@ -211,14 +222,31 @@ example-bql:
 	@curllm --bql -d 'query { page(url: "https://example.com") { title links { href text } } }'
 
 # Release
+
 release:
 	@echo "Preparing release..."
+	@python3 -m pip install -U build twine >/dev/null 2>&1 || true
 	@python3 -m build
-	@twine check dist/*
+	@python3 -m twine check dist/*
 
 publish: release
 	@echo "Publishing to PyPI..."
-	@twine upload dist/*
+	@echo "Using TWINE_USERNAME=__token__ and TWINE_PASSWORD (or PYPI_TOKEN) from environment"
+	@set -e; \
+	if [ -z "$$TWINE_PASSWORD" ] && [ -z "$$PYPI_TOKEN" ]; then \
+		echo "Error: Set TWINE_PASSWORD or PYPI_TOKEN environment variable"; exit 1; \
+	fi; \
+	if [ -n "$$PYPI_TOKEN" ]; then export TWINE_USERNAME=__token__; export TWINE_PASSWORD=$$PYPI_TOKEN; fi; \
+	python3 -m twine upload --non-interactive dist/*
+
+publish-test: release
+	@echo "Publishing to TestPyPI..."
+	@set -e; \
+	if [ -z "$$TWINE_PASSWORD" ] && [ -z "$$PYPI_TOKEN" ]; then \
+		echo "Error: Set TWINE_PASSWORD or PYPI_TOKEN environment variable"; exit 1; \
+	fi; \
+	if [ -n "$$PYPI_TOKEN" ]; then export TWINE_USERNAME=__token__; export TWINE_PASSWORD=$$PYPI_TOKEN; fi; \
+	python3 -m twine upload --repository testpypi --non-interactive dist/*
 
 # Installation from scratch
 bootstrap:

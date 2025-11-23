@@ -36,6 +36,13 @@ NC='\033[0m' # No Color
 # Version info
 VERSION="1.0.0"
 
+# Debug logger
+dbg() {
+    if [ "$CURLLM_DEBUG" = "true" ] || [ "$VERBOSE" = true ]; then
+        echo -e "${YELLOW}[DEBUG]${NC} $*"
+    fi
+}
+
 # Parse command line arguments
 METHOD="GET"
 URL=""
@@ -102,17 +109,22 @@ check_services() {
     
     # Check Ollama
     local OLLAMA_OK=false
+    dbg "Checking Ollama at ${CURLLM_OLLAMA_HOST}"
     if curl -s "${CURLLM_OLLAMA_HOST}/api/tags" > /dev/null 2>&1; then
         echo -e "${GREEN}✓ Ollama is running${NC}"
         OLLAMA_OK=true
     else
+        dbg "Primary Ollama check failed. Probing candidates..."
+        dbg "Candidates: ${CURLLM_OLLAMA_PORT} $(cat /tmp/ollama_port 2>/dev/null) 11434 11435 11436"
         for p in "${CURLLM_OLLAMA_PORT}" $(cat /tmp/ollama_port 2>/dev/null) 11434 11435 11436; do
+            dbg "Probing http://localhost:${p}/api/tags"
             if [ -n "$p" ] && curl -s "http://localhost:${p}/api/tags" > /dev/null 2>&1; then
                 CURLLM_OLLAMA_HOST="http://localhost:${p}"
                 echo ${p} > /tmp/ollama_port
                 [ -f .env ] || touch .env
                 if grep -q '^CURLLM_OLLAMA_PORT=' .env; then sed -i "s/^CURLLM_OLLAMA_PORT=.*/CURLLM_OLLAMA_PORT=${p}/" .env; else echo "CURLLM_OLLAMA_PORT=${p}" >> .env; fi
                 if grep -q '^CURLLM_OLLAMA_HOST=' .env; then sed -i "s#^CURLLM_OLLAMA_HOST=.*#CURLLM_OLLAMA_HOST=http://localhost:${p}#" .env; else echo "CURLLM_OLLAMA_HOST=http://localhost:${p}" >> .env; fi
+                dbg "Detected existing Ollama at port ${p}. .env updated."
                 echo -e "${GREEN}✓ Ollama is running${NC}"
                 OLLAMA_OK=true
                 break
@@ -127,16 +139,20 @@ check_services() {
     
     # Check API server (with fallback to detected port)
     local API_OK=false
+    dbg "Checking API at ${CURLLM_API_HOST}/health"
     if curl -s "${CURLLM_API_HOST}/health" > /dev/null 2>&1; then
         API_OK=true
     else
+        dbg "Primary API check failed. Trying fallback from /tmp/curllm_api_port"
         if [ -f /tmp/curllm_api_port ]; then
             local ap=$(cat /tmp/curllm_api_port)
+            dbg "Probing http://localhost:${ap}/health"
             if curl -s "http://localhost:${ap}/health" > /dev/null 2>&1; then
                 CURLLM_API_HOST="http://localhost:${ap}"
                 [ -f .env ] || touch .env
                 if grep -q '^CURLLM_API_PORT=' .env; then sed -i "s/^CURLLM_API_PORT=.*/CURLLM_API_PORT=${ap}/" .env; else echo "CURLLM_API_PORT=${ap}" >> .env; fi
                 if grep -q '^CURLLM_API_HOST=' .env; then sed -i "s#^CURLLM_API_HOST=.*#CURLLM_API_HOST=http://localhost:${ap}#" .env; else echo "CURLLM_API_HOST=http://localhost:${ap}" >> .env; fi
+                dbg ".env API updated to port ${ap}"
                 API_OK=true
             fi
         fi
@@ -171,11 +187,16 @@ start_services() {
     echo -e "${BLUE}Starting curllm services...${NC}"
     
     PORT=${CURLLM_API_PORT:-$(if [ -f /tmp/curllm_api_port ]; then cat /tmp/curllm_api_port; else echo 8000; fi)}
+    INIT_PORT=$PORT
     while ss -ltn | grep -q ":${PORT}\b"; do PORT=$((PORT+1)); done
+    if [ "$PORT" != "$INIT_PORT" ]; then dbg "API port ${INIT_PORT} busy; selected ${PORT}"; fi
     OPORT=${CURLLM_OLLAMA_PORT:-$(if [ -f /tmp/ollama_port ]; then cat /tmp/ollama_port; else echo 11434; fi)}
+    INIT_OPORT=$OPORT
     while ss -ltn | grep -q ":${OPORT}\b"; do OPORT=$((OPORT+1)); done
+    if [ "$OPORT" != "$INIT_OPORT" ]; then dbg "Ollama port ${INIT_OPORT} busy; selected ${OPORT}"; fi
     echo ${PORT} > /tmp/curllm_api_port
     echo ${OPORT} > /tmp/ollama_port
+    dbg "Persisted /tmp/curllm_api_port=${PORT}, /tmp/ollama_port=${OPORT}"
     # Persist selected ports and hosts to .env for future runs
     if [ ! -f .env ]; then touch .env; fi
     if grep -q '^CURLLM_API_PORT=' .env; then
@@ -198,6 +219,7 @@ start_services() {
     else
         echo "CURLLM_OLLAMA_HOST=http://localhost:${OPORT}" >> .env
     fi
+    dbg "Updated .env (API ${PORT}, OLLAMA ${OPORT})"
 
     if ! pgrep -x "ollama" > /dev/null; then
         echo "Starting Ollama..."
@@ -205,10 +227,15 @@ start_services() {
         sleep 2
     else
         # Detect existing Ollama port (prefer current env/.env, then common defaults)
+        dbg "Ollama process already running; probing ports to detect host..."
         for p in "${CURLLM_OLLAMA_PORT}" $(cat /tmp/ollama_port 2>/dev/null) 11434 11435 11436; do
+            dbg "Probing http://localhost:${p}/api/tags"
             if [ -n "$p" ] && curl -s "http://localhost:${p}/api/tags" > /dev/null 2>&1; then
                 OPORT="$p"
                 echo ${OPORT} > /tmp/ollama_port
+                if grep -q '^CURLLM_OLLAMA_PORT=' .env; then sed -i "s/^CURLLM_OLLAMA_PORT=.*/CURLLM_OLLAMA_PORT=${OPORT}/" .env; else echo "CURLLM_OLLAMA_PORT=${OPORT}" >> .env; fi
+                if grep -q '^CURLLM_OLLAMA_HOST=' .env; then sed -i "s#^CURLLM_OLLAMA_HOST=.*#CURLLM_OLLAMA_HOST=http://localhost:${OPORT}#" .env; else echo "CURLLM_OLLAMA_HOST=http://localhost:${OPORT}" >> .env; fi
+                dbg "Detected existing Ollama at port ${OPORT}. .env updated."
                 break
             fi
         done
@@ -226,12 +253,47 @@ start_services() {
         # Find Python script location
         SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
         SCRIPT_DIR="$( dirname "${SCRIPT_PATH}" )"
-        if [ -f "$SCRIPT_DIR/curllm_server.py" ]; then
-            CURLLM_API_PORT=${PORT} CURLLM_OLLAMA_HOST="http://localhost:${OPORT}" python3 "$SCRIPT_DIR/curllm_server.py" > /tmp/curllm.log 2>&1 &
+        dbg "BASH_SOURCE[0]=${BASH_SOURCE[0]}"
+        dbg "Resolved SCRIPT_PATH=${SCRIPT_PATH}"
+        dbg "Resolved SCRIPT_DIR=${SCRIPT_DIR}"
+        # Fallback search for curllm_server.py
+        CANDIDATES=(
+            "$SCRIPT_DIR/curllm_server.py"
+            "$(dirname "$SCRIPT_DIR")/curllm_server.py"
+            "$PWD/curllm_server.py"
+            "$(dirname "$PWD")/curllm_server.py"
+        )
+        SERVER_PATH=""
+        for c in "${CANDIDATES[@]}"; do
+            dbg "Checking server candidate: $c"
+            if [ -f "$c" ]; then SERVER_PATH="$c"; break; fi
+        done
+        if [ -z "$SERVER_PATH" ]; then
+            # Try to locate curllm_server module via Python import (pip-installed site-packages)
+            SERVER_PATH_PY=$(python3 - <<'PY'
+import importlib, inspect
+try:
+    m = importlib.import_module('curllm_server')
+    print(inspect.getfile(m))
+except Exception:
+    pass
+PY
+)
+            if [ -n "$SERVER_PATH_PY" ] && [ -f "$SERVER_PATH_PY" ]; then
+                SERVER_PATH="$SERVER_PATH_PY"
+                dbg "Found server via Python import: $SERVER_PATH"
+            fi
+        fi
+        if [ -n "$SERVER_PATH" ]; then
+            dbg "Using server path: $SERVER_PATH"
+            CURLLM_API_PORT=${PORT} CURLLM_OLLAMA_HOST="http://localhost:${OPORT}" python3 "$SERVER_PATH" > /tmp/curllm.log 2>&1 &
             echo $! > /tmp/curllm.pid
             sleep 3
         else
             echo -e "${RED}Error: curllm_server.py not found${NC}"
+            echo "Searched paths:"
+            for c in "${CANDIDATES[@]}"; do echo "  - $c"; done
+            echo "Tip: ensure the curllm script points to the repository version (symlink) or run from repo root."
             return 1
         fi
     fi
@@ -383,6 +445,11 @@ main() {
     
     # Build request payload
     DATA_JSON=$( [ -z "$DATA" ] && echo '""' || printf '%s' "$DATA" | jq -Rs '.' )
+    if [ ${#HEADERS[@]} -eq 0 ]; then
+        HEADERS_JSON='[]'
+    else
+        HEADERS_JSON=$(printf '%s\n' "${HEADERS[@]}" | jq -R . | jq -s .)
+    fi
     PAYLOAD=$(cat <<EOF
 {
     "method": "$METHOD",
@@ -393,7 +460,7 @@ main() {
     "captcha_solver": $CAPTCHA_SOLVER,
     "use_bql": $USE_BQL,
     "model": "$CURLLM_MODEL",
-    "headers": $(printf '%s\n' "${HEADERS[@]}" | jq -R . | jq -s .)
+    "headers": $HEADERS_JSON
 }
 EOF
     )

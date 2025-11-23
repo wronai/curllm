@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "curllm"
+version = "1.0.0"
+description = "Browser Automation with Local LLM (8GB GPU compatible)"
+readme = "README.md"
+authors = [
+  { name = "Softreck" }
+]
+license = { text = "Apache" }
+requires-python = ">=3.11"
+keywords = ["llm", "browser", "automation", "scraping", "ollama", "playwright"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: POSIX :: Linux",
+  "Framework :: Flask",
+  "Topic :: Internet :: WWW/HTTP",
+]
+dependencies = [
+  "flask",
+  "flask-cors",
+  "aiohttp",
+  "playwright",
+  "langchain-ollama",
+  "pillow",
+  "opencv-python",
+  "pytesseract",
+  "numpy",
+  "websockets",
+  "requests",
+  "python-dotenv",
+]
+
+[project.urls]
+Homepage = "https://github.com/softreck/curllm"
+Issues = "https://github.com/softreck/curllm/issues"
+
+[tool.setuptools]
+# Install non-Python CLI script
+scripts = ["curllm"]
+
+[tool.setuptools.py-modules]
+# Single-file Python modules to include
+py-modules = ["curllm_server", "bql_parser"]

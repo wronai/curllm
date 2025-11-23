@@ -37,6 +37,13 @@
 make install
 ```
 
+## 📚 More Documentation & Example Scripts
+
+- Full examples with commands and context: docs/EXAMPLES.md
+- Generate runnable scripts: make examples
+  - Scripts are created in examples/ as executable files (curllm-*.sh)
+  - Run with: ./examples/curllm-extract-links.sh
+
 ```shell
 Installing curllm dependencies...
 ╔════════════════════════════════════════════╗
@@ -104,6 +111,11 @@ curllm --bql -d 'query {
 ```
 
 ## 🎯 Examples
+
+For a comprehensive, curated set of examples and ready-to-run scripts, see:
+
+- docs/EXAMPLES.md
+- Generate scripts: make examples (scripts are created in examples/ as curllm-*.sh)
 
 ### Extract Data from Dynamic Pages
 
