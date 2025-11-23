@@ -101,21 +101,52 @@ check_services() {
     local all_good=true
     
     # Check Ollama
-    if ! curl -s "${CURLLM_OLLAMA_HOST}/api/tags" > /dev/null 2>&1; then
-        echo -e "${RED}✗ Ollama is not running${NC}"
-        echo "  Run: ollama serve"
-        all_good=false
-    else
+    local OLLAMA_OK=false
+    if curl -s "${CURLLM_OLLAMA_HOST}/api/tags" > /dev/null 2>&1; then
         echo -e "${GREEN}✓ Ollama is running${NC}"
+        OLLAMA_OK=true
+    else
+        for p in "${CURLLM_OLLAMA_PORT}" $(cat /tmp/ollama_port 2>/dev/null) 11434 11435 11436; do
+            if [ -n "$p" ] && curl -s "http://localhost:${p}/api/tags" > /dev/null 2>&1; then
+                CURLLM_OLLAMA_HOST="http://localhost:${p}"
+                echo ${p} > /tmp/ollama_port
+                [ -f .env ] || touch .env
+                if grep -q '^CURLLM_OLLAMA_PORT=' .env; then sed -i "s/^CURLLM_OLLAMA_PORT=.*/CURLLM_OLLAMA_PORT=${p}/" .env; else echo "CURLLM_OLLAMA_PORT=${p}" >> .env; fi
+                if grep -q '^CURLLM_OLLAMA_HOST=' .env; then sed -i "s#^CURLLM_OLLAMA_HOST=.*#CURLLM_OLLAMA_HOST=http://localhost:${p}#" .env; else echo "CURLLM_OLLAMA_HOST=http://localhost:${p}" >> .env; fi
+                echo -e "${GREEN}✓ Ollama is running${NC}"
+                OLLAMA_OK=true
+                break
+            fi
+        done
+        if [ "$OLLAMA_OK" != true ]; then
+            echo -e "${RED}✗ Ollama is not running${NC}"
+            echo "  Run: ollama serve"
+            all_good=false
+        fi
     fi
     
-    # Check API server
-    if ! curl -s "${CURLLM_API_HOST}/health" > /dev/null 2>&1; then
+    # Check API server (with fallback to detected port)
+    local API_OK=false
+    if curl -s "${CURLLM_API_HOST}/health" > /dev/null 2>&1; then
+        API_OK=true
+    else
+        if [ -f /tmp/curllm_api_port ]; then
+            local ap=$(cat /tmp/curllm_api_port)
+            if curl -s "http://localhost:${ap}/health" > /dev/null 2>&1; then
+                CURLLM_API_HOST="http://localhost:${ap}"
+                [ -f .env ] || touch .env
+                if grep -q '^CURLLM_API_PORT=' .env; then sed -i "s/^CURLLM_API_PORT=.*/CURLLM_API_PORT=${ap}/" .env; else echo "CURLLM_API_PORT=${ap}" >> .env; fi
+                if grep -q '^CURLLM_API_HOST=' .env; then sed -i "s#^CURLLM_API_HOST=.*#CURLLM_API_HOST=http://localhost:${ap}#" .env; else echo "CURLLM_API_HOST=http://localhost:${ap}" >> .env; fi
+                API_OK=true
+            fi
+        fi
+    fi
+    if [ "$API_OK" = true ]; then
+        echo -e "${GREEN}✓ curllm API is running${NC}"
+    else
         echo -e "${RED}✗ curllm API server is not running${NC}"
         echo "  Run: curllm --start-services"
         all_good=false
-    else
-        echo -e "${GREEN}✓ curllm API is running${NC}"
     fi
     
     # Check if model exists
@@ -193,7 +224,8 @@ start_services() {
     if ! curl -s "http://localhost:${PORT}/health" > /dev/null 2>&1; then
         echo "Starting curllm API server..."
         # Find Python script location
-        SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+        SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+        SCRIPT_DIR="$( dirname "${SCRIPT_PATH}" )"
         if [ -f "$SCRIPT_DIR/curllm_server.py" ]; then
             CURLLM_API_PORT=${PORT} CURLLM_OLLAMA_HOST="http://localhost:${OPORT}" python3 "$SCRIPT_DIR/curllm_server.py" > /tmp/curllm.log 2>&1 &
             echo $! > /tmp/curllm.pid
