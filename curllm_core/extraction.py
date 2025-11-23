@@ -204,3 +204,58 @@ async def _page_context_min(page) -> Dict[str, Any]:
         () => ({ title: document.title, url: window.location.href })
         """
     )
+
+
+async def extract_articles_eval(page) -> Optional[list[Dict[str, Any]]]:
+    """Deterministic article titles extraction using DOM evaluation.
+    Returns a list of {title, url} or None if nothing meaningful was found.
+    """
+    items = await page.evaluate(
+        r"""
+        () => {
+          const uniq = new Set();
+          const out = [];
+          const push = (title, url) => {
+            title = (title||'').trim();
+            if (!title) return;
+            if (url) url = String(url).trim();
+            const key = (url||'') + '|' + title.toLowerCase();
+            if (uniq.has(key)) return; uniq.add(key);
+            out.push({title, url: url||null});
+          };
+          const selAnchors = [
+            'article h1 a','article h2 a','article h3 a',
+            'main h1 a','main h2 a','main h3 a',
+            'section h1 a','section h2 a','section h3 a'
+          ];
+          selAnchors.forEach(s => {
+            document.querySelectorAll(s).forEach(a => push(a.innerText, a.href));
+          });
+          const selHeadings = ['article h1','article h2','article h3'];
+          selHeadings.forEach(s => {
+            document.querySelectorAll(s).forEach(h => {
+              let url = null;
+              let a = h.querySelector('a[href]');
+              if (a) url = a.href; else {
+                // try nearest following/preceding anchor
+                let parentA = h.closest('a[href]');
+                if (parentA) url = parentA.href;
+              }
+              push(h.innerText, url);
+            });
+          });
+          // As a fallback, anchors in main/section that look like posts by href pattern
+          const pat = /(blog|post|wpis|article|artyk|news|aktualno)/i;
+          document.querySelectorAll('main a[href], section a[href]').forEach(a => {
+            const t = (a.innerText||'').trim();
+            if (!t) return;
+            const href = a.getAttribute('href')||'';
+            if (pat.test(href)) push(t, a.href);
+          });
+          return out.slice(0, 40);
+        }
+        """
+    )
+    if isinstance(items, list) and items:
+        return items
+    return None

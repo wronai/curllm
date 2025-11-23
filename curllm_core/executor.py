@@ -39,6 +39,7 @@ from .captcha_widget import handle_captcha_image as _handle_captcha_image_widget
 from .page_utils import auto_scroll as _auto_scroll, accept_cookies as _accept_cookies, is_block_page as _is_block_page
 from .extraction import generic_fastpath, direct_fastpath, product_heuristics, fallback_extract
 from .captcha_slider import attempt_slider_challenge
+from .slider_plugin import try_external_slider_solver
 
 logger = logging.getLogger(__name__)
 
@@ -277,7 +278,15 @@ class CurllmExecutor:
                     run_logger.log_kv("widget_captcha_on_nav", str(bool(solved)))
                 except Exception as e:
                     run_logger.log_kv("widget_captcha_on_nav_error", str(e))
-            # Attempt slider CAPTCHA (best-effort) regardless of captcha_solver
+            # Attempt slider CAPTCHA
+            if bool(runtime.get("use_external_slider_solver")):
+                try:
+                    ext = await try_external_slider_solver(page, run_logger)
+                    if ext is not None:
+                        run_logger.log_kv("ext_slider_solver_on_nav", str(bool(ext)))
+                except Exception as e:
+                    run_logger.log_kv("ext_slider_solver_on_nav_error", str(e))
+            # Always attempt internal heuristic as best-effort too
             try:
                 slid = await attempt_slider_challenge(page, run_logger)
                 if slid:
@@ -438,8 +447,15 @@ class CurllmExecutor:
                 run_logger.log_kv("iframes_count", str(ifr_len))
                 run_logger.log_kv("headings_count", str(head_len))
                 run_logger.log_kv("article_candidates_count", str(artc_len))
-                # If looks like slider block (no content, only iframe), try a drag attempt once per step
+                # If looks like slider block (no content, only iframe), try plugin and/or drag attempt once per step
                 if inter_len == 0 and dom_len < 300 and ifr_len > 0:
+                    if bool(runtime.get("use_external_slider_solver")):
+                        try:
+                            ext2 = await try_external_slider_solver(page, run_logger)
+                            if ext2 is not None:
+                                run_logger.log_kv("ext_slider_solver_on_step", str(bool(ext2)))
+                        except Exception as e:
+                            run_logger.log_kv("ext_slider_solver_on_step_error", str(e))
                     try:
                         slid_step = await attempt_slider_challenge(page, run_logger)
                         if slid_step:

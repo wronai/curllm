@@ -40,7 +40,76 @@ async def generate_action(llm: Any, instruction: str, page_context: Dict, step: 
     if run_logger:
         run_logger.log_text("LLM Raw Response:")
         run_logger.log_code("json", text)
+    # Robust JSON parsing: strip code fences, then load; if fails, extract first JSON object by brace matching
+    def _strip_fences(s: str) -> str:
+        s = s.strip()
+        if s.startswith("```"):
+            # remove first fence line
+            s = s.split("\n", 1)[1] if "\n" in s else s
+            # remove trailing fence
+            if s.rstrip().endswith("```"):
+                s = s.rsplit("```", 1)[0]
+        return s.strip()
+
+    raw = _strip_fences(text)
+    # Strategy 1: direct JSON
     try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        return {"type": "wait"}
+        return json.loads(raw)
+    except Exception:
+        pass
+    # Strategy 2: find first balanced JSON object, ignoring braces in strings
+    def _first_json_object(s: str) -> str | None:
+        start = -1
+        depth = 0
+        in_str = False
+        esc = False
+        for i, ch in enumerate(s):
+            if in_str:
+                if esc:
+                    esc = False
+                elif ch == '\\':
+                    esc = True
+                elif ch == '"':
+                    in_str = False
+                continue
+            else:
+                if ch == '"':
+                    in_str = True
+                    continue
+                if ch == '{':
+                    if depth == 0:
+                        start = i
+                    depth += 1
+                    continue
+                if ch == '}' and depth > 0:
+                    depth -= 1
+                    if depth == 0 and start != -1:
+                        return s[start : i + 1]
+        return None
+
+    try:
+        cand = _first_json_object(raw)
+        if cand:
+            return json.loads(cand)
+    except Exception as e:
+        if run_logger:
+            run_logger.log_text("Planner parse error (balanced scan):")
+            run_logger.log_code("text", str(e))
+    # Strategy 3: incremental closing brace trial
+    try:
+        start = raw.find('{')
+        if start != -1:
+            positions = [i for i, ch in enumerate(raw, start=0) if ch == '}']
+            for pos in positions:
+                if pos <= start:
+                    continue
+                sl = raw[start : pos + 1]
+                try:
+                    return json.loads(sl)
+                except Exception:
+                    continue
+    except Exception as e:
+        if run_logger:
+            run_logger.log_text("Planner parse error (incremental):")
+            run_logger.log_code("text", str(e))
+    return {"type": "wait"}
