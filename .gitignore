@@ -5,6 +5,7 @@ dsl.sqlite
 dsl.sqlite.*.bak
 data/
 generated/
+screenshots/
 # Logs
 logs
 *.log
