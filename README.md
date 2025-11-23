@@ -174,6 +174,27 @@ curllm "https://www.prototypowanie.pl/kontakt/" -d "extract all links"
 ```bash
 curllm "https://www.prototypowanie.pl/kontakt/" -d "extract all email addresses"
 ```
+```bash
+{
+  "emails": [
+    "info@prototypowanie.pl"
+  ]
+}
+```
+
+- Extract emails
+```bash
+curllm "https://4coils.eu" -d "extract all email addresses"
+```
+output:
+```bash
+{
+  "emails": [
+    "office@4coils.eu",
+    "sales@4coils.eu"
+  ]
+}
+```
 
 - Visual mode / Stealth mode
 
