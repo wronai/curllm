@@ -219,14 +219,15 @@ curllm --visual "https://allegro.com" \
 ```
 
 ### Create screenshot in folder name of domain
-
+command:
 ```bash
 curllm "https://www.prototypowanie.pl"  -d "Create screenshot in folder name of domain"
 ```
-
+output:
 ```shell
 {"result":{"screenshot_saved":"screenshots/www.prototypowanie.pl/step_0_1763903516.803199.png"},"run_log":"logs/run-20251123-141151.md","screenshots":["screenshots/www.prototypowanie.pl/step_0_1763903516.803199.png"],"steps_taken":0,"success":true,"timestamp":"2025-11-23T14:11:57.025193"}
 ```
+screenshot:
 ![step_0_1763903516.803199.png](screenshots/www.prototypowanie.pl/step_0_1763903516.803199.png)
 
 ### Handle 2FA Authentication

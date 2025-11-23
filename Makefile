@@ -251,8 +251,8 @@ example-bql:
 # Release
 
 version-bump:
-    @echo "Bumping patch version in pyproject.toml..."
-    @python3 - <<'PY'
+	@echo "Bumping patch version in pyproject.toml..."
+	@python3 - <<-'PY'
 import re, sys
 p = 'pyproject.toml'
 with open(p, 'r', encoding='utf-8') as f:
@@ -270,19 +270,19 @@ print(new)
 PY
 
 release:
-    @echo "Preparing release..."
-    @rm -rf dist build 2>/dev/null || true
-    @python3 -m pip install -U build twine >/dev/null 2>&1 || true
-    @python3 -m build
-    @python3 -m twine check dist/*
+	@echo "Preparing release..."
+	@rm -rf dist build 2>/dev/null || true
+	@python3 -m pip install -U build twine >/dev/null 2>&1 || true
+	@python3 -m build
+	@python3 -m twine check dist/*
 
 publish: version-bump release
-    @echo "Publishing to PyPI..."
-    @TWINE_USERNAME=$${TWINE_USERNAME:-__token__} python3 -m twine upload --non-interactive dist/*
+	@echo "Publishing to PyPI..."
+	@TWINE_USERNAME=$${TWINE_USERNAME:-__token__} python3 -m twine upload --non-interactive dist/*
 
 publish-test: version-bump release
-    @echo "Publishing to TestPyPI..."
-    @TWINE_USERNAME=$${TWINE_USERNAME:-__token__} python3 -m twine upload --repository testpypi --non-interactive dist/*
+	@echo "Publishing to TestPyPI..."
+	@TWINE_USERNAME=$${TWINE_USERNAME:-__token__} python3 -m twine upload --repository testpypi --non-interactive dist/*
 
 # Installation from scratch
 bootstrap:
