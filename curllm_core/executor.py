@@ -269,6 +269,12 @@ class CurllmExecutor:
                 await self._handle_human_verification(page, run_logger)
             except Exception:
                 pass
+            # Attempt widget CAPTCHA solving right after navigation if enabled
+            if captcha_solver:
+                try:
+                    await self._handle_widget_captcha(page, current_url=url, run_logger=run_logger)
+                except Exception:
+                    pass
         else:
             page = await agent.browser.new_page()
         try:
@@ -464,6 +470,18 @@ class CurllmExecutor:
                 await self._handle_human_verification(page, run_logger)
             except Exception:
                 pass
+            # Try widget CAPTCHA solving per step if enabled
+            if captcha_solver:
+                try:
+                    # Try to obtain current URL from page if available
+                    cur_url = None
+                    try:
+                        cur_url = await page.evaluate("() => window.location.href")
+                    except Exception:
+                        cur_url = url
+                    await self._handle_widget_captcha(page, current_url=cur_url, run_logger=run_logger)
+                except Exception:
+                    pass
             page_context = await self._extract_page_context(page)
             try:
                 sig = f"{page_context.get('url','')}|{page_context.get('title','')}|{(page_context.get('text','') or '')[:500]}"
@@ -806,6 +824,11 @@ class CurllmExecutor:
             "potwierdź, że jesteś człowiekiem",
             "potwierdz, że jesteś człowiekiem",
             "potwierdzam",
+            "jestem człowiekiem",
+            "jestem czlowiekiem",
+            "przejdź dalej",
+            "przejdz dalej",
+            "kontynuuj",
             "confirm you are human",
             "verify you are human",
         ]
@@ -827,7 +850,7 @@ class CurllmExecutor:
         # Try various strategies to click the confirmation button
         clicked = False
         try:
-            btn = page.get_by_role("button", name=re.compile("potwierdzam|potwierdź|confirm", re.I))
+            btn = page.get_by_role("button", name=re.compile("potwierdzam|potwierdź|confirm|kontynuuj|przej(d|dz)\s+dalej|jestem", re.I))
             if await btn.count() > 0:
                 await btn.first.click(timeout=1500)
                 clicked = True
@@ -837,8 +860,15 @@ class CurllmExecutor:
             for sel in [
                 'button:has-text("Potwierdzam")',
                 'button:has-text("Potwierdź")',
+                'button:has-text("Kontynuuj")',
+                'button:has-text("Jestem człowiekiem")',
+                'button:has-text("Jestem czlowiekiem")',
+                'button:has-text("Przejdź dalej")',
+                'button:has-text("Przejdz dalej")',
                 'button[aria-label*="potwierd" i]',
                 '[role="button"]:has-text("Potwierdzam")',
+                '[role="button"]:has-text("Kontynuuj")',
+                '[role="button"]:has-text("Jestem człowiekiem")',
             ]:
                 try:
                     loc = page.locator(sel)
@@ -855,7 +885,10 @@ class CurllmExecutor:
                     """
                     () => {
                       const el = Array.from(document.querySelectorAll('button, a, [role=button]'))
-                        .find(e => (e.innerText||'').toLowerCase().includes('potwierdzam'));
+                        .find(e => {
+                          const t=(e.innerText||'').toLowerCase();
+                          return t.includes('potwierdzam') || t.includes('potwierdź') || t.includes('kontynuuj') || t.includes('jestem cz') || t.includes('przejdź dalej') || t.includes('przejdz dalej');
+                        });
                       if (el) el.click();
                     }
                     """
@@ -875,3 +908,79 @@ class CurllmExecutor:
                 except Exception:
                     pass
         return clicked
+
+    async def _handle_widget_captcha(self, page, current_url: Optional[str], run_logger: RunLogger | None = None) -> bool:
+        """Detect common widget CAPTCHAs (reCAPTCHA/hCaptcha/Turnstile) and solve via 2captcha.
+        Returns True if a token was obtained and injected.
+        """
+        # Find sitekey and type
+        try:
+            info = await page.evaluate(
+                """
+                () => {
+                  const q = (sel) => document.querySelector(sel);
+                  const byAttr = document.querySelector('[data-sitekey]');
+                  const recaptchaEl = q('.g-recaptcha[data-sitekey], [class*="recaptcha"][data-sitekey]') || (byAttr && /recaptcha/i.test(byAttr.className) ? byAttr : null);
+                  const hcaptchaEl = q('.h-captcha[data-sitekey]') || (byAttr && /hcaptcha/i.test(byAttr.className) ? byAttr : null);
+                  const turnstileEl = q('.cf-turnstile[data-sitekey]') || (byAttr && /turnstile/i.test(byAttr.className) ? byAttr : null);
+                  const getKey = (el) => el && (el.getAttribute('data-sitekey') || el.dataset.sitekey);
+                  if (recaptchaEl) return {type: 'recaptcha', sitekey: getKey(recaptchaEl)};
+                  if (hcaptchaEl) return {type: 'hcaptcha', sitekey: getKey(hcaptchaEl)};
+                  if (turnstileEl) return {type: 'turnstile', sitekey: getKey(turnstileEl)};
+                  // Try to infer from scripts
+                  const scripts = Array.from(document.scripts).map(s => s.src||'');
+                  if (scripts.some(s => /recaptcha\.google\.com|google\.com\/recaptcha/i.test(s))) return {type: 'recaptcha', sitekey: (q('[data-sitekey]')||{}).dataset?.sitekey || null};
+                  if (scripts.some(s => /hcaptcha\.com/i.test(s))) return {type: 'hcaptcha', sitekey: (q('[data-sitekey]')||{}).dataset?.sitekey || null};
+                  if (scripts.some(s => /challenges\.cloudflare\.com|turnstile/i.test(s))) return {type: 'turnstile', sitekey: (q('[data-sitekey]')||{}).dataset?.sitekey || null};
+                  return null;
+                }
+                """
+            )
+        except Exception:
+            info = None
+        if not info or not isinstance(info, dict) or not info.get('sitekey') or not info.get('type'):
+            return False
+        wtype = str(info.get('type'))
+        sitekey = str(info.get('sitekey'))
+        if not self.captcha_solver or not getattr(self.captcha_solver, 'solve_sitekey', None):
+            return False
+        token = await self.captcha_solver.solve_sitekey(wtype, sitekey, current_url or '')
+        if not token:
+            return False
+        # Inject token into expected response input(s)
+        try:
+            await page.evaluate(
+                """
+                (token) => {
+                  const ensureInput = (name) => {
+                    let el = document.querySelector('input[name="'+name+'"]');
+                    if (!el) { el = document.createElement('input'); el.type='hidden'; el.name=name; document.body.appendChild(el); }
+                    el.value = token;
+                  };
+                  // Common targets
+                  ensureInput('g-recaptcha-response');
+                  ensureInput('h-recaptcha-response');
+                  ensureInput('hcaptcha-response');
+                  ensureInput('cf-turnstile-response');
+                  // Fire events to notify frameworks
+                  ['g-recaptcha-response','h-recaptcha-response','hcaptcha-response','cf-turnstile-response'].forEach(n => {
+                    const el = document.querySelector('input[name="'+n+'"]');
+                    if (el) {
+                      el.dispatchEvent(new Event('change', {bubbles: true}));
+                      el.dispatchEvent(new Event('input', {bubbles: true}));
+                    }
+                  });
+                }
+                """,
+                token,
+            )
+        except Exception:
+            return False
+        if run_logger:
+            run_logger.log_text(f"Widget CAPTCHA solved via 2captcha ({wtype})")
+        # Give page time to process token
+        try:
+            await page.wait_for_timeout(1000)
+        except Exception:
+            pass
+        return True

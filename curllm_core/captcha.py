@@ -25,6 +25,51 @@ class CaptchaSolver:
         except Exception:
             return None
 
+    async def solve_sitekey(self, widget_type: str, sitekey: str, page_url: str) -> Optional[str]:
+        """Solve widget-based CAPTCHA via 2captcha using sitekey and pageurl.
+        widget_type: 'recaptcha' | 'hcaptcha' | 'turnstile'
+        Returns solution token or None.
+        """
+        if not self.use_2captcha or not self.api_key:
+            return None
+        import aiohttp  # lazy import
+        method_map = {
+            'recaptcha': 'userrecaptcha',
+            'hcaptcha': 'hcaptcha',
+            'turnstile': 'turnstile',
+        }
+        method = method_map.get(widget_type)
+        if not method:
+            return None
+        data = {
+            'key': self.api_key,
+            'method': method,
+            # 2captcha expects 'googlekey' for recaptcha and sitekey for others
+            'googlekey' if widget_type == 'recaptcha' else 'sitekey': sitekey,
+            'pageurl': page_url,
+            'json': 1,
+        }
+        async with aiohttp.ClientSession() as session:
+            async with session.post('http://2captcha.com/in.php', data=data) as resp:
+                up = await resp.json(content_type=None)
+            if not isinstance(up, dict) or up.get('status') != 1:
+                return None
+            captcha_id = up.get('request')
+            # Poll for result
+            for _ in range(24):  # ~ 2 min max
+                await asyncio.sleep(5)
+                async with session.get('http://2captcha.com/res.php', params={
+                    'key': self.api_key,
+                    'action': 'get',
+                    'id': captcha_id,
+                    'json': 1,
+                }) as r2:
+                    rs = await r2.json(content_type=None)
+                if isinstance(rs, dict) and rs.get('status') == 1:
+                    return rs.get('request')
+                # continue polling if 'CAPCHA_NOT_READY'
+            return None
+
     async def _solve_2captcha(self, image_path: str) -> Optional[str]:
         import aiohttp  # lazy import
         async with aiohttp.ClientSession() as session:
