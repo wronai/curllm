@@ -7,8 +7,8 @@ stworz kod, który moglby realizowac funkcje Testing Framework:
 dodaj przykłady uzycia w róznych jezykach programowania, jak np. bash, python, node.js, java, php
 
 
-Stwórz w folderze webtest/ przykłady testów w różnych językach programowania w celu pokazania w przeglądarce jak 
+Stwórz w folderze webtest/ przykłady testów i testowanego kodu w różnych językach programowania z folderem per jezyk z docker w celu pokazania w przeglądarce jak 
 działa w praktyce to rozwiązanie, przygotuj frontend i backend w python lub nodejs aby mozna bylo uruchamiać na VPS to rozwiążanie w docker
 aby była izolacja
-pozwol tez na uruchomienia lokalnie tej strony webtest na localhost
+pozwol tez na uruchomienia lokalnie tej strony webtest na localhost z docker
 

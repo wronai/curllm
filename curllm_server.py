@@ -479,6 +479,43 @@ class CurllmExecutor:
         except Exception:
             pass
         
+        # Early generic-extract fast-path: if instruction is too generic, avoid LLM loop
+        try:
+            lower_instr = (instruction or "").lower()
+            generic_triggers = ("extract" in lower_instr or "scrape" in lower_instr)
+            specific_keywords = ["link", "email", "mail", "phone", "tel", "telefon", "product", "produkt", "form", "screenshot", "captcha", "bql"]
+            if generic_triggers and not any(k in lower_instr for k in specific_keywords):
+                ctx = await self._extract_page_context(page)
+                try:
+                    text = await page.evaluate("() => document.body.innerText")
+                except Exception:
+                    text = ""
+                # Collect basic signals
+                anchors = await page.evaluate(
+                    """
+                        () => Array.from(document.querySelectorAll('a')).map(a => ({
+                            text: (a.innerText||'').trim(),
+                            href: a.href
+                        }))
+                    """
+                )
+                emails = list(set(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", text)))
+                phones = list(set(re.findall(r"(?:\+\d{1,3}[\s-]?)?(?:\(?\d{2,4}\)?[\s-]?)?\d[\d\s-]{6,}\d", text)))
+                result["data"] = {
+                    "title": ctx.get("title"),
+                    "url": ctx.get("url"),
+                    "links": anchors[:50],
+                    "emails": emails[:50],
+                    "phones": [p.replace(" ", "").replace("-", "") for p in phones][:50],
+                }
+                if run_logger:
+                    run_logger.log_text("Generic fast-path used (title/url/links/emails/phones)")
+                    run_logger.log_code("json", json.dumps(result["data"], indent=2))
+                await page.close()
+                return result
+        except Exception:
+            pass
+        
         # Direct extraction fast-path (avoid LLM for common queries)
         try:
             lower_instr = (instruction or "").lower()
@@ -550,6 +587,9 @@ class CurllmExecutor:
             pass
         
         # Main execution loop
+        last_sig = None
+        no_progress = 0
+        stall_limit = 3
         for step in range(config.max_steps):
             result["steps"] = step + 1
             if run_logger:
@@ -569,6 +609,23 @@ class CurllmExecutor:
             
             # Get page context
             page_context = await self._extract_page_context(page)
+            # No-progress detection based on URL+title+text snippet signature
+            try:
+                sig = f"{page_context.get('url','')}|{page_context.get('title','')}|{(page_context.get('text','') or '')[:500]}"
+                if last_sig is None:
+                    last_sig = sig
+                    no_progress = 0
+                elif sig == last_sig:
+                    no_progress += 1
+                else:
+                    last_sig = sig
+                    no_progress = 0
+                if no_progress >= stall_limit:
+                    if run_logger:
+                        run_logger.log_text(f"No progress detected for {stall_limit} consecutive steps. Stopping early.")
+                    break
+            except Exception:
+                pass
             if run_logger:
                 try:
                     run_logger.log_text("Page context snapshot (truncated):")
