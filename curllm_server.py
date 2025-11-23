@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Any
+from urllib.parse import urlparse
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -348,6 +349,7 @@ class CurllmExecutor:
             "steps": 0,
             "screenshots": []
         }
+        lower_instr = (instruction or "").lower()
         
         # Navigate to URL if provided
         if url:
@@ -355,6 +357,36 @@ class CurllmExecutor:
             await page.goto(url)
         else:
             page = await agent.browser.new_page()
+        
+        # Determine domain-specific screenshot directory (after navigation/redirects)
+        domain_dir = config.screenshot_dir
+        try:
+            host = await page.evaluate("() => window.location.hostname")
+            if host:
+                domain_dir = config.screenshot_dir / host
+                domain_dir.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            try:
+                # Fallback from input URL
+                if url:
+                    host = urlparse(url).hostname
+                    if host:
+                        domain_dir = config.screenshot_dir / host
+                        domain_dir.mkdir(parents=True, exist_ok=True)
+            except Exception:
+                pass
+        
+        # If instruction asks for screenshot, take one even without visual_mode
+        try:
+            if ("screenshot" in lower_instr) or ("zrzut" in lower_instr):
+                shot_path = await self._take_screenshot(page, 0, target_dir=domain_dir)
+                result["screenshots"].append(shot_path)
+                if run_logger:
+                    run_logger.log_text(f"Initial screenshot saved: {shot_path}")
+                # Also reflect in data
+                result["data"] = {"screenshot_saved": shot_path}
+        except Exception:
+            pass
         
         # Direct extraction fast-path (avoid LLM for common queries)
         try:
@@ -372,7 +404,7 @@ class CurllmExecutor:
                 direct["links"] = anchors[:100]
             if "email" in lower_instr or "mail" in lower_instr:
                 text = await page.evaluate("() => document.body.innerText")
-                emails_text = list(set(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}", text)))
+                emails_text = list(set(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", text)))
                 emails_mailto = await page.evaluate(
                     """
                         () => Array.from(document.querySelectorAll('a[href^=\"mailto:\"]'))
@@ -409,6 +441,14 @@ class CurllmExecutor:
                 phones = list(sorted(set([_norm(p) for p in (phones_text + phones_tel) if p])))
                 direct["phones"] = phones[:100]
             if direct:
+                # Apply 'only' filter if requested
+                if "only" in lower_instr and ("email" in lower_instr or "mail" in lower_instr or "phone" in lower_instr or "tel" in lower_instr or "telefon" in lower_instr):
+                    filtered = {}
+                    if ("email" in lower_instr or "mail" in lower_instr) and "emails" in direct:
+                        filtered["emails"] = direct["emails"]
+                    if ("phone" in lower_instr or "tel" in lower_instr or "telefon" in lower_instr) and "phones" in direct:
+                        filtered["phones"] = direct["phones"]
+                    direct = filtered
                 result["data"] = direct
                 if run_logger:
                     run_logger.log_text("Direct extraction fast-path used:")
@@ -426,7 +466,7 @@ class CurllmExecutor:
             
             # Take screenshot if visual mode
             if visual_mode:
-                screenshot_path = await self._take_screenshot(page, step)
+                screenshot_path = await self._take_screenshot(page, step, target_dir=domain_dir)
                 result["screenshots"].append(screenshot_path)
                 
                 # Analyze visual state
@@ -444,6 +484,53 @@ class CurllmExecutor:
                     run_logger.log_code("json", json.dumps(page_context, indent=2)[:1500])
                 except Exception:
                     pass
+            # Heuristic product extraction when instruction requests products under a price
+            try:
+                if ("product" in lower_instr or "produkt" in lower_instr) and ("under" in lower_instr or "poniżej" in lower_instr or "below" in lower_instr or re.search(r"\b(<=?|mniej niż)\b", lower_instr)):
+                    m = re.search(r"under\s*(\d+)|poniżej\s*(\d+)|below\s*(\d+)|mniej\s*niż\s*(\d+)", lower_instr)
+                    thr = None
+                    if m:
+                        for g in m.groups():
+                            if g:
+                                thr = int(g)
+                                break
+                    # default threshold if not parsed
+                    if thr is None:
+                        thr = 150
+                    items = await page.evaluate(
+                        """
+                        (thr) => {
+                          const asNumber = (t) => {
+                            const m = (t||'').replace(/\s/g,'').match(/(\d+[\.,]\d{2}|\d+)(?=\s*(?:zł|PLN|\$|€)?)/i);
+                            if (!m) return null;
+                            return parseFloat(m[1].replace(',', '.'));
+                          };
+                          const cards = Array.from(document.querySelectorAll('article, li, div'));
+                          const out = [];
+                          for (const el of cards) {
+                            const text = el.innerText || '';
+                            const price = asNumber(text);
+                            if (price == null || price > thr) continue;
+                            let a = el.querySelector('a[href]');
+                            const name = (a && a.innerText && a.innerText.trim()) || (text.split('\n')[0]||'').trim();
+                            const url = a ? a.href : null;
+                            if (!url || !name) continue;
+                            out.push({ name, price, url });
+                            if (out.length >= 50) break;
+                          }
+                          return out;
+                        }
+                        """,
+                        thr
+                    )
+                    if isinstance(items, list) and items:
+                        result["data"] = {"products": items}
+                        if run_logger:
+                            run_logger.log_text("Heuristic product extraction used:")
+                            run_logger.log_code("json", json.dumps(result["data"], indent=2))
+                        break
+            except Exception:
+                pass
             
             # Generate next action using LLM
             action = await self._generate_action(
@@ -495,12 +582,27 @@ class CurllmExecutor:
                     run_logger.log_code("json", json.dumps(result["data"], indent=2))
             except Exception as _:
                 pass
+        # Final result filter for 'only email/phone' instructions
+        try:
+            if "only" in lower_instr and ("email" in lower_instr or "mail" in lower_instr or "phone" in lower_instr or "tel" in lower_instr or "telefon" in lower_instr):
+                data = result.get("data")
+                if isinstance(data, dict):
+                    filtered = {}
+                    if ("email" in lower_instr or "mail" in lower_instr) and "emails" in data:
+                        filtered["emails"] = data["emails"]
+                    if ("phone" in lower_instr or "tel" in lower_instr or "telefon" in lower_instr) and "phones" in data:
+                        filtered["phones"] = data["phones"]
+                    result["data"] = filtered
+        except Exception:
+            pass
         await page.close()
         return result
     
-    async def _take_screenshot(self, page, step: int) -> str:
+    async def _take_screenshot(self, page, step: int, target_dir: Optional[Path] = None) -> str:
         """Take and save screenshot"""
-        filename = config.screenshot_dir / f"step_{step}_{datetime.now().timestamp()}.png"
+        tdir = Path(target_dir) if target_dir else config.screenshot_dir
+        tdir.mkdir(parents=True, exist_ok=True)
+        filename = tdir / f"step_{step}_{datetime.now().timestamp()}.png"
         await page.screenshot(path=str(filename))
         return str(filename)
     

@@ -499,10 +499,9 @@ main() {
 EOF
     )
     
-    # Show verbose output if requested
+    # Show verbose output if requested (to stderr)
     if [ "$VERBOSE" = true ]; then
-        echo -e "${BLUE}Request:${NC}"
-        echo "$PAYLOAD" | jq .
+        { echo -e "${BLUE}Request:${NC}"; echo "$PAYLOAD" | jq .; } 1>&2
     fi
     
     # Make API request
@@ -517,28 +516,16 @@ EOF
         exit 1
     fi
     
-    # Process response
+    # Always output pure JSON on stdout; verbose info goes to stderr
     if [ "$VERBOSE" = true ]; then
-        echo -e "${BLUE}Response:${NC}"
-        echo "$RESPONSE" | jq .
-        RUN_LOG=$(echo "$RESPONSE" | jq -r '.run_log // empty')
-        if [ -n "$RUN_LOG" ]; then
-            echo -e "${YELLOW}Run log saved to:${NC} $RUN_LOG"
-        fi
-    else
-        # Extract result field
-        RESULT=$(echo "$RESPONSE" | jq -r '.result // .error')
-        echo "$RESULT"
-        RUN_LOG=$(echo "$RESPONSE" | jq -r '.run_log // empty')
-        if [ -n "$RUN_LOG" ]; then
-            echo "Run log: $RUN_LOG"
-        fi
+        { echo -e "${BLUE}Response:${NC}"; echo "$RESPONSE" | jq .; } 1>&2
     fi
+    echo "$RESPONSE"
     
     # Save to file if requested
     if [ -n "$OUTPUT_FILE" ]; then
         echo "$RESPONSE" > "$OUTPUT_FILE"
-        echo -e "${GREEN}Output saved to: $OUTPUT_FILE${NC}"
+        { echo -e "${GREEN}Output saved to: $OUTPUT_FILE${NC}"; } 1>&2
     fi
 }
 

@@ -71,8 +71,8 @@ start:
 			fi; \
 		done; \
 	fi; \
-	if ! curl -s http://localhost:$${PORT}/health > /dev/null 2>&1; then \
-		CURLLM_OLLAMA_HOST="http://localhost:$${OPORT}" CURLLM_API_PORT=$${PORT} python3 curllm_server.py > /tmp/curllm.log 2>&1 & \
+	if ! curl -s http://localhost:$${PORT}/health > \/dev\/null 2>&1; then \
+		CURLLM_OLLAMA_HOST="http://localhost:$${OPORT}" CURLLM_API_PORT=$${PORT} CURLLM_DEBUG=false python3 curllm_server.py > /tmp/curllm.log 2>&1 & \
 		echo $$! > /tmp/curllm.pid; \
 		echo "Started curllm API server on port $$PORT"; \
 		sleep 3; \
@@ -82,9 +82,26 @@ start:
 stop:
 	@echo "Stopping curllm services..."
 	@if [ -f /tmp/curllm.pid ]; then \
-		kill $$(cat /tmp/curllm.pid) 2>/dev/null || true; \
-		rm /tmp/curllm.pid; \
+		PID=$$(cat /tmp/curllm.pid); \
+		if echo $$PID | grep -Eq '^[0-9]+$$' && [ $$PID -gt 1 ]; then \
+			kill $$PID 2>/dev/null || true; \
+			sleep 0.2; \
+			kill -9 $$PID 2>/dev/null || true; \
+		fi; \
+		rm -f /tmp/curllm.pid; \
 		echo "Stopped curllm API server"; \
+	fi
+	@PORT=$$(cat /tmp/curllm_api_port 2>/dev/null); \
+	if [ -n "$$PORT" ]; then \
+		PIDS=$$(ss -ltnp 2>/dev/null | awk -v port=":$$PORT " 'index($$4, port){print $$7}' | sed -E 's/.*pid=([0-9]+).*/\1/' | sort -u); \
+		for pid in $$PIDS; do \
+			if ps -p $$pid -o comm= | grep -q python; then \
+				kill $$pid 2>/dev/null || true; \
+				sleep 0.2; \
+				kill -9 $$pid 2>/dev/null || true; \
+				echo "Killed API server process PID=$$pid on port $$PORT"; \
+			fi; \
+		done; \
 	fi
 	@pkill -f "ollama serve" 2>/dev/null || true
 	@docker compose stop browserless redis 2>/dev/null || docker-compose stop browserless redis 2>/dev/null || true
