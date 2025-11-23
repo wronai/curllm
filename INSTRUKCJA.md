@@ -211,7 +211,7 @@ System obsługuje lokalny Browserless w Docker dla maksymalnej stealth:
 MIT - możesz używać komercyjnie
 
 ## 🔗 Linki
-- GitHub: github.com/softreck/curllm
+- GitHub: github.com/wronai/curllm
 - Dokumentacja: docs.curllm.io
 - Discord: discord.gg/curllm
 

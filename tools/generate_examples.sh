@@ -53,7 +53,8 @@ cd examples/$slug
 EOF
 }
 
-EXAMPLES_JSON='[
+EXAMPLES_JSON=$(cat <<'JSON'
+[
   {
     "slug": "extract-links",
     "title": "Extract Links from a Page",
@@ -113,8 +114,52 @@ EXAMPLES_JSON='[
     "title": "POST with Custom Headers",
     "description": "Send a POST request with custom headers and instruction payload.",
     "command": "curllm -X POST -H 'Authorization: Bearer TOKEN' -H 'X-Trace: 1' -d '{\"instruction\": \"submit form with authenticated session\"}' https://httpbin.org/post -v"
+  },
+  {
+    "slug": "only-email-phone",
+    "title": "Only Email and Phone",
+    "description": "Extract only emails and phone numbers (no other links).",
+    "command": "curllm \"https://www.prototypowanie.pl/kontakt/\" -d \"extract only email and phone links\" -v"
+  },
+  {
+    "slug": "domain-screenshot",
+    "title": "Screenshot Saved in Domain Folder",
+    "description": "Create a screenshot and save it under screenshots/<domain>.",
+    "command": "curllm \"https://www.wikipedia.org\" -d \"Create screenshot in folder name of domain\" -v"
+  },
+  {
+    "slug": "allegro-products-under-150",
+    "title": "Products Under 150 (Visual + Locale)",
+    "description": "Find products under 150 using visual mode with locale/timezone configured.",
+    "command": "export CURLLM_HEADLESS=false\nexport CURLLM_LOCALE=pl-PL\nexport CURLLM_TIMEZONE=Europe/Warsaw\ncurllm --visual \"https://allegro.com\" -d \"Find all products under 150 and extract names, prices and urls\" -v"
+  },
+  {
+    "slug": "stealth-detection-test",
+    "title": "Stealth Detection Test",
+    "description": "Visit a bot detection test page with stealth mode and take a screenshot.",
+    "command": "curllm --stealth \"https://bot.sannysoft.com/\" -d \"Create screenshot of the results page\" -v"
+  },
+  {
+    "slug": "use-proxy",
+    "title": "Run via Proxy",
+    "description": "Run curllm through an HTTP proxy (replace host:port).",
+    "command": "CURLLM_PROXY=http://proxy:3128 curllm \"https://example.com\" -d \"extract title and first 10 links\" -v"
+  },
+  {
+    "slug": "capture-run-log",
+    "title": "Capture run_log Path",
+    "description": "Capture and print run_log path from the JSON output (requires jq).",
+    "command": "curllm \"https://www.wikipedia.org\" -d \"extract title\" | jq -r .run_log"
+  },
+  {
+    "slug": "headless-off-visual",
+    "title": "Headless Off with Visual Mode",
+    "description": "Run in non-headless visual mode to debug actions and scrolling.",
+    "command": "CURLLM_HEADLESS=false curllm --visual \"https://example.com\" -d \"scroll and extract top 5 links\" -v"
   }
-]'
+]
+JSON
+)
 
 echo "$EXAMPLES_JSON" | jq -c '.[]' | while read -r row; do
   slug=$(jq -r '.slug' <<<"$row")

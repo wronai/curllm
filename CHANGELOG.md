@@ -17,4 +17,4 @@ All notable changes to this project will be documented in this file.
 - Packaging: added `pyproject.toml`; Makefile `release/publish/publish-test` targets using Twine token from env.
 - Misc: improved CLI payload handling (headers), better debug logs, server path resolution via symlink and Python import.
 
-[1.0.0]: https://github.com/softreck/curllm/releases/tag/v1.0.0
+[1.0.0]: https://github.com/wronai/curllm/releases/tag/v1.0.0

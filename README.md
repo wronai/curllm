@@ -66,7 +66,7 @@ Installing curllm dependencies...
 
 ```bash
 # Clone the repository
-git clone https://github.com/softreck/curllm.git
+git clone https://github.com/wronai/curllm.git
 cd curllm
 
 # Run automatic installer
@@ -633,13 +633,53 @@ export SCREENSHOT_QUALITY=100
 - [ ] Distributed scraping with Ray
 - [ ] Custom model training pipeline
 
+## Files
+tree -L 3 -I node_modules -I venv
+
+```
+$ tree -L 3 -I node_modules -I venv
+.
+├── bql_parser.py
+├── CHANGELOG.md
+├── curllm
+├── curllm_server.py
+├── docker-compose.yml
+├── Dockerfile
+├── docs
+│   └── EXAMPLES.md
+├── downloads
+├── examples.py
+├── install.sh
+├── INSTRUKCJA.md
+├── LICENSE
+├── logs
+│   └── run-20251123-141151.md
+├── Makefile
+├── __pycache__
+│   └── curllm_server.cpython-313.pyc
+├── pyproject.toml
+├── QUICKSTART.sh
+├── README.md
+├── requirements.txt
+├── screenshots
+│   └── www.prototypowanie.pl
+│       └── step_0_1763903516.803199.png
+├── tests
+│   └── e2e.sh
+├── TODO.md
+├── tools
+│   └── generate_examples.sh
+└── workspace
+
+12 directories, 37 files
+```
 ## 🤝 Contributing
 
 We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ```bash
 # Development setup
-git clone https://github.com/softreck/curllm.git
+git clone https://github.com/wronai/curllm.git
 cd curllm
 pip install -e .
 pytest tests/
@@ -659,9 +699,9 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## 📞 Support
 
-- 📧 Email: support@softreck.com
+- 📧 Email: info@softreck.com
 - 💬 Discord: [Join our server](https://discord.gg/curllm)
-- 🐛 Issues: [GitHub Issues](https://github.com/softreck/curllm/issues)
+- 🐛 Issues: [GitHub Issues](https://github.com/wronai/curllm/issues)
 - 📚 Docs: [Documentation](https://docs.curllm.io)
 
 ---

@@ -1,0 +1,771 @@
+<!-- ============================================================================
+     popup.html - Extension Popup Interface
+     ============================================================================ -->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            width: 400px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .header {
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .header h1 {
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+            margin-top: 5px;
+            opacity: 0.9;
+        }
+        
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4CAF50;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-indicator.offline {
+            background: #F44336;
+            animation: none;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .main {
+            padding: 15px;
+        }
+        
+        .command-box {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .command-input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        .command-input::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+        
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+        
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-1px);
+        }
+        
+        .btn.recording {
+            background: #F44336;
+            animation: pulse 1s infinite;
+        }
+        
+        .workflows {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            padding: 10px;
+        }
+        
+        .workflows h3 {
+            font-size: 14px;
+            margin-bottom: 10px;
+            opacity: 0.9;
+        }
+        
+        .workflow-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px;
+            border-radius: 5px;
+            margin-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .workflow-item:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .workflow-name {
+            font-size: 13px;
+        }
+        
+        .workflow-actions {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .mini-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        
+        .settings-link {
+            display: block;
+            text-align: center;
+            margin-top: 10px;
+            color: white;
+            text-decoration: none;
+            font-size: 12px;
+            opacity: 0.8;
+        }
+        
+        .settings-link:hover {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🤖 curllm Assistant</h1>
+        <div class="status">
+            <span class="status-indicator" id="status-indicator"></span>
+            <span id="status-text">Connected to local server</span>
+        </div>
+    </div>
+    
+    <div class="main">
+        <div class="command-box">
+            <input type="text" 
+                   class="command-input" 
+                   id="command-input"
+                   placeholder="What should I do? (e.g., 'extract all emails')"
+                   autocomplete="off">
+        </div>
+        
+        <div class="quick-actions">
+            <button class="btn" id="record-btn">
+                <span>🔴</span> Record
+            </button>
+            <button class="btn" id="picker-btn">
+                <span>🎯</span> Pick Element
+            </button>
+            <button class="btn" id="extract-btn">
+                <span>📋</span> Extract Data
+            </button>
+            <button class="btn" id="fill-btn">
+                <span>✏️</span> Auto Fill
+            </button>
+        </div>
+        
+        <div class="workflows">
+            <h3>Saved Workflows</h3>
+            <div id="workflow-list">
+                <!-- Workflows will be loaded here -->
+            </div>
+        </div>
+        
+        <a href="#" class="settings-link" id="settings-link">
+            ⚙️ Settings | Side Panel
+        </a>
+    </div>
+    
+    <script src="popup.js"></script>
+</body>
+</html>
+
+<!-- ============================================================================
+     sidepanel.html - Chrome Side Panel Interface
+     ============================================================================ -->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .panel-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .tabs {
+            display: flex;
+            background: white;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+            background: white;
+            border: none;
+            color: #666;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .tab.active {
+            color: #667eea;
+            border-bottom: 2px solid #667eea;
+        }
+        
+        .panel-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+        }
+        
+        .workflow-builder {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        
+        .step {
+            background: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .step-number {
+            background: #667eea;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .step-content {
+            flex: 1;
+        }
+        
+        .step-type {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 3px;
+        }
+        
+        .step-details {
+            font-size: 13px;
+            color: #666;
+        }
+        
+        .add-step-btn {
+            width: 100%;
+            padding: 10px;
+            background: #f5f5f5;
+            border: 2px dashed #ccc;
+            border-radius: 5px;
+            color: #666;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s;
+        }
+        
+        .add-step-btn:hover {
+            background: #e8f5e9;
+            border-color: #4CAF50;
+            color: #4CAF50;
+        }
+        
+        .data-preview {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        
+        .data-table th {
+            background: #f5f5f5;
+            padding: 8px;
+            text-align: left;
+            font-size: 13px;
+            font-weight: 600;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        
+        .data-table td {
+            padding: 8px;
+            font-size: 13px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .ai-chat {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+        
+        .message {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 5px;
+        }
+        
+        .message.user {
+            background: #667eea;
+            color: white;
+            margin-left: 20%;
+        }
+        
+        .message.ai {
+            background: #f5f5f5;
+            margin-right: 20%;
+        }
+        
+        .chat-input {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .chat-input input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+        }
+        
+        .chat-input button {
+            padding: 8px 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="panel-header">
+        <h1>curllm Control Panel</h1>
+    </div>
+    
+    <div class="tabs">
+        <button class="tab active" data-tab="workflow">Workflow</button>
+        <button class="tab" data-tab="data">Data</button>
+        <button class="tab" data-tab="ai">AI Chat</button>
+        <button class="tab" data-tab="settings">Settings</button>
+    </div>
+    
+    <div class="panel-content">
+        <!-- Workflow Tab -->
+        <div id="workflow-tab" class="tab-content">
+            <div class="workflow-builder">
+                <h3>Workflow Builder</h3>
+                <div id="workflow-steps">
+                    <div class="step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <div class="step-type">Navigate</div>
+                            <div class="step-details">Go to target website</div>
+                        </div>
+                    </div>
+                </div>
+                <button class="add-step-btn">+ Add Step</button>
+            </div>
+        </div>
+        
+        <!-- Data Tab -->
+        <div id="data-tab" class="tab-content" style="display:none;">
+            <div class="data-preview">
+                <h3>Extracted Data</h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Field</th>
+                            <th>Value</th>
+                        </tr>
+                    </thead>
+                    <tbody id="data-table-body">
+                        <!-- Data will be inserted here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- AI Chat Tab -->
+        <div id="ai-tab" class="tab-content" style="display:none;">
+            <div class="ai-chat">
+                <div class="chat-messages" id="chat-messages">
+                    <div class="message ai">
+                        Hi! I'm your AI assistant. How can I help you automate this page?
+                    </div>
+                </div>
+                <div class="chat-input">
+                    <input type="text" placeholder="Ask me anything..." id="chat-input">
+                    <button id="chat-send">Send</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Settings Tab -->
+        <div id="settings-tab" class="tab-content" style="display:none;">
+            <div class="settings">
+                <h3>Settings</h3>
+                <!-- Settings content -->
+            </div>
+        </div>
+    </div>
+    
+    <script src="sidepanel.js"></script>
+</body>
+</html>
+
+<!-- ============================================================================
+     Integration Examples for Popular Polish Websites
+     ============================================================================ -->
+
+<script>
+// integration-examples.js - Specific integrations for Polish websites
+
+const IntegrationExamples = {
+    // ============================================
+    // Allegro Integration
+    // ============================================
+    allegro: {
+        name: 'Allegro Automation',
+        
+        // Auto-login with saved session
+        autoLogin: async function() {
+            await curllm.execute({
+                instruction: "Login to Allegro using saved credentials",
+                stealth: true
+            });
+        },
+        
+        // Monitor prices
+        monitorPrices: async function(productIds) {
+            const prices = [];
+            for (const id of productIds) {
+                const result = await curllm.execute({
+                    instruction: `Go to product ${id} and extract price`,
+                    url: `https://allegro.pl/oferta/${id}`
+                });
+                prices.push(result);
+            }
+            return prices;
+        },
+        
+        // Bulk listing update
+        updateListings: async function(listings) {
+            for (const listing of listings) {
+                await curllm.execute({
+                    instruction: `
+                        1. Go to my listings
+                        2. Find listing "${listing.title}"
+                        3. Update price to ${listing.newPrice}
+                        4. Save changes
+                    `,
+                    stealth: true
+                });
+            }
+        },
+        
+        // Extract competitor data
+        analyzeCompetitor: async function(competitorUrl) {
+            return await curllm.execute({
+                instruction: `
+                    Extract from this seller:
+                    - Number of products
+                    - Average price
+                    - Top categories
+                    - Rating and reviews count
+                    - Shipping methods
+                `,
+                url: competitorUrl,
+                visual: true
+            });
+        }
+    },
+    
+    // ============================================
+    // OLX Integration
+    // ============================================
+    olx: {
+        name: 'OLX Automation',
+        
+        // Post new ad
+        postAd: async function(adData) {
+            return await curllm.execute({
+                instruction: `
+                    1. Click "Dodaj ogłoszenie"
+                    2. Select category: ${adData.category}
+                    3. Fill title: ${adData.title}
+                    4. Fill description: ${adData.description}
+                    5. Set price: ${adData.price}
+                    6. Upload images from local folder
+                    7. Fill contact info
+                    8. Submit ad
+                `,
+                visual: true,
+                captcha: true
+            });
+        },
+        
+        // Refresh ads
+        refreshAds: async function() {
+            return await curllm.execute({
+                instruction: `
+                    1. Go to my ads
+                    2. For each ad that can be refreshed:
+                       - Click refresh button
+                       - Confirm
+                    3. Return count of refreshed ads
+                `
+            });
+        }
+    },
+    
+    // ============================================
+    // Banking Integration (Generic)
+    // ============================================
+    banking: {
+        name: 'Banking Automation',
+        
+        // Download statements
+        downloadStatements: async function(dateRange) {
+            return await curllm.execute({
+                instruction: `
+                    1. Login with 2FA if needed
+                    2. Go to account history
+                    3. Set date range: ${dateRange.from} to ${dateRange.to}
+                    4. Export as PDF
+                    5. Save to Downloads folder
+                `,
+                stealth: true,
+                visual: true
+            });
+        },
+        
+        // Make transfer
+        makeTransfer: async function(transferData) {
+            return await curllm.execute({
+                instruction: `
+                    1. Go to transfers
+                    2. Select "Przelew krajowy"
+                    3. Fill recipient: ${transferData.recipient}
+                    4. Fill account: ${transferData.account}
+                    5. Fill amount: ${transferData.amount}
+                    6. Fill title: ${transferData.title}
+                    7. Confirm with SMS code when prompted
+                `,
+                stealth: true,
+                visual: true,
+                interactive: true // Wait for user input for 2FA
+            });
+        }
+    },
+    
+    // ============================================
+    // E-commerce Shop Integration (Shoper/WooCommerce)
+    // ============================================
+    shop: {
+        name: 'Shop Admin Automation',
+        
+        // Bulk product import
+        importProducts: async function(csvFile) {
+            return await curllm.execute({
+                instruction: `
+                    1. Go to admin panel
+                    2. Navigate to Products > Import
+                    3. Upload CSV file: ${csvFile}
+                    4. Map columns automatically
+                    5. Start import
+                    6. Wait for completion
+                    7. Return import summary
+                `
+            });
+        },
+        
+        // Update inventory from supplier
+        syncInventory: async function(supplierUrl) {
+            const supplierData = await curllm.execute({
+                instruction: "Extract all products with stock levels",
+                url: supplierUrl
+            });
+            
+            return await curllm.execute({
+                instruction: `
+                    Update inventory based on data:
+                    ${JSON.stringify(supplierData)}
+                `
+            });
+        },
+        
+        // Generate product descriptions with AI
+        enhanceDescriptions: async function() {
+            return await curllm.execute({
+                instruction: `
+                    1. Go to product list
+                    2. For each product without description:
+                       - Open edit page
+                       - Generate SEO description based on title and specs
+                       - Save
+                    3. Return count of updated products
+                `,
+                ai: true
+            });
+        }
+    },
+    
+    // ============================================
+    // Social Media Integration
+    // ============================================
+    social: {
+        name: 'Social Media Automation',
+        
+        // Cross-post content
+        crossPost: async function(content) {
+            const platforms = ['facebook', 'instagram', 'linkedin'];
+            const results = [];
+            
+            for (const platform of platforms) {
+                const result = await curllm.execute({
+                    instruction: `
+                        1. Go to ${platform}
+                        2. Create new post
+                        3. Add content: ${content.text}
+                        4. Upload image: ${content.image}
+                        5. Add hashtags: ${content.hashtags}
+                        6. Schedule for: ${content.schedule}
+                        7. Publish/Schedule
+                    `,
+                    url: `https://${platform}.com`
+                });
+                results.push(result);
+            }
+            
+            return results;
+        }
+    },
+    
+    // ============================================
+    // Government Services (ePUAP, ZUS, etc.)
+    // ============================================
+    government: {
+        name: 'Government Services Automation',
+        
+        // Submit forms
+        submitForm: async function(formType, data) {
+            return await curllm.execute({
+                instruction: `
+                    1. Login to ePUAP with Profil Zaufany
+                    2. Find form: ${formType}
+                    3. Fill all fields with provided data
+                    4. Attach required documents
+                    5. Sign electronically
+                    6. Submit and save confirmation
+                `,
+                data: data,
+                stealth: true,
+                captcha: true
+            });
+        }
+    }
+};
+
+// Export for use in extension
+if (typeof module !== 'undefined') {
+    module.exports = IntegrationExamples;
+}
+</script>

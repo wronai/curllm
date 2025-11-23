@@ -252,22 +252,10 @@ example-bql:
 
 version-bump:
 	@echo "Bumping patch version in pyproject.toml..."
-	@python3 - <<-'PY'
-import re, sys
-p = 'pyproject.toml'
-with open(p, 'r', encoding='utf-8') as f:
-    s = f.read()
-m = re.search(r'(?m)^version\s*=\s*"(\d+)\.(\d+)\.(\d+)"', s)
-if not m:
-    print("Could not find version in pyproject.toml", file=sys.stderr)
-    sys.exit(1)
-major, minor, patch = map(int, m.groups())
-new = f"{major}.{minor}.{patch+1}"
-s = re.sub(r'(?m)^version\s*=\s*".*?"', f'version = "{new}"', s, count=1)
-with open(p, 'w', encoding='utf-8') as f:
-    f.write(s)
-print(new)
-PY
+	@python3 -c "import re,sys; p='pyproject.toml'; s=open(p,'r',encoding='utf-8').read(); m=re.search(r'(?m)^version\\s*=\\s*\"(\\d+)\\.(\\d+)\\.(\\d+)\"', s);\
+	import sys as _s;\
+	[(_s.stderr.write('Could not find version in pyproject.toml\n'), _s.exit(1)) for _ in []] if m else (_s.stderr.write('Could not find version in pyproject.toml\n') or _s.exit(1));\
+	a,b,c=map(int,m.groups()); new=f'{a}.{b}.{c+1}'; s=re.sub(r'(?m)^version\\s*=\\s*\".*?\"', f'version = \"{new}\"', s, 1); open(p,'w',encoding='utf-8').write(s); print(new)"
 
 release:
 	@echo "Preparing release..."
