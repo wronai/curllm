@@ -3,14 +3,12 @@ import asyncio
 import json
 import logging
 import os
-import random
-import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
-import aiohttp
+
 
 # optional browser_use agent
 try:
@@ -31,13 +29,15 @@ from .llm import SimpleOllama
 from .vision import VisionAnalyzer
 from .captcha import CaptchaSolver
 from .stealth import StealthConfig
-from .browserless import BrowserlessContext
 from .runtime import parse_runtime_from_instruction
 from .headers import normalize_headers
 from .browser_setup import setup_browser
 from .page_context import extract_page_context
 from .actions import execute_action
 from .human_verify import handle_human_verification, looks_like_human_verify_text
+from .captcha_widget import handle_captcha_image as _handle_captcha_image_widget, handle_widget_captcha as _handle_widget_captcha
+from .page_utils import auto_scroll as _auto_scroll, accept_cookies as _accept_cookies, is_block_page as _is_block_page
+from .extraction import generic_fastpath, direct_fastpath, product_heuristics, fallback_extract
 
 logger = logging.getLogger(__name__)
 
@@ -217,10 +217,7 @@ class CurllmExecutor:
             config=config,
         )
 
-    async def _setup_browserless(self):
-        import websockets  # lazy import
-        ws = await websockets.connect(config.browserless_url)
-        return BrowserlessContext(ws)
+    # browserless setup handled in browser_setup.setup_browser
 
     async def _execute_task(
         self,
@@ -250,19 +247,19 @@ class CurllmExecutor:
             # Optional initial scroll to load content
             if runtime.get("scroll_load"):
                 try:
-                    await self._auto_scroll(page, steps=4, delay_ms=600)
+                    await _auto_scroll(page, steps=4, delay_ms=600)
                 except Exception:
                     pass
             # Attempt widget CAPTCHA solving right after navigation if enabled
             if captcha_solver:
                 try:
-                    await self._handle_widget_captcha(page, current_url=url, run_logger=run_logger)
+                    await _handle_widget_captcha(page, current_url=url, solver=self.captcha_solver, run_logger=run_logger)
                 except Exception:
                     pass
         else:
             page = await agent.browser.new_page()
         try:
-            if await self._is_block_page(page) and not stealth_mode:
+            if await _is_block_page(page) and not stealth_mode:
                 if run_logger:
                     run_logger.log_text("Block page detected; retrying with stealth mode...")
                 try:
@@ -278,7 +275,7 @@ class CurllmExecutor:
                             host = urlparse(url).hostname
                     except Exception:
                         pass
-                new_ctx = await self._setup_playwright(True, host)
+                new_ctx = await self._setup_browser(True, host, headers=None)
                 agent.browser = new_ctx
                 page = await agent.browser.new_page()
                 await page.goto(url)
@@ -318,120 +315,21 @@ class CurllmExecutor:
         except Exception:
             pass
         try:
-            await self._accept_cookies(page)
+            await _accept_cookies(page)
         except Exception:
             pass
         try:
-            lower_instr = (instruction or "").lower()
-            generic_triggers = ("extract" in lower_instr or "scrape" in lower_instr)
-            specific_keywords = [
-                "link",
-                "email",
-                "mail",
-                "phone",
-                "tel",
-                "telefon",
-                "product",
-                "produkt",
-                "form",
-                "screenshot",
-                "captcha",
-                "bql",
-            ]
-            if generic_triggers and not any(k in lower_instr for k in specific_keywords):
-                ctx = await self._extract_page_context(page)
-                try:
-                    text = await page.evaluate("() => document.body.innerText")
-                except Exception:
-                    text = ""
-                anchors = await page.evaluate(
-                    """
-                        () => Array.from(document.querySelectorAll('a')).map(a => ({
-                            text: (a.innerText||'').trim(),
-                            href: a.href
-                        }))
-                    """
-                )
-                emails = list(set(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", text)))
-                phones = list(
-                    set(re.findall(r"(?:\+\d{1,3}[\s-]?)?(?:\(?\d{2,4}\)?[\s-]?)?\d[\d\s-]{6,}\d", text))
-                )
-                result["data"] = {
-                    "title": ctx.get("title"),
-                    "url": ctx.get("url"),
-                    "links": anchors[:50],
-                    "emails": emails[:50],
-                    "phones": [p.replace(" ", "").replace("-", "") for p in phones][:50],
-                }
-                if run_logger:
-                    run_logger.log_text("Generic fast-path used (title/url/links/emails/phones)")
-                    run_logger.log_code("json", json.dumps(result["data"], indent=2))
+            res_generic = await generic_fastpath(instruction, page, run_logger)
+            if res_generic is not None:
+                result["data"] = res_generic
                 await page.close()
                 return result
         except Exception:
             pass
         try:
-            lower_instr = (instruction or "").lower()
-            direct = {}
-            if "link" in lower_instr and not (
-                ("only" in lower_instr)
-                and ("email" in lower_instr or "mail" in lower_instr or "phone" in lower_instr or "tel" in lower_instr or "telefon" in lower_instr)
-            ):
-                anchors = await page.evaluate(
-                    """
-                        () => Array.from(document.querySelectorAll('a')).map(a => ({
-                            text: (a.innerText||'').trim(),
-                            href: a.href
-                        }))
-                    """
-                )
-                direct["links"] = anchors[:100]
-            if "email" in lower_instr or "mail" in lower_instr:
-                text = await page.evaluate("() => document.body.innerText")
-                emails_text = list(set(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", text)))
-                emails_mailto = await page.evaluate(
-                    """
-                        () => Array.from(document.querySelectorAll('a[href^=\"mailto:\"]'))
-                            .map(a => (a.getAttribute('href')||'')
-                                .replace(/^mailto:/,'')
-                                .split('?')[0]
-                                .trim())
-                            .filter(Boolean)
-                    """
-                )
-                emails = list(sorted(set(emails_text + emails_mailto)))
-                direct["emails"] = emails[:100]
-            if "phone" in lower_instr or "tel" in lower_instr or "telefon" in lower_instr:
-                text = await page.evaluate("() => document.body.innerText")
-                phones_text = list(set(re.findall(r"(?:\\+\\d{1,3}[\\s-]?)?(?:\\(?\\d{2,4}\\)?[\\s-]?)?\\d[\\d\\s-]{6,}\\d", text)))
-                phones_tel = await page.evaluate(
-                    """
-                        () => Array.from(document.querySelectorAll('a[href^=\"tel:\"]'))
-                            .map(a => (a.getAttribute('href')||'')
-                                .replace(/^tel:/,'')
-                                .split('?')[0]
-                                .trim())
-                            .filter(Boolean)
-                    """
-                )
-                def _norm(p: str) -> str:
-                    return p.replace(" ", "").replace("-", "")
-                phones = list(sorted(set([_norm(p) for p in (phones_text + phones_tel) if p])))
-                direct["phones"] = phones[:100]
-            if direct:
-                if "only" in lower_instr and (
-                    "email" in lower_instr or "mail" in lower_instr or "phone" in lower_instr or "tel" in lower_instr or "telefon" in lower_instr
-                ):
-                    filtered = {}
-                    if ("email" in lower_instr or "mail" in lower_instr) and "emails" in direct:
-                        filtered["emails"] = direct["emails"]
-                    if ("phone" in lower_instr or "tel" in lower_instr or "telefon" in lower_instr) and "phones" in direct:
-                        filtered["phones"] = direct["phones"]
-                    direct = filtered
-                result["data"] = direct
-                if run_logger:
-                    run_logger.log_text("Direct extraction fast-path used:")
-                    run_logger.log_code("json", json.dumps(result["data"], indent=2))
+            res_direct = await direct_fastpath(instruction, page, run_logger)
+            if res_direct is not None:
+                result["data"] = res_direct
                 await page.close()
                 return result
         except Exception:
@@ -448,7 +346,7 @@ class CurllmExecutor:
                 result["screenshots"].append(screenshot_path)
                 visual_analysis = await self.vision_analyzer.analyze(screenshot_path)
                 if captcha_solver and visual_analysis.get("has_captcha"):
-                    await handle_captcha(page, screenshot_path, run_logger)
+                    await _handle_captcha_image_widget(page, screenshot_path, self.captcha_solver, run_logger)
             # Try handle human verification banners/buttons each step
             try:
                 await handle_human_verification(page, run_logger)
@@ -457,14 +355,13 @@ class CurllmExecutor:
             # Try widget CAPTCHA solving per step if enabled
             if captcha_solver:
                 try:
-                    await handle_widget_captcha(page, current_url=url, run_logger=run_logger)
                     # Try to obtain current URL from page if available
                     cur_url = None
                     try:
                         cur_url = await page.evaluate("() => window.location.href")
                     except Exception:
                         cur_url = url
-                    await self._handle_widget_captcha(page, current_url=cur_url, run_logger=run_logger)
+                    await _handle_widget_captcha(page, current_url=cur_url, solver=self.captcha_solver, run_logger=run_logger)
                 except Exception:
                     pass
             page_context = await self._extract_page_context(
@@ -495,54 +392,10 @@ class CurllmExecutor:
                 except Exception:
                     pass
             try:
-                if ("product" in lower_instr or "produkt" in lower_instr) and (
-                    "under" in lower_instr or "poniżej" in lower_instr or "below" in lower_instr or re.search(r"\b(<=?|mniej niż)\b", lower_instr)
-                ):
-                    m = re.search(r"under\s*(\d+)|poniżej\s*(\d+)|below\s*(\d+)|mniej\s*niż\s*(\d+)", lower_instr)
-                    thr = None
-                    if m:
-                        for g in m.groups():
-                            if g:
-                                thr = int(g)
-                                break
-                    if thr is None:
-                        thr = 150
-                    try:
-                        await self._auto_scroll(page, steps=4, delay_ms=700)
-                    except Exception:
-                        pass
-                    items = await page.evaluate(
-                        r"""
-                        (thr) => {
-                          const asNumber = (t) => {
-                            const m = (t||'').replace(/\s/g,'').match(/(\d+[\.,]\d{2}|\d+)(?=\s*(?:zł|PLN|\$|€)?)/i);
-                            if (!m) return null;
-                            return parseFloat(m[1].replace(',', '.'));
-                          };
-                          const cards = Array.from(document.querySelectorAll('article, li, div'));
-                          const out = [];
-                          for (const el of cards) {
-                            const text = el.innerText || '';
-                            const price = asNumber(text);
-                            if (price == null || price > thr) continue;
-                            let a = el.querySelector('a[href]');
-                            const name = (a && a.innerText && a.innerText.trim()) || (text.split('\n')[0]||'').trim();
-                            const url = a ? a.href : null;
-                            if (!url || !name) continue;
-                            out.push({ name, price, url });
-                            if (out.length >= 50) break;
-                          }
-                          return out;
-                        }
-                        """,
-                        thr,
-                    )
-                    if isinstance(items, list) and items:
-                        result["data"] = {"products": items}
-                        if run_logger:
-                            run_logger.log_text("Heuristic product extraction used:")
-                            run_logger.log_code("json", json.dumps(result["data"], indent=2))
-                        break
+                res_products = await product_heuristics(instruction, page, run_logger)
+                if res_products is not None:
+                    result["data"] = res_products
+                    break
             except Exception:
                 pass
             action = await self._generate_action(
@@ -570,51 +423,8 @@ class CurllmExecutor:
         if result.get("data") is None:
             try:
                 lower_instr = (instruction or "").lower()
-                fallback: Dict[str, Any] = {}
-                if "link" in lower_instr:
-                    anchors = await page.evaluate(
-                        """
-                        () => Array.from(document.querySelectorAll('a')).map(a => ({
-                            text: (a.innerText||'').trim(),
-                            href: a.href
-                        }))
-                        """
-                    )
-                    fallback["links"] = anchors[:100]
-                if "email" in lower_instr or "mail" in lower_instr:
-                    text = await page.evaluate("() => document.body.innerText")
-                    emails = list(set(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", text)))
-                    fallback["emails"] = emails[:100]
-                if "phone" in lower_instr or "tel" in lower_instr or "telefon" in lower_instr:
-                    text = await page.evaluate("() => document.body.innerText")
-                    phones_text = list(set(re.findall(r"(?:\+\d{1,3}[\s-]?)?(?:\(?\d{2,4}\)?[\s-]?)?\d[\d\s-]{6,}\d", text)))
-                    phones_tel = await page.evaluate(
-                        """
-                            () => Array.from(document.querySelectorAll('a[href^=\"tel:\"]'))
-                                .map(a => (a.getAttribute('href')||'')
-                                    .replace(/^tel:/,'')
-                                    .split('?')[0]
-                                    .trim())
-                                .filter(Boolean)
-                        """
-                    )
-                    def _norm2(p: str) -> str:
-                        return p.replace(" ", "").replace("-", "")
-                    phones = list(sorted(set([_norm2(p) for p in (phones_text + phones_tel) if p])))
-                    fallback["phones"] = phones[:100]
-                if not fallback:
-                    ctx = await self._extract_page_context(page)
-                    fallback = {"title": ctx.get("title"), "url": ctx.get("url")}
-                result["data"] = fallback
-                if run_logger:
-                    run_logger.log_text("Fallback extraction used:")
-                    run_logger.log_code("json", json.dumps(result["data"], indent=2))
-            except Exception:
-                pass
-        try:
-            if "only" in lower_instr and (
-                "email" in lower_instr or "mail" in lower_instr or "phone" in lower_instr or "tel" in lower_instr or "telefon" in lower_instr
-            ):
+                result["data"] = await fallback_extract(instruction, page, run_logger)
+                # ... (rest of the code remains the same)
                 data = result.get("data")
                 if isinstance(data, dict):
                     filtered = {}
@@ -623,8 +433,8 @@ class CurllmExecutor:
                     if ("phone" in lower_instr or "tel" in lower_instr or "telefon" in lower_instr) and "phones" in data:
                         filtered["phones"] = data["phones"]
                     result["data"] = filtered
-        except Exception:
-            pass
+            except Exception:
+                pass
         await page.close()
         return result
 
@@ -639,43 +449,8 @@ class CurllmExecutor:
         return await extract_page_context(page, include_dom=include_dom, dom_max_chars=dom_max_chars)
 
     async def _generate_action(self, instruction: str, page_context: Dict, step: int, run_logger: RunLogger | None = None) -> Dict:
-        context_str = json.dumps(page_context, indent=2)[:3000]
-        prompt_text = (
-            "You are a browser automation expert. Analyze the current page and determine the next action.\n\n"
-            f"Instruction: {instruction}\n"
-            f"Current Step: {step}\n"
-            f"Page Context: {context_str}\n\n"
-            "If 'interactive' or 'dom_preview' are present, prefer using selectors for existing elements.\n"
-            "Generate a JSON action:\n"
-            "{\n"
-            "    \"type\": \"click|fill|scroll|wait|complete\",\n"
-            "    \"selector\": \"CSS selector if applicable\",\n"
-            "    \"value\": \"value to fill if applicable\",\n"
-            "    \"waitFor\": \"optional selector to wait for\",\n"
-            "    \"timeoutMs\": 8000\n"
-            "    \"extracted_data\": \"data if task is complete\"\n"
-            "}\n\n"
-            "Response (JSON only):"
-        )
-        if run_logger:
-            run_logger.log_text("LLM Prompt:")
-            run_logger.log_code("json", prompt_text)
-        try:
-            response = await self.llm.ainvoke(prompt_text)
-            text = response["text"] if isinstance(response, dict) and "text" in response else str(response)
-        except Exception as e:
-            if run_logger:
-                run_logger.log_text("LLM error, continuing with wait/fallback:")
-                run_logger.log_code("text", str(e))
-            logger.warning(f"LLM ainvoke failed, using wait action: {e}")
-            return {"type": "wait"}
-        if run_logger:
-            run_logger.log_text("LLM Raw Response:")
-            run_logger.log_code("json", text)
-        try:
-            return json.loads(text)
-        except json.JSONDecodeError:
-            return {"type": "wait"}
+        from .llm_planner import generate_action
+        return await generate_action(self.llm, instruction, page_context, step, run_logger)
 
     async def _execute_action(self, page, action: Dict, runtime: Dict[str, Any]):
         return await execute_action(page, action, runtime)
@@ -709,236 +484,7 @@ class CurllmExecutor:
         )
         return bool(honeypots)
 
-    async def _is_block_page(self, page) -> bool:
-        try:
-            txt = await page.evaluate("() => (document.body && document.body.innerText || '').slice(0, 4000).toLowerCase()")
-            markers = [
-                "you have been blocked",
-                "access denied",
-                "robot",
-                "are you human",
-                "verify you are human",
-                "potwierdź, że jesteś człowiekiem",
-                "potwierdz, że jesteś człowiekiem",
-                "potwierdzam",
-            ]
-            return any(m in txt for m in markers)
-        except Exception:
-            return False
-
-    async def _accept_cookies(self, page):
-        try:
-            names = ["Akceptuj", "Zgadzam się", "Accept", "I agree"]
-            for name in names:
-                try:
-                    btn = page.get_by_role("button", name=name)
-                    if await btn.count() > 0:
-                        await btn.first.click(timeout=1000)
-                        return
-                except Exception:
-                    pass
-            selectors = [
-                'button:has-text("Akceptuj")',
-                'button:has-text("Zgadzam się")',
-                'button:has-text("Accept")',
-                'button:has-text("I agree")',
-                'button[aria-label*="accept" i]',
-                '#onetrust-accept-btn-handler',
-                '.cookie-accept', '.cookie-approve', '.cookies-accept',
-                'button[mode="primary"]',
-            ]
-            for sel in selectors:
-                try:
-                    loc = page.locator(sel)
-                    if await loc.count() > 0:
-                        await loc.first.click(timeout=1000)
-                        return
-                except Exception:
-                    pass
-        except Exception:
-            pass
-
-    async def _auto_scroll(self, page, steps: int = 3, delay_ms: int = 500):
-        for _ in range(steps):
-            try:
-                await page.evaluate("window.scrollBy(0, window.innerHeight);")
-                await page.wait_for_timeout(delay_ms)
-            except Exception:
-                break
-
-    async def _handle_captcha(self, page, screenshot_path: str):
-        solution = await self.captcha_solver.solve(screenshot_path)
-        if solution:
-            await page.fill('input[name*="captcha"]', solution)
-
     def _parse_bql(self, query: str) -> str:
         if "query" in query and "{" in query:
             return f"Extract the following fields from the page: {query}"
         return query
-
-    def _looks_like_human_verify_text(self, txt: str) -> bool:
-        t = (txt or "").lower()
-        patterns = [
-            "potwierdź, że jesteś człowiekiem",
-            "potwierdz, że jesteś człowiekiem",
-            "potwierdzam",
-            "jestem człowiekiem",
-            "jestem czlowiekiem",
-            "przejdź dalej",
-            "przejdz dalej",
-            "kontynuuj",
-            "confirm you are human",
-            "verify you are human",
-        ]
-        return any(p in t for p in patterns)
-
-    async def _handle_human_verification(self, page, run_logger: RunLogger | None = None) -> bool:
-        try:
-            txt = await page.evaluate("() => (document.body && document.body.innerText) || ''")
-        except Exception:
-            txt = ""
-        if not self._looks_like_human_verify_text(txt):
-            # Also check for presence of specific button text even if page text filter missed
-            try:
-                has_btn = await page.evaluate("() => !!Array.from(document.querySelectorAll('button, a, [role=button]')).find(el => (el.innerText||'').toLowerCase().includes('potwierdzam'))")
-            except Exception:
-                has_btn = False
-            if not has_btn:
-                return False
-        # Try various strategies to click the confirmation button
-        clicked = False
-        try:
-            btn = page.get_by_role("button", name=re.compile("potwierdzam|potwierdź|confirm|kontynuuj|przej(d|dz)\s+dalej|jestem", re.I))
-            if await btn.count() > 0:
-                await btn.first.click(timeout=1500)
-                clicked = True
-        except Exception:
-            pass
-        if not clicked:
-            for sel in [
-                'button:has-text("Potwierdzam")',
-                'button:has-text("Potwierdź")',
-                'button:has-text("Kontynuuj")',
-                'button:has-text("Jestem człowiekiem")',
-                'button:has-text("Jestem czlowiekiem")',
-                'button:has-text("Przejdź dalej")',
-                'button:has-text("Przejdz dalej")',
-                'button[aria-label*="potwierd" i]',
-                '[role="button"]:has-text("Potwierdzam")',
-                '[role="button"]:has-text("Kontynuuj")',
-                '[role="button"]:has-text("Jestem człowiekiem")',
-            ]:
-                try:
-                    loc = page.locator(sel)
-                    if await loc.count() > 0:
-                        await loc.first.click(timeout=1500)
-                        clicked = True
-                        break
-                except Exception:
-                    continue
-        if not clicked:
-            try:
-                # Last resort: evaluate and click first matching button by text
-                await page.evaluate(
-                    """
-                    () => {
-                      const el = Array.from(document.querySelectorAll('button, a, [role=button]'))
-                        .find(e => {
-                          const t=(e.innerText||'').toLowerCase();
-                          return t.includes('potwierdzam') || t.includes('potwierdź') || t.includes('kontynuuj') || t.includes('jestem cz') || t.includes('przejdź dalej') || t.includes('przejdz dalej');
-                        });
-                      if (el) el.click();
-                    }
-                    """
-                )
-                clicked = True
-            except Exception:
-                pass
-        if clicked:
-            if run_logger:
-                run_logger.log_text("Clicked human verification button (Potwierdzam)")
-            # Give page a moment to transition
-            try:
-                await page.wait_for_load_state("networkidle")
-            except Exception:
-                try:
-                    await page.wait_for_timeout(800)
-                except Exception:
-                    pass
-        return clicked
-
-    async def _handle_widget_captcha(self, page, current_url: Optional[str], run_logger: RunLogger | None = None) -> bool:
-        """Detect common widget CAPTCHAs (reCAPTCHA/hCaptcha/Turnstile) and solve via 2captcha.
-        Returns True if a token was obtained and injected.
-        """
-        # Find sitekey and type
-        try:
-            info = await page.evaluate(
-                """
-                () => {
-                  const q = (sel) => document.querySelector(sel);
-                  const byAttr = document.querySelector('[data-sitekey]');
-                  const recaptchaEl = q('.g-recaptcha[data-sitekey], [class*="recaptcha"][data-sitekey]') || (byAttr && /recaptcha/i.test(byAttr.className) ? byAttr : null);
-                  const hcaptchaEl = q('.h-captcha[data-sitekey]') || (byAttr && /hcaptcha/i.test(byAttr.className) ? byAttr : null);
-                  const turnstileEl = q('.cf-turnstile[data-sitekey]') || (byAttr && /turnstile/i.test(byAttr.className) ? byAttr : null);
-                  const getKey = (el) => el && (el.getAttribute('data-sitekey') || el.dataset.sitekey);
-                  if (recaptchaEl) return {type: 'recaptcha', sitekey: getKey(recaptchaEl)};
-                  if (hcaptchaEl) return {type: 'hcaptcha', sitekey: getKey(hcaptchaEl)};
-                  if (turnstileEl) return {type: 'turnstile', sitekey: getKey(turnstileEl)};
-                  // Try to infer from scripts
-                  const scripts = Array.from(document.scripts).map(s => s.src||'');
-                  if (scripts.some(s => /recaptcha\.google\.com|google\.com\/recaptcha/i.test(s))) return {type: 'recaptcha', sitekey: (q('[data-sitekey]')||{}).dataset?.sitekey || null};
-                  if (scripts.some(s => /hcaptcha\.com/i.test(s))) return {type: 'hcaptcha', sitekey: (q('[data-sitekey]')||{}).dataset?.sitekey || null};
-                  if (scripts.some(s => /challenges\.cloudflare\.com|turnstile/i.test(s))) return {type: 'turnstile', sitekey: (q('[data-sitekey]')||{}).dataset?.sitekey || null};
-                  return null;
-                }
-                """
-            )
-        except Exception:
-            info = None
-        if not info or not isinstance(info, dict) or not info.get('sitekey') or not info.get('type'):
-            return False
-        wtype = str(info.get('type'))
-        sitekey = str(info.get('sitekey'))
-        if not self.captcha_solver or not getattr(self.captcha_solver, 'solve_sitekey', None):
-            return False
-        token = await self.captcha_solver.solve_sitekey(wtype, sitekey, current_url or '')
-        if not token:
-            return False
-        # Inject token into expected response input(s)
-        try:
-            await page.evaluate(
-                """
-                (token) => {
-                  const ensureInput = (name) => {
-                    let el = document.querySelector('input[name="'+name+'"]');
-                    if (!el) { el = document.createElement('input'); el.type='hidden'; el.name=name; document.body.appendChild(el); }
-                    el.value = token;
-                  };
-                  // Common targets
-                  ensureInput('g-recaptcha-response');
-                  ensureInput('h-recaptcha-response');
-                  ensureInput('hcaptcha-response');
-                  ensureInput('cf-turnstile-response');
-                  // Fire events to notify frameworks
-                  ['g-recaptcha-response','h-recaptcha-response','hcaptcha-response','cf-turnstile-response'].forEach(n => {
-                    const el = document.querySelector('input[name="'+n+'"]');
-                    if (el) {
-                      el.dispatchEvent(new Event('change', {bubbles: true}));
-                      el.dispatchEvent(new Event('input', {bubbles: true}));
-                    }
-                  });
-                }
-                """,
-                token,
-            )
-        except Exception:
-            return False
-        if run_logger:
-            run_logger.log_text(f"Widget CAPTCHA solved via 2captcha ({wtype})")
-        # Give page time to process token
-        try:
-            await page.wait_for_timeout(1000)
-        except Exception:
-            pass
-        return True
