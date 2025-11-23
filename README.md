@@ -145,11 +145,60 @@ For a comprehensive, curated set of examples and ready-to-run scripts, see:
 - docs/EXAMPLES.md
 - Generate scripts: make examples (scripts are created in examples/ as curllm-*.sh)
 
+### Validated examples (tested)
+
+- Extract links (basic)
+
+```bash
+curllm "https://example.com" -d "extract all links"
+```
+
+Expected output (truncated):
+
+```json
+{
+  "links": [
+    { "href": "https://iana.org/domains/example", "text": "Learn more" }
+  ]
+}
+```
+
+- Extract links (Polish site)
+
+```bash
+curllm "https://www.prototypowanie.pl/kontakt/" -d "extract all links"
+```
+
+- Extract emails
+
+```bash
+curllm "https://www.prototypowanie.pl/kontakt/" -d "extract all email addresses"
+```
+
+- Visual mode / Stealth mode
+
+```bash
+curllm --visual "https://example.com" -d "extract all links"
+curllm --stealth "https://example.com" -d "extract all links"
+curllm --visual --stealth "https://example.com" -d "extract all email addresses"
+```
+
+Notes:
+
+- Results and step logs are saved to files in `./logs/run-*.md` (path is printed in CLI output as `run_log`).
+- Ports and hosts are auto-managed; run `curllm --start-services` once, then `curllm --status`.
+- By default, the server uses a lightweight Ollama HTTP backend. To switch to LangChain's `langchain_ollama`, set `CURLLM_LLM_BACKEND=langchain` and ensure `langchain-ollama` is installed.
+
 ### Extract Data from Dynamic Pages
 
 ```bash
-curllm --visual "https://shop.com" \
-  -d "Find all products under $50 and extract names, prices, and images"
+curllm --visual "https://allegro.com" \
+  -d "Find all products under 150 and extract names, prices and urls"
+```
+
+
+```bash
+curllm "https://allegro.com"  -d "Create screenshot in folder name of domain"
 ```
 
 ### Handle 2FA Authentication
@@ -169,11 +218,154 @@ curllm --stealth --visual \
   https://www.prototypowanie.pl/kontakt/
 ```
 
+
+
+### Extract only email and phone links 
+
+```bash
+curllm "https://www.prototypowanie.pl/kontakt/" -d "extract only email and phone links"
+```
+output:
+```bash
+{
+  "emails": ["info@prototypowanie.pl"],
+  "phones": ["+48503503761"]
+}
+Run log: ./logs/run-YYYYMMDD-HHMMSS.md
+```
+
+
+
 ### Extract all links 
 
 ```bash
 curllm "https://www.prototypowanie.pl/kontakt/" -d "extract all links"
 ```
+output:
+```bash
+{
+  "links": [
+    {
+      "href": "https://www.prototypowanie.pl/kontakt/#content",
+      "text": "Skip to content"
+    },
+    {
+      "href": "https://www.prototypowanie.pl/",
+      "text": "PROTOTYPOWANIE.PL"
+    },
+    {
+      "href": "https://www.prototypowanie.pl/blog/",
+      "text": "BLOG"
+    },
+    {
+      "href": "https://www.prototypowanie.pl/",
+      "text": "WYCENA"
+    },
+    {
+      "href": "https://www.prototypowanie.pl/technologie/",
+      "text": "TECHNOLOGIE"
+    },
+    {
+      "href": "https://www.prototypowanie.pl/portfolio-open-source/",
+      "text": "PORTFOLIO"
+    },
+    {
+      "href": "https://www.prototypowanie.pl/marka/ondayrun/",
+      "text": "USŁUGI"
+    },
+    {
+      "href": "https://www.prototypowanie.pl/kontakt/",
+      "text": "KONTAKT"
+    },
+    {
+      "href": "https://www.prototypowanie.pl/blog/",
+      "text": "blog"
+    },
+    {
+      "href": "https://www.prototypowanie.pl/co-napisac-w-formularzu-zlecenia-praktyczny-przewodnik/",
+      "text": "Co napisać w formularzu zlecenia?"
+    },
+    {
+      "href": "https://www.prototypowanie.pl/uslugi/",
+      "text": "Do usług"
+    },
+    {
+      "href": "https://www.prototypowanie.pl/faq-wszystko-o-wspolpracy-z-prototypowanie-pl/",
+      "text": "Jak zacząć z Prototypowanie?pl"
+    },
+    {
+      "href": "https://www.prototypowanie.pl/konsultacja/",
+      "text": "Konsultacja"
+    },
+    {
+      "href": "https://www.prototypowanie.pl/kontakt/",
+      "text": "Kontakt"
+    },
+    {
+      "href": "https://www.prototypowanie.pl/polityka-prywatnosci/",
+      "text": "Polityka prywatności"
+    },
+    {
+      "href": "https://www.prototypowanie.pl/polityka-prywatnosci/cookie-policy-eu/",
+      "text": "Cookie policy (EU)"
+    },
+    {
+      "href": "https://www.prototypowanie.pl/polityka-prywatnosci/privacy-policy/",
+      "text": "Privacy Policy"
+    },
+    {
+      "href": "https://www.prototypowanie.pl/polityka-prywatnosci/privacy-tools/",
+      "text": "Privacy Tools"
+    },
+    {
+      "href": "https://www.prototypowanie.pl/portfolio-open-source/",
+      "text": "Portfolio Open Source"
+    },
+    {
+      "href": "https://www.prototypowanie.pl/technologie/",
+      "text": "Technologie"
+    },
+    {
+      "href": "https://www.prototypowanie.pl/terms-conditions/",
+      "text": "Terms & conditions"
+    },
+    {
+      "href": "https://www.prototypowanie.pl/tomasz-sapletta/",
+      "text": "Tomasz Sapletta"
+    },
+    {
+      "href": "https://www.prototypowanie.pl/",
+      "text": "Twoje oprogramowanie gotowe w 24h?"
+    },
+    {
+      "href": "https://www.prototypowanie.pl/wycena/",
+      "text": "Wycena"
+    },
+    {
+      "href": "mailto:info@prototypowanie.pl",
+      "text": "info@prototypowanie.pl"
+    },
+    {
+      "href": "tel:48503503761",
+      "text": "+48 503 503 761"
+    },
+    {
+      "href": "https://www.linkedin.com/company/prototypowanie-pl/",
+      "text": "Linkedin"
+    },
+    {
+      "href": "https://www.prototypowanie.pl/",
+      "text": "rototypowanie.pl"
+    },
+    {
+      "href": "https://wordpress.org/plugins/gdpr-cookie-compliance/",
+      "text": "Powered by  Zgodności ciasteczek z RODO"
+    }
+  ]
+}
+Run log: logs/run-20251123-115654.md
+```
+
 
 ### Complex Workflow Automation
 

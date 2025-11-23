@@ -339,6 +339,26 @@ stop_services() {
         rm /tmp/curllm.pid
         echo "Stopped curllm API server"
     fi
+    # Additionally, kill any Python process bound to the API port (handles Flask reloader children)
+    # Determine port candidates
+    PORTS=()
+    if [ -f /tmp/curllm_api_port ]; then PORTS+=("$(cat /tmp/curllm_api_port)"); fi
+    if [ -n "$CURLLM_API_PORT" ]; then PORTS+=("$CURLLM_API_PORT"); fi
+    # De-duplicate
+    UNIQUE_PORTS=($(printf "%s\n" "${PORTS[@]}" | awk '!seen[$0]++'))
+    for p in "${UNIQUE_PORTS[@]}"; do
+        [ -z "$p" ] && continue
+        # Find PIDs via ss
+        PIDS=$(ss -ltnp 2>/dev/null | awk -v port=":${p} " 'index($4, port){print $7}' | sed -E 's/.*pid=([0-9]+).*/\1/' | sort -u)
+        for pid in $PIDS; do
+            if ps -p "$pid" -o comm= | grep -q "python"; then
+                kill "$pid" 2>/dev/null || true
+                sleep 0.2
+                kill -9 "$pid" 2>/dev/null || true
+                echo "Killed API server process PID=$pid on port $p"
+            fi
+        done
+    done
     
     # Stop Browserless
     docker stop browserless 2>/dev/null

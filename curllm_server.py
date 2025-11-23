@@ -147,27 +147,32 @@ class CurllmExecutor:
         self.stealth_config = StealthConfig()
         
     def _setup_llm(self) -> Any:
-        """Initialize Ollama LLM"""
-        try:
-            from langchain_ollama import OllamaLLM
-            return OllamaLLM(
-                base_url=config.ollama_host,
-                model=config.ollama_model,
-                temperature=config.temperature,
-                top_p=config.top_p,
-                num_ctx=config.num_ctx,
-                num_predict=config.num_predict,
-            )
-        except Exception as e:
-            logger.warning(f"langchain_ollama unavailable, using SimpleOllama fallback: {e}")
-            return SimpleOllama(
-                base_url=config.ollama_host,
-                model=config.ollama_model,
-                num_ctx=config.num_ctx,
-                num_predict=config.num_predict,
-                temperature=config.temperature,
-                top_p=config.top_p,
-            )
+        """Initialize Ollama LLM. Default to SimpleOllama for stability.
+        Set env CURLLM_LLM_BACKEND=langchain to use langchain_ollama.
+        """
+        backend = os.getenv("CURLLM_LLM_BACKEND", "simple").lower()
+        if backend == "langchain":
+            try:
+                from langchain_ollama import OllamaLLM
+                return OllamaLLM(
+                    base_url=config.ollama_host,
+                    model=config.ollama_model,
+                    temperature=config.temperature,
+                    top_p=config.top_p,
+                    num_ctx=config.num_ctx,
+                    num_predict=config.num_predict,
+                )
+            except Exception as e:
+                logger.warning(f"langchain_ollama requested but unavailable, falling back to SimpleOllama: {e}")
+        # Fallback / default
+        return SimpleOllama(
+            base_url=config.ollama_host,
+            model=config.ollama_model,
+            num_ctx=config.num_ctx,
+            num_predict=config.num_predict,
+            temperature=config.temperature,
+            top_p=config.top_p,
+        )
     
     async def execute_workflow(
         self,
@@ -248,7 +253,7 @@ class CurllmExecutor:
             return res
             
         except Exception as e:
-            logger.error(f"Workflow execution failed: {str(e)}")
+            logger.error(f"Workflow execution failed: {str(e)}", exc_info=True)
             run_logger.log_text("Error occurred:")
             run_logger.log_code("text", str(e))
             if browser_context is not None:
@@ -350,6 +355,68 @@ class CurllmExecutor:
             await page.goto(url)
         else:
             page = await agent.browser.new_page()
+        
+        # Direct extraction fast-path (avoid LLM for common queries)
+        try:
+            lower_instr = (instruction or "").lower()
+            direct = {}
+            if "link" in lower_instr and not ("only" in lower_instr and ("email" in lower_instr or "mail" in lower_instr or "phone" in lower_instr or "tel" in lower_instr or "telefon" in lower_instr)):
+                anchors = await page.evaluate(
+                    """
+                        () => Array.from(document.querySelectorAll('a')).map(a => ({
+                            text: (a.innerText||'').trim(),
+                            href: a.href
+                        }))
+                    """
+                )
+                direct["links"] = anchors[:100]
+            if "email" in lower_instr or "mail" in lower_instr:
+                text = await page.evaluate("() => document.body.innerText")
+                emails_text = list(set(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}", text)))
+                emails_mailto = await page.evaluate(
+                    """
+                        () => Array.from(document.querySelectorAll('a[href^=\"mailto:\"]'))
+                            .map(a => (a.getAttribute('href')||'')
+                                .replace(/^mailto:/,'')
+                                .split('?')[0]
+                                .trim())
+                            .filter(Boolean)
+                    """
+                )
+                emails = list(sorted(set(emails_text + emails_mailto)))
+                direct["emails"] = emails[:100]
+            if "phone" in lower_instr or "tel" in lower_instr or "telefon" in lower_instr:
+                text = await page.evaluate("() => document.body.innerText")
+                phones_text = list(set(re.findall(r"(?:\\+\\d{1,3}[\\s-]?)?(?:\\(?\\d{2,4}\\)?[\\s-]?)?\\d[\\d\\s-]{6,}\\d", text)))
+                phones_tel = await page.evaluate(
+                    """
+                        () => Array.from(document.querySelectorAll('a[href^=\"tel:\"]'))
+                            .map(a => (a.getAttribute('href')||'')
+                                .replace(/^tel:/,'')
+                                .split('?')[0]
+                                .trim())
+                            .filter(Boolean)
+                    """
+                )
+                # Normalize: keep digits and leading +
+                import re as _re
+                def _norm(p):
+                    p = p.strip()
+                    # keep leading + and digits
+                    m = _re.findall(r"^\\+?|\\d+", p)
+                    # simple cleanup: remove spaces and dashes
+                    return p.replace(" ", "").replace("-", "")
+                phones = list(sorted(set([_norm(p) for p in (phones_text + phones_tel) if p])))
+                direct["phones"] = phones[:100]
+            if direct:
+                result["data"] = direct
+                if run_logger:
+                    run_logger.log_text("Direct extraction fast-path used:")
+                    run_logger.log_code("json", json.dumps(result["data"], indent=2))
+                await page.close()
+                return result
+        except Exception:
+            pass
         
         # Main execution loop
         for step in range(config.max_steps):
@@ -487,8 +554,15 @@ class CurllmExecutor:
         if run_logger:
             run_logger.log_text("LLM Prompt:")
             run_logger.log_code("json", prompt_text)
-        response = await self.llm.ainvoke(prompt_text)
-        text = response["text"] if isinstance(response, dict) and "text" in response else str(response)
+        try:
+            response = await self.llm.ainvoke(prompt_text)
+            text = response["text"] if isinstance(response, dict) and "text" in response else str(response)
+        except Exception as e:
+            if run_logger:
+                run_logger.log_text("LLM error, continuing with wait/fallback:")
+                run_logger.log_code("text", str(e))
+            logger.warning(f"LLM ainvoke failed, using wait action: {e}")
+            return {"type": "wait"}
         if run_logger:
             run_logger.log_text("LLM Raw Response:")
             run_logger.log_code("json", text)
@@ -920,5 +994,6 @@ if __name__ == '__main__':
     app.run(
         host='0.0.0.0',
         port=config.api_port,
-        debug=config.enable_debug
+        debug=False,
+        use_reloader=False
     )
