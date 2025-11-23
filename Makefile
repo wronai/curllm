@@ -237,6 +237,7 @@ publish: release
 		echo "Error: Set TWINE_PASSWORD or PYPI_TOKEN environment variable"; exit 1; \
 	fi; \
 	if [ -n "$$PYPI_TOKEN" ]; then export TWINE_USERNAME=__token__; export TWINE_PASSWORD=$$PYPI_TOKEN; fi; \
+	if [ -n "$$TWINE_PASSWORD" ] && [ -z "$$TWINE_USERNAME" ]; then export TWINE_USERNAME=__token__; fi; \
 	python3 -m twine upload --non-interactive dist/*
 
 publish-test: release
@@ -246,6 +247,7 @@ publish-test: release
 		echo "Error: Set TWINE_PASSWORD or PYPI_TOKEN environment variable"; exit 1; \
 	fi; \
 	if [ -n "$$PYPI_TOKEN" ]; then export TWINE_USERNAME=__token__; export TWINE_PASSWORD=$$PYPI_TOKEN; fi; \
+	if [ -n "$$TWINE_PASSWORD" ] && [ -z "$$TWINE_USERNAME" ]; then export TWINE_USERNAME=__token__; fi; \
 	python3 -m twine upload --repository testpypi --non-interactive dist/*
 
 # Installation from scratch

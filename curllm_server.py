@@ -23,6 +23,7 @@ import aiohttp
 from dotenv import load_dotenv
 
 import inspect
+from dataclasses import dataclass as _dc_dataclass
 
 # Browser automation imports (optional) with robust fallback
 try:
@@ -36,7 +37,7 @@ class LocalAgent:
         self.llm = llm
         self.max_steps = max_steps
         self.visual_mode = visual_mode
-from langchain_ollama import OllamaLLM
+
 from playwright.async_api import async_playwright
 from PIL import Image
 import cv2
@@ -82,6 +83,60 @@ config = Config()
 # Core Execution Engine
 # ============================================================================
 
+class RunLogger:
+    """Markdown run logger for step-by-step diagnostics"""
+    def __init__(self, instruction: str, url: Optional[str]):
+        ts = datetime.now().strftime('%Y%m%d-%H%M%S')
+        self.dir = Path('./logs')
+        self.dir.mkdir(parents=True, exist_ok=True)
+        self.path = self.dir / f'run-{ts}.md'
+        with open(self.path, 'w', encoding='utf-8') as f:
+            f.write(f"# curllm Run Log ({ts})\n\n")
+            if url:
+                f.write(f"- URL: {url}\n")
+            if instruction:
+                f.write(f"- Instruction: {instruction}\n\n")
+
+    def _write(self, text: str):
+        with open(self.path, 'a', encoding='utf-8') as f:
+            f.write(text)
+
+    def log_heading(self, text: str):
+        self._write(f"\n## {text}\n\n")
+
+    def log_text(self, text: str):
+        self._write(f"{text}\n\n")
+
+    def log_kv(self, key: str, value: str):
+        self._write(f"- {key}: {value}\n")
+
+    def log_code(self, lang: str, code: str):
+        self._write(f"```{lang}\n{code}\n```\n\n")
+
+class SimpleOllama:
+    """Minimal async Ollama client used when langchain_ollama is unavailable"""
+    def __init__(self, base_url: str, model: str, num_ctx: int, num_predict: int, temperature: float, top_p: float):
+        self.base_url = base_url.rstrip('/')
+        self.model = model
+        self.options = {
+            "num_ctx": num_ctx,
+            "num_predict": num_predict,
+            "temperature": temperature,
+            "top_p": top_p,
+        }
+    async def ainvoke(self, prompt: str):
+        payload = {
+            "model": self.model,
+            "prompt": prompt,
+            "stream": False,
+            "options": self.options,
+        }
+        async with aiohttp.ClientSession() as session:
+            async with session.post(f"{self.base_url}/api/generate", json=payload) as resp:
+                data = await resp.json()
+        text = data.get("response", "") if isinstance(data, dict) else str(data)
+        return {"text": text}
+
 class CurllmExecutor:
     """Main browser automation executor with LLM support"""
     
@@ -91,16 +146,28 @@ class CurllmExecutor:
         self.captcha_solver = CaptchaSolver()
         self.stealth_config = StealthConfig()
         
-    def _setup_llm(self) -> OllamaLLM:
+    def _setup_llm(self) -> Any:
         """Initialize Ollama LLM"""
-        return OllamaLLM(
-            base_url=config.ollama_host,
-            model=config.ollama_model,
-            temperature=config.temperature,
-            top_p=config.top_p,
-            num_predict=config.num_predict,
-            num_ctx=config.num_ctx
-        )
+        try:
+            from langchain_ollama import OllamaLLM
+            return OllamaLLM(
+                base_url=config.ollama_host,
+                model=config.ollama_model,
+                temperature=config.temperature,
+                top_p=config.top_p,
+                num_ctx=config.num_ctx,
+                num_predict=config.num_predict,
+            )
+        except Exception as e:
+            logger.warning(f"langchain_ollama unavailable, using SimpleOllama fallback: {e}")
+            return SimpleOllama(
+                base_url=config.ollama_host,
+                model=config.ollama_model,
+                num_ctx=config.num_ctx,
+                num_predict=config.num_predict,
+                temperature=config.temperature,
+                top_p=config.top_p,
+            )
     
     async def execute_workflow(
         self,
@@ -113,14 +180,26 @@ class CurllmExecutor:
         headers: Optional[Dict] = None
     ) -> Dict[str, Any]:
         """Execute browser automation workflow"""
-        
+        # Prepare run logger
+        run_logger = RunLogger(instruction=instruction, url=url)
+        run_logger.log_heading(f"curllm run: {datetime.now().isoformat()}")
+        run_logger.log_kv("Model", config.ollama_model)
+        run_logger.log_kv("Ollama Host", config.ollama_host)
+        run_logger.log_kv("Visual Mode", str(visual_mode))
+        run_logger.log_kv("Stealth Mode", str(stealth_mode))
+        run_logger.log_kv("Use BQL", str(use_bql))
+
+        browser_context = None
         try:
             # Parse instruction if BQL mode
             if use_bql:
                 instruction = self._parse_bql(instruction)
+                run_logger.log_text("BQL parsed instruction:")
+                run_logger.log_code("text", instruction)
             
             # Setup browser context
             browser_context = await self._setup_browser(stealth_mode)
+            run_logger.log_text("Browser context initialized.")
             
             # Create agent (supports browser_use.Agent if available; else LocalAgent)
             agent = self._create_agent(
@@ -135,26 +214,62 @@ class CurllmExecutor:
                 instruction=instruction,
                 url=url,
                 visual_mode=visual_mode,
-                captcha_solver=captcha_solver
+                captcha_solver=captcha_solver,
+                run_logger=run_logger
             )
             
             # Cleanup
-            await browser_context.close()
+            if browser_context is not None:
+                try:
+                    await browser_context.close()
+                except Exception as e:
+                    logger.warning(f"Error during browser close: {e}")
+                # Close browser and playwright if attached
+                try:
+                    br = getattr(browser_context, "_curllm_browser", None)
+                    if br is not None:
+                        await br.close()
+                    pw = getattr(browser_context, "_curllm_playwright", None)
+                    if pw is not None:
+                        await pw.stop()
+                except Exception as e:
+                    logger.warning(f"Error closing Playwright resources: {e}")
             
-            return {
+            # Attach run log path
+            res = {
                 "success": True,
                 "result": result.get("data"),
                 "steps_taken": result.get("steps", 0),
                 "screenshots": result.get("screenshots", []),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
+                "run_log": str(run_logger.path)
             }
+            run_logger.log_text("Run finished successfully.")
+            return res
             
         except Exception as e:
             logger.error(f"Workflow execution failed: {str(e)}")
+            run_logger.log_text("Error occurred:")
+            run_logger.log_code("text", str(e))
+            if browser_context is not None:
+                try:
+                    await browser_context.close()
+                except Exception as ce:
+                    logger.warning(f"Error during browser close after failure: {ce}")
+                try:
+                    br = getattr(browser_context, "_curllm_browser", None)
+                    if br is not None:
+                        await br.close()
+                    pw = getattr(browser_context, "_curllm_playwright", None)
+                    if pw is not None:
+                        await pw.stop()
+                except Exception as e:
+                    logger.warning(f"Error closing Playwright resources after failure: {e}")
             return {
                 "success": False,
                 "error": str(e),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
+                "run_log": str(run_logger.path)
             }
 
     def _create_agent(self, browser_context, instruction: str, visual_mode: bool):
@@ -183,29 +298,25 @@ class CurllmExecutor:
             return await self._setup_playwright(stealth_mode)
     
     async def _setup_playwright(self, stealth_mode: bool):
-        """Setup Playwright browser"""
+        """Setup Playwright browser and return context with attached resources"""
         playwright = await async_playwright().start()
-        
         launch_args = {
             "headless": True,
             "args": ["--no-sandbox", "--disable-dev-shm-usage"]
         }
-        
         if stealth_mode:
             launch_args["args"].extend(self.stealth_config.get_chrome_args())
-        
         browser = await playwright.chromium.launch(**launch_args)
-        
         context_args = {
             "viewport": {"width": 1920, "height": 1080},
             "user_agent": self.stealth_config.get_user_agent() if stealth_mode else None
         }
-        
         context = await browser.new_context(**context_args)
-        
         if stealth_mode:
             await self.stealth_config.apply_to_context(context)
-        
+        # Attach resources for later cleanup
+        setattr(context, "_curllm_browser", browser)
+        setattr(context, "_curllm_playwright", playwright)
         return context
     
     async def _setup_browserless(self):
@@ -222,7 +333,8 @@ class CurllmExecutor:
         instruction: str,
         url: Optional[str],
         visual_mode: bool,
-        captcha_solver: bool
+        captcha_solver: bool,
+        run_logger: RunLogger
     ) -> Dict:
         """Execute the main browser task"""
         
@@ -242,6 +354,8 @@ class CurllmExecutor:
         # Main execution loop
         for step in range(config.max_steps):
             result["steps"] = step + 1
+            if run_logger:
+                run_logger.log_heading(f"Step {step + 1}")
             
             # Take screenshot if visual mode
             if visual_mode:
@@ -257,13 +371,23 @@ class CurllmExecutor:
             
             # Get page context
             page_context = await self._extract_page_context(page)
+            if run_logger:
+                try:
+                    run_logger.log_text("Page context snapshot (truncated):")
+                    run_logger.log_code("json", json.dumps(page_context, indent=2)[:1500])
+                except Exception:
+                    pass
             
             # Generate next action using LLM
             action = await self._generate_action(
                 instruction=instruction,
                 page_context=page_context,
-                step=step
+                step=step,
+                run_logger=run_logger
             )
+            if run_logger:
+                run_logger.log_text("Planned action:")
+                run_logger.log_code("json", json.dumps(action))
             
             # Execute action
             if action["type"] == "complete":
@@ -271,6 +395,8 @@ class CurllmExecutor:
                 break
             
             await self._execute_action(page, action)
+            if run_logger:
+                run_logger.log_text(f"Executed action: {action.get('type')}")
             
             # Check for honeypots
             if await self._detect_honeypot(page):
@@ -282,7 +408,7 @@ class CurllmExecutor:
                 lower_instr = (instruction or "").lower()
                 fallback = {}
                 if "link" in lower_instr:
-                    anchors = await agent.browser.evaluate("""
+                    anchors = await page.evaluate("""
                         () => Array.from(document.querySelectorAll('a')).map(a => ({
                             text: (a.innerText||'').trim(),
                             href: a.href
@@ -290,13 +416,16 @@ class CurllmExecutor:
                     """)
                     fallback["links"] = anchors[:100]
                 if "email" in lower_instr or "mail" in lower_instr:
-                    text = await agent.browser.evaluate("() => document.body.innerText")
+                    text = await page.evaluate("() => document.body.innerText")
                     emails = list(set(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", text)))
                     fallback["emails"] = emails[:100]
                 if not fallback:
                     ctx = await self._extract_page_context(page)
                     fallback = {"title": ctx.get("title"), "url": ctx.get("url")}
                 result["data"] = fallback
+                if run_logger:
+                    run_logger.log_text("Fallback extraction used:")
+                    run_logger.log_code("json", json.dumps(result["data"], indent=2))
             except Exception as _:
                 pass
         await page.close()
@@ -338,7 +467,7 @@ class CurllmExecutor:
             }
         """)
     
-    async def _generate_action(self, instruction: str, page_context: Dict, step: int) -> Dict:
+    async def _generate_action(self, instruction: str, page_context: Dict, step: int, run_logger: 'RunLogger' = None) -> Dict:
         """Generate next action using LLM"""
         context_str = json.dumps(page_context, indent=2)[:3000]
         prompt_text = (
@@ -355,10 +484,14 @@ class CurllmExecutor:
             "}\n\n"
             "Response (JSON only):"
         )
-
+        if run_logger:
+            run_logger.log_text("LLM Prompt:")
+            run_logger.log_code("json", prompt_text)
         response = await self.llm.ainvoke(prompt_text)
-
         text = response["text"] if isinstance(response, dict) and "text" in response else str(response)
+        if run_logger:
+            run_logger.log_text("LLM Raw Response:")
+            run_logger.log_code("json", text)
         try:
             return json.loads(text)
         except json.JSONDecodeError:
@@ -713,18 +846,34 @@ def execute():
     use_bql = data.get('use_bql', False)
     headers = data.get('headers', {})
     
-    # Run async task
-    result = asyncio.run(
-        executor.execute_workflow(
-            instruction=instruction,
-            url=url,
-            visual_mode=visual_mode,
-            stealth_mode=stealth_mode,
-            captcha_solver=captcha_solver,
-            use_bql=use_bql,
-            headers=headers
-        )
-    )
+    # Run async task in a fresh event loop per request to avoid loop state issues
+    def _run_in_new_loop():
+        loop = asyncio.new_event_loop()
+        try:
+            asyncio.set_event_loop(loop)
+            return loop.run_until_complete(
+                executor.execute_workflow(
+                    instruction=instruction,
+                    url=url,
+                    visual_mode=visual_mode,
+                    stealth_mode=stealth_mode,
+                    captcha_solver=captcha_solver,
+                    use_bql=use_bql,
+                    headers=headers
+                )
+            )
+        finally:
+            try:
+                loop.run_until_complete(asyncio.sleep(0))
+            except Exception:
+                pass
+            loop.close()
+            try:
+                asyncio.set_event_loop(asyncio.new_event_loop())
+            except Exception:
+                pass
+
+    result = _run_in_new_loop()
     
     return jsonify(result)
 

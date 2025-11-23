@@ -186,10 +186,24 @@ check_services() {
 start_services() {
     echo -e "${BLUE}Starting curllm services...${NC}"
     
-    PORT=${CURLLM_API_PORT:-$(if [ -f /tmp/curllm_api_port ]; then cat /tmp/curllm_api_port; else echo 8000; fi)}
-    INIT_PORT=$PORT
-    while ss -ltn | grep -q ":${PORT}\b"; do PORT=$((PORT+1)); done
-    if [ "$PORT" != "$INIT_PORT" ]; then dbg "API port ${INIT_PORT} busy; selected ${PORT}"; fi
+    # Prefer reusing an already running API server port, if reachable
+    SKIP_API_START=false
+    if [ -f /tmp/curllm_api_port ]; then
+        ap=$(cat /tmp/curllm_api_port)
+        dbg "Probing existing API at http://localhost:${ap}/health"
+        if [ -n "$ap" ] && curl -s "http://localhost:${ap}/health" > /dev/null 2>&1; then
+            PORT=$ap
+            SKIP_API_START=true
+            dbg "Detected running API at port ${PORT}; will not start a new instance"
+        fi
+    fi
+    # If no running API was detected, choose a free port (starting from .env or default)
+    if [ "$SKIP_API_START" = false ]; then
+        PORT=${CURLLM_API_PORT:-$(if [ -f /tmp/curllm_api_port ]; then cat /tmp/curllm_api_port; else echo 8000; fi)}
+        INIT_PORT=$PORT
+        while ss -ltn | grep -q ":${PORT}\b"; do PORT=$((PORT+1)); done
+        if [ "$PORT" != "$INIT_PORT" ]; then dbg "API port ${INIT_PORT} busy; selected ${PORT}"; fi
+    fi
     OPORT=${CURLLM_OLLAMA_PORT:-$(if [ -f /tmp/ollama_port ]; then cat /tmp/ollama_port; else echo 11434; fi)}
     INIT_OPORT=$OPORT
     while ss -ltn | grep -q ":${OPORT}\b"; do OPORT=$((OPORT+1)); done
@@ -247,8 +261,8 @@ start_services() {
         ollama pull "$CURLLM_MODEL"
     fi
     
-    # Start API server
-    if ! curl -s "http://localhost:${PORT}/health" > /dev/null 2>&1; then
+    # Start API server (only if not already running)
+    if [ "$SKIP_API_START" = false ] && ! curl -s "http://localhost:${PORT}/health" > /dev/null 2>&1; then
         echo "Starting curllm API server..."
         # Find Python script location
         SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
@@ -286,7 +300,7 @@ PY
         fi
         if [ -n "$SERVER_PATH" ]; then
             dbg "Using server path: $SERVER_PATH"
-            CURLLM_API_PORT=${PORT} CURLLM_OLLAMA_HOST="http://localhost:${OPORT}" python3 "$SERVER_PATH" > /tmp/curllm.log 2>&1 &
+            CURLLM_API_PORT=${PORT} CURLLM_OLLAMA_HOST="http://localhost:${OPORT}" CURLLM_DEBUG=false python3 "$SERVER_PATH" > /tmp/curllm.log 2>&1 &
             echo $! > /tmp/curllm.pid
             sleep 3
         else
@@ -487,10 +501,18 @@ EOF
     if [ "$VERBOSE" = true ]; then
         echo -e "${BLUE}Response:${NC}"
         echo "$RESPONSE" | jq .
+        RUN_LOG=$(echo "$RESPONSE" | jq -r '.run_log // empty')
+        if [ -n "$RUN_LOG" ]; then
+            echo -e "${YELLOW}Run log saved to:${NC} $RUN_LOG"
+        fi
     else
         # Extract result field
         RESULT=$(echo "$RESPONSE" | jq -r '.result // .error')
         echo "$RESULT"
+        RUN_LOG=$(echo "$RESPONSE" | jq -r '.run_log // empty')
+        if [ -n "$RUN_LOG" ]; then
+            echo "Run log: $RUN_LOG"
+        fi
     fi
     
     # Save to file if requested

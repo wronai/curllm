@@ -80,13 +80,24 @@ ollama pull qwen2.5:7b
 
 
 ### 2. Start Services
-
+Start all required services (auto-selects free ports and saves them to .env)
 ```bash
-# Start all required services (auto-selects free ports and saves them to .env)
 curllm --start-services
+```
 
-# Check status (reads ports from .env)
+Check status (reads ports from .env)
+```
 curllm --status
+```
+output:
+```bash
+=== curllm Service Status ===
+✓ Ollama is running
+✓ curllm API is running
+✓ Model qwen2.5:7b is available
+
+GPU Status:
+NVIDIA GeForce RTX 4060, 1190 MiB, 8188 MiB
 ```
 
 ### 3. Basic Usage
@@ -94,14 +105,31 @@ curllm --status
 ```bash
 # Simple extraction (ensure services are running)
 curllm "https://example.com" -d "extract all links"
+```
+output:
+```bash
+{
+  "links": [
+    {
+      "href": "https://iana.org/domains/example",
+      "text": "Learn more"
+    }
+  ]
+}
+Run log: ./logs/run-20251123-113145.md
+```
 
-# Form automation with authentication
+
+Form automation with authentication
+```bash
 curllm -X POST --visual --stealth \
   -d '{"instruction": "Login and download invoice", 
        "credentials": {"user": "john@example.com", "pass": "secret"}}' \
   https://app.example.com
+```
 
-# BQL query for structured data
+BQL query for structured data
+```bash
 curllm --bql -d 'query {
   page(url: "https://news.ycombinator.com") {
     title
@@ -139,6 +167,12 @@ curllm --visual --captcha \
 curllm --stealth --visual \
   -d "Fill contact form: name=John Doe, email=john@example.com, message=Hello" \
   https://www.prototypowanie.pl/kontakt/
+```
+
+### Extract all links 
+
+```bash
+curllm "https://www.prototypowanie.pl/kontakt/" -d "extract all links"
 ```
 
 ### Complex Workflow Automation
