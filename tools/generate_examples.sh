@@ -53,7 +53,8 @@ cd examples/$slug
 EOF
 }
 
-EXAMPLES_JSON=$(cat <<'JSON'
+generate() {
+  cat <<'JSON'
 [
   {
     "slug": "extract-links",
@@ -65,7 +66,7 @@ EXAMPLES_JSON=$(cat <<'JSON'
     "slug": "bql-hn-links",
     "title": "BQL: Hacker News Links",
     "description": "Use BQL to collect article titles and URLs from Hacker News.",
-    "command": "curllm --bql -d 'query {\n  page(url: \"https://news.ycombinator.com\") {\n    title\n    links: select(css: \"a.storylink, a.titlelink\") { text url: attr(name: \"href\") }\n  }\n}' -v"
+    "command": "curllm --bql -d 'query { page(url: \"https://news.ycombinator.com\") { title links { text url } } }' -v"
   },
   {
     "slug": "fill-contact-form",
@@ -131,7 +132,7 @@ EXAMPLES_JSON=$(cat <<'JSON'
     "slug": "allegro-products-under-150",
     "title": "Products Under 150 (Visual + Locale)",
     "description": "Find products under 150 using visual mode with locale/timezone configured.",
-    "command": "export CURLLM_HEADLESS=false\nexport CURLLM_LOCALE=pl-PL\nexport CURLLM_TIMEZONE=Europe/Warsaw\ncurllm --visual \"https://allegro.com\" -d \"Find all products under 150 and extract names, prices and urls\" -v"
+    "command": "CURLLM_HEADLESS=false CURLLM_LOCALE=pl-PL CURLLM_TIMEZONE=Europe/Warsaw curllm --visual \"https://allegro.com\" -d \"Find all products under 150 and extract names, prices and urls\" -v"
   },
   {
     "slug": "stealth-detection-test",
@@ -159,13 +160,14 @@ EXAMPLES_JSON=$(cat <<'JSON'
   }
 ]
 JSON
-)
+}
 
-echo "$EXAMPLES_JSON" | jq -c '.[]' | while read -r row; do
-  slug=$(jq -r '.slug' <<<"$row")
-  title=$(jq -r '.title' <<<"$row")
-  desc=$(jq -r '.description' <<<"$row")
-  cmd=$(jq -r '.command' <<<"$row")
+generate | jq -r '.[] | @base64' | while IFS= read -r row_b64; do
+  row=$(printf '%s' "$row_b64" | base64 -d)
+  slug=$(printf '%s\n' "$row" | jq -r '.slug')
+  title=$(printf '%s\n' "$row" | jq -r '.title')
+  desc=$(printf '%s\n' "$row" | jq -r '.description')
+  cmd=$(printf '%s\n' "$row" | jq -r '.command')
 
   # Per-example folder with README and run.sh
   dir="$EX_DIR/$slug"

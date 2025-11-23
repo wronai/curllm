@@ -1,3 +1,4 @@
+![curllm.png](docs/curllm.png)
 # curllm - Browser Automation with Local LLM
 
 <div align="center">
@@ -523,7 +524,7 @@ Bypasses common bot detection:
 - Custom user agents and headers
 
 ```bash
-curllm --stealth "https://protected-site.com" -d "Extract data"
+curllm --stealth "https://pypi.org/project/curllm/" -d "Extract data"
 ```
 
 ### BQL (Browser Query Language)
@@ -687,7 +688,7 @@ pytest tests/
 
 ## 📄 License
 
-MIT License - see [LICENSE](LICENSE) for details.
+Apache License - see [LICENSE](LICENSE) for details.
 
 ## 🙏 Acknowledgments
 

@@ -1,6 +1,6 @@
 # Makefile for curllm project
 
-.PHONY: help install setup start stop test clean docker-build docker-up docker-down benchmark
+.PHONY: help install setup start stop test clean docker-build docker-up docker-down benchmark examples
 
 # Default target
 help:
