@@ -44,3 +44,4 @@ Issues = "https://github.com/wronai/curllm/issues"
 # Install non-Python CLI script and top-level modules
 script-files = ["curllm"]
 py-modules = ["curllm_server", "bql_parser"]
+packages = ["curllm_core"]

@@ -143,7 +143,7 @@ status:
 # Testing
 test:
 	@echo "Running tests..."
-	@python3 -m pytest tests/ -v
+	@PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/ -v
 
 test-integration:
 	@echo "Running integration tests..."

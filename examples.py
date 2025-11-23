@@ -5,7 +5,7 @@ examples.py - Example usage of curllm for various automation tasks
 
 import asyncio
 import json
-from curllm_server import CurllmExecutor
+from curllm_core import CurllmExecutor
 
 async def example_simple_extraction():
     """Example: Extract data from a webpage"""
