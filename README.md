@@ -174,6 +174,7 @@ curllm "https://www.prototypowanie.pl/kontakt/" -d "extract all links"
 ```bash
 curllm "https://www.prototypowanie.pl/kontakt/" -d "extract all email addresses"
 ```
+output:
 ```bash
 {
   "emails": [
