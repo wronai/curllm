@@ -2,7 +2,7 @@
 import json
 from typing import Dict
 
-async def extract_page_context(page, include_dom: bool = False, dom_max_chars: int = 20000) -> Dict:
+async def extract_page_context(page, include_dom: bool = False, dom_max_chars: int = 20000, include_iframes: bool = True) -> Dict:
     base = await page.evaluate(
         """
         () => {
@@ -93,4 +93,59 @@ async def extract_page_context(page, include_dom: bool = False, dom_max_chars: i
             dom_preview = None
         if dom_preview:
             base["dom_preview"] = dom_preview
+        # Optionally capture iframes (CAPTCHA, consent UIs)
+        if include_iframes:
+            iframes = []
+            try:
+                for fr in page.frames:
+                    if fr == page.main_frame:
+                        continue
+                    try:
+                        fdom = await fr.evaluate(
+                            """
+                            () => {
+                              const SKIP = new Set(["script","style","meta","link","noscript"]);
+                              function ser(n){
+                                if(!n||n.nodeType!==Node.ELEMENT_NODE) return null;
+                                const tag=n.tagName.toLowerCase();
+                                if(SKIP.has(tag)) return null;
+                                let text=(n.innerText||"").trim();
+                                if(text && text.length>200) text=undefined;
+                                const obj={tag, text:text||undefined};
+                                const children=[];
+                                for(const ch of n.children){ const c=ser(ch); if(c) children.push(c); }
+                                if(children.length) obj.children=children;
+                                return obj;
+                              }
+                              return ser(document.body);
+                            }
+                            """
+                        )
+                    except Exception:
+                        fdom = None
+                    try:
+                        finter = await fr.evaluate(
+                            """
+                            () => {
+                              const sel = ["a[href]","button","input","textarea","select","[role=button]","[onclick]"].join(",");
+                              const out=[];
+                              for(const el of document.querySelectorAll(sel)){
+                                out.push({tag: el.tagName.toLowerCase(), text: (el.innerText||"").trim()||undefined});
+                              }
+                              return out;
+                            }
+                            """
+                        )
+                    except Exception:
+                        finter = []
+                    try:
+                        furl = fr.url
+                    except Exception:
+                        furl = None
+                    if fdom or finter:
+                        iframes.append({"url": furl, "dom": fdom, "interactive": (finter or [])[:20]})
+            except Exception:
+                pass
+            if iframes:
+                base["iframes"] = iframes[:5]
     return base

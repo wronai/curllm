@@ -92,6 +92,15 @@ class CurllmExecutor:
         run_logger.log_kv("Visual Mode", str(visual_mode))
         run_logger.log_kv("Stealth Mode", str(stealth_mode))
         run_logger.log_kv("Use BQL", str(use_bql))
+        # Auto-enable DOM snapshot if task looks like extraction and user didn't force it
+        try:
+            low = (instruction or "").lower()
+            looks_extractive = any(k in low for k in ["extract", "title", "product", "produkt", "price", "lista", "list"])  # noqa: E501
+            if looks_extractive and not bool(runtime.get("include_dom_html")):
+                runtime["include_dom_html"] = True
+                run_logger.log_kv("Auto include_dom_html", "True")
+        except Exception:
+            pass
 
         browser_context = None
         try:
@@ -241,9 +250,10 @@ class CurllmExecutor:
             except Exception:
                 pass
             try:
-                await handle_human_verification(page, run_logger)
-            except Exception:
-                pass
+                hv = await handle_human_verification(page, run_logger)
+                run_logger.log_kv("human_verify_clicked_on_nav", str(bool(hv)))
+            except Exception as e:
+                run_logger.log_kv("human_verify_on_nav_error", str(e))
             # Optional initial scroll to load content
             if runtime.get("scroll_load"):
                 try:
@@ -253,9 +263,10 @@ class CurllmExecutor:
             # Attempt widget CAPTCHA solving right after navigation if enabled
             if captcha_solver:
                 try:
-                    await _handle_widget_captcha(page, current_url=url, solver=self.captcha_solver, run_logger=run_logger)
-                except Exception:
-                    pass
+                    solved = await _handle_widget_captcha(page, current_url=url, solver=self.captcha_solver, run_logger=run_logger)
+                    run_logger.log_kv("widget_captcha_on_nav", str(bool(solved)))
+                except Exception as e:
+                    run_logger.log_kv("widget_captcha_on_nav_error", str(e))
         else:
             page = await agent.browser.new_page()
         try:
@@ -316,24 +327,29 @@ class CurllmExecutor:
             pass
         try:
             await _accept_cookies(page)
-        except Exception:
-            pass
-        try:
-            res_generic = await generic_fastpath(instruction, page, run_logger)
-            if res_generic is not None:
-                result["data"] = res_generic
-                await page.close()
-                return result
-        except Exception:
-            pass
-        try:
-            res_direct = await direct_fastpath(instruction, page, run_logger)
-            if res_direct is not None:
-                result["data"] = res_direct
-                await page.close()
-                return result
-        except Exception:
-            pass
+            run_logger.log_kv("accept_cookies", "attempted")
+        except Exception as e:
+            run_logger.log_kv("accept_cookies_error", str(e))
+        if bool(runtime.get("fastpath")):
+            try:
+                res_generic = await generic_fastpath(instruction, page, run_logger)
+                if res_generic is not None:
+                    result["data"] = res_generic
+                    await page.close()
+                    return result
+            except Exception as e:
+                run_logger.log_kv("generic_fastpath_error", str(e))
+        else:
+            run_logger.log_text("Fastpath disabled; using DOM-aware LLM planner.")
+        if bool(runtime.get("fastpath")):
+            try:
+                res_direct = await direct_fastpath(instruction, page, run_logger)
+                if res_direct is not None:
+                    result["data"] = res_direct
+                    await page.close()
+                    return result
+            except Exception as e:
+                run_logger.log_kv("direct_fastpath_error", str(e))
         last_sig = None
         no_progress = 0
         stall_limit = 3
@@ -369,6 +385,42 @@ class CurllmExecutor:
                 include_dom=bool(runtime.get("include_dom_html")),
                 dom_max_chars=int(runtime.get("dom_max_chars", 20000) or 20000),
             )
+            # Decision logging and remediation when DOM looks empty
+            try:
+                inter_len = len(page_context.get("interactive", []) or [])
+                dom_len = len(page_context.get("dom_preview", "") or "")
+                ifr_len = len(page_context.get("iframes", []) or [])
+                run_logger.log_kv("interactive_count", str(inter_len))
+                run_logger.log_kv("dom_preview_len", str(dom_len))
+                run_logger.log_kv("iframes_count", str(ifr_len))
+                if (inter_len == 0 and dom_len == 0 and bool(runtime.get("include_dom_html"))):
+                    run_logger.log_text("DOM snapshot empty; running remediation: human_verify -> accept_cookies -> small scroll -> re-extract")
+                    try:
+                        hv2 = await handle_human_verification(page, run_logger)
+                        run_logger.log_kv("human_verify_remediation", str(bool(hv2)))
+                    except Exception as e:
+                        run_logger.log_kv("human_verify_remediation_error", str(e))
+                    try:
+                        await _accept_cookies(page)
+                    except Exception:
+                        pass
+                    try:
+                        await _auto_scroll(page, steps=1, delay_ms=300)
+                    except Exception:
+                        pass
+                    page_context = await self._extract_page_context(
+                        page,
+                        include_dom=True,
+                        dom_max_chars=int(runtime.get("dom_max_chars", 20000) or 20000),
+                    )
+                    inter_len2 = len(page_context.get("interactive", []) or [])
+                    dom_len2 = len(page_context.get("dom_preview", "") or "")
+                    ifr_len2 = len(page_context.get("iframes", []) or [])
+                    run_logger.log_kv("interactive_count_after_remediate", str(inter_len2))
+                    run_logger.log_kv("dom_preview_len_after_remediate", str(dom_len2))
+                    run_logger.log_kv("iframes_count_after_remediate", str(ifr_len2))
+            except Exception:
+                pass
             try:
                 sig = f"{page_context.get('url','')}|{page_context.get('title','')}|{(page_context.get('text','') or '')[:500]}"
                 if last_sig is None:

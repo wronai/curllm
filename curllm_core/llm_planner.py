@@ -4,14 +4,16 @@ from typing import Any, Dict
 
 from .logger import RunLogger
 
-async def generate_action(llm: Any, instruction: str, page_context: Dict, step: int, run_logger: RunLogger | None = None) -> Dict:
-    context_str = json.dumps(page_context, indent=2)[:3000]
+async def generate_action(llm: Any, instruction: str, page_context: Dict, step: int, run_logger: RunLogger | None = None, max_chars: int = 8000) -> Dict:
+    context_str = json.dumps(page_context, indent=2)[: max(1000, int(max_chars))]
     prompt_text = (
         "You are a browser automation expert. Analyze the current page and determine the next action.\n\n"
         f"Instruction: {instruction}\n"
         f"Current Step: {step}\n"
         f"Page Context: {context_str}\n\n"
         "If 'interactive' or 'dom_preview' are present, prefer using selectors for existing elements.\n"
+        "If the instruction asks to extract data (titles, prices, urls, emails, etc.), and clicking is unnecessary, respond with type=complete and return extracted_data only.\n"
+        "For article titles, look for headings in <article>, <main>, <section> (h1/h2/h3) and anchor texts that look like article links.\n"
         "Generate a JSON action:\n"
         "{\n"
         "    \"type\": \"click|fill|scroll|wait|complete\",\n"

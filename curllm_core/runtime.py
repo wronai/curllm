@@ -11,6 +11,7 @@ DEFAULT_RUNTIME: Dict[str, Any] = {
     "wait_after_nav_ms": 800,
     "no_click": False,
     "scroll_load": False,
+    "fastpath": False,
 }
 
 
