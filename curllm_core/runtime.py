@@ -3,7 +3,7 @@ import json
 from typing import Any, Dict, Tuple
 
 DEFAULT_RUNTIME: Dict[str, Any] = {
-    "include_dom_html": False,
+    "include_dom_html": True,
     "dom_max_chars": 20000,
     "smart_click": True,
     "action_timeout_ms": 8000,
@@ -12,6 +12,7 @@ DEFAULT_RUNTIME: Dict[str, Any] = {
     "no_click": False,
     "scroll_load": False,
     "fastpath": False,
+    "use_external_slider_solver": True,
 }
 
 

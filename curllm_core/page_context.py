@@ -27,7 +27,23 @@ async def extract_page_context(page, include_dom: bool = False, dom_max_chars: i
                 buttons: Array.from(document.querySelectorAll('button')).map(b => ({
                     text: b.innerText,
                     onclick: b.onclick ? 'has handler' : null
-                }))
+                })),
+                headings: Array.from(document.querySelectorAll('h1, h2, h3')).slice(0, 100).map(h => ({
+                    tag: h.tagName.toLowerCase(),
+                    text: (h.innerText||'').trim(),
+                    id: h.id || undefined,
+                    class: h.className || undefined
+                })),
+                article_candidates: (() => {
+                    const anchors = Array.from(document.querySelectorAll('a[href]'));
+                    const pat = /(blog|post|wpis|article|artyk|news|aktualno)/i;
+                    return anchors.filter(a => {
+                        const href = a.getAttribute('href') || '';
+                        const t = (a.innerText||'').trim();
+                        if (!t) return false;
+                        return pat.test(href) || !!a.closest('article');
+                    }).slice(0, 100).map(a => ({ text: (a.innerText||'').trim(), href: a.href }));
+                })()
             };
         }
         """

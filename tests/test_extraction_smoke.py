@@ -1,3 +1,4 @@
+import asyncio
 import pytest
 
 from curllm_core.extraction import generic_fastpath, direct_fastpath, product_heuristics, fallback_extract
@@ -45,33 +46,29 @@ class FakePage:
         return None
 
 
-@pytest.mark.asyncio
-async def test_generic_fastpath():
+def test_generic_fastpath():
     page = FakePage()
-    res = await generic_fastpath("extract info", page)
+    res = asyncio.run(generic_fastpath("extract info", page))
     assert isinstance(res, dict)
     assert res["links"][0]["href"].startswith("https://example.com")
     assert any("@" in e for e in res["emails"])  # email present
     assert any(p for p in res["phones"])  # phone present
 
 
-@pytest.mark.asyncio
-async def test_direct_fastpath_links_only():
+def test_direct_fastpath_links_only():
     page = FakePage()
-    res = await direct_fastpath("links", page)
+    res = asyncio.run(direct_fastpath("links", page))
     assert isinstance(res, dict)
     assert "links" in res and res["links"]
 
 
-@pytest.mark.asyncio
-async def test_product_heuristics():
+def test_product_heuristics():
     page = FakePage()
-    res = await product_heuristics("find product under 150", page)
+    res = asyncio.run(product_heuristics("find product under 150", page))
     assert res and "products" in res and res["products"][0]["price"] < 150
 
 
-@pytest.mark.asyncio
-async def test_fallback_extract():
+def test_fallback_extract():
     page = FakePage()
-    res = await fallback_extract("emails and phones only", page)
+    res = asyncio.run(fallback_extract("emails and phones only", page))
     assert "emails" in res or "phones" in res

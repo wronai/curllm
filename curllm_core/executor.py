@@ -38,6 +38,7 @@ from .human_verify import handle_human_verification, looks_like_human_verify_tex
 from .captcha_widget import handle_captcha_image as _handle_captcha_image_widget, handle_widget_captcha as _handle_widget_captcha
 from .page_utils import auto_scroll as _auto_scroll, accept_cookies as _accept_cookies, is_block_page as _is_block_page
 from .extraction import generic_fastpath, direct_fastpath, product_heuristics, fallback_extract
+from .captcha_slider import attempt_slider_challenge
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +93,15 @@ class CurllmExecutor:
         run_logger.log_kv("Visual Mode", str(visual_mode))
         run_logger.log_kv("Stealth Mode", str(stealth_mode))
         run_logger.log_kv("Use BQL", str(use_bql))
+        # Log runtime flags
+        try:
+            for k in [
+                "include_dom_html","dom_max_chars","smart_click","action_timeout_ms",
+                "wait_after_click_ms","no_click","scroll_load","fastpath"]:
+                if k in runtime:
+                    run_logger.log_kv(f"runtime.{k}", str(runtime.get(k)))
+        except Exception:
+            pass
         # Auto-enable DOM snapshot if task looks like extraction and user didn't force it
         try:
             low = (instruction or "").lower()
@@ -267,6 +277,13 @@ class CurllmExecutor:
                     run_logger.log_kv("widget_captcha_on_nav", str(bool(solved)))
                 except Exception as e:
                     run_logger.log_kv("widget_captcha_on_nav_error", str(e))
+            # Attempt slider CAPTCHA (best-effort) regardless of captcha_solver
+            try:
+                slid = await attempt_slider_challenge(page, run_logger)
+                if slid:
+                    run_logger.log_kv("slider_attempt_on_nav", "True")
+            except Exception as e:
+                run_logger.log_kv("slider_attempt_on_nav_error", str(e))
         else:
             page = await agent.browser.new_page()
         try:
@@ -353,6 +370,8 @@ class CurllmExecutor:
         last_sig = None
         no_progress = 0
         stall_limit = 3
+        last_screenshot_path: Optional[str] = None
+        last_visual_analysis: Optional[Dict[str, Any]] = None
         for step in range(config.max_steps):
             result["steps"] = step + 1
             if run_logger:
@@ -361,6 +380,8 @@ class CurllmExecutor:
                 screenshot_path = await self._take_screenshot(page, step, target_dir=domain_dir)
                 result["screenshots"].append(screenshot_path)
                 visual_analysis = await self.vision_analyzer.analyze(screenshot_path)
+                last_screenshot_path = screenshot_path
+                last_visual_analysis = visual_analysis if isinstance(visual_analysis, dict) else {"raw": str(visual_analysis)}
                 if captcha_solver and visual_analysis.get("has_captcha"):
                     await _handle_captcha_image_widget(page, screenshot_path, self.captcha_solver, run_logger)
             # Try handle human verification banners/buttons each step
@@ -385,14 +406,46 @@ class CurllmExecutor:
                 include_dom=bool(runtime.get("include_dom_html")),
                 dom_max_chars=int(runtime.get("dom_max_chars", 20000) or 20000),
             )
+            # Attach vision info if present
+            if last_screenshot_path:
+                page_context.setdefault("status", {})
+                page_context["status"]["screenshot_path"] = last_screenshot_path
+            if last_visual_analysis:
+                page_context["vision"] = last_visual_analysis
             # Decision logging and remediation when DOM looks empty
             try:
                 inter_len = len(page_context.get("interactive", []) or [])
                 dom_len = len(page_context.get("dom_preview", "") or "")
                 ifr_len = len(page_context.get("iframes", []) or [])
+                head_len = len(page_context.get("headings", []) or [])
+                artc_len = len(page_context.get("article_candidates", []) or [])
+                # Attach status for LLM
+                try:
+                    hv_possible = looks_like_human_verify_text(page_context.get("text", ""))
+                except Exception:
+                    hv_possible = False
+                page_context.setdefault("status", {})
+                page_context["status"].update({
+                    "interactive_count": inter_len,
+                    "dom_preview_len": dom_len,
+                    "iframes_count": ifr_len,
+                    "headings_count": head_len,
+                    "article_candidates_count": artc_len,
+                    "human_verify_possible": bool(hv_possible),
+                })
                 run_logger.log_kv("interactive_count", str(inter_len))
                 run_logger.log_kv("dom_preview_len", str(dom_len))
                 run_logger.log_kv("iframes_count", str(ifr_len))
+                run_logger.log_kv("headings_count", str(head_len))
+                run_logger.log_kv("article_candidates_count", str(artc_len))
+                # If looks like slider block (no content, only iframe), try a drag attempt once per step
+                if inter_len == 0 and dom_len < 300 and ifr_len > 0:
+                    try:
+                        slid_step = await attempt_slider_challenge(page, run_logger)
+                        if slid_step:
+                            run_logger.log_kv("slider_attempt_on_step", "True")
+                    except Exception as e:
+                        run_logger.log_kv("slider_attempt_on_step_error", str(e))
                 if (inter_len == 0 and dom_len == 0 and bool(runtime.get("include_dom_html"))):
                     run_logger.log_text("DOM snapshot empty; running remediation: human_verify -> accept_cookies -> small scroll -> re-extract")
                     try:
@@ -416,6 +469,18 @@ class CurllmExecutor:
                     inter_len2 = len(page_context.get("interactive", []) or [])
                     dom_len2 = len(page_context.get("dom_preview", "") or "")
                     ifr_len2 = len(page_context.get("iframes", []) or [])
+                    try:
+                        hv_possible2 = looks_like_human_verify_text(page_context.get("text", ""))
+                    except Exception:
+                        hv_possible2 = False
+                    page_context.setdefault("status", {})
+                    page_context["status"].update({
+                        "interactive_count": inter_len2,
+                        "dom_preview_len": dom_len2,
+                        "iframes_count": ifr_len2,
+                        "human_verify_possible": bool(hv_possible2),
+                        "remediated": True,
+                    })
                     run_logger.log_kv("interactive_count_after_remediate", str(inter_len2))
                     run_logger.log_kv("dom_preview_len_after_remediate", str(dom_len2))
                     run_logger.log_kv("iframes_count_after_remediate", str(ifr_len2))
@@ -450,6 +515,12 @@ class CurllmExecutor:
                     break
             except Exception:
                 pass
+            # Planner: log size of provided context
+            try:
+                ctx_bytes = len(json.dumps(page_context)[:100000])
+                run_logger.log_kv("planner_context_bytes", str(ctx_bytes))
+            except Exception:
+                pass
             action = await self._generate_action(
                 instruction=instruction,
                 page_context=page_context,
@@ -461,6 +532,8 @@ class CurllmExecutor:
                 run_logger.log_code("json", json.dumps(action))
             if action.get("type") == "complete":
                 result["data"] = action.get("extracted_data", page_context)
+                if run_logger:
+                    run_logger.log_text("Planner returned complete with extracted_data.")
                 break
             # Respect no_click runtime flag
             if runtime.get("no_click") and str(action.get("type")) == "click":
