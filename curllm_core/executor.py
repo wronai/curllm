@@ -32,6 +32,12 @@ from .vision import VisionAnalyzer
 from .captcha import CaptchaSolver
 from .stealth import StealthConfig
 from .browserless import BrowserlessContext
+from .runtime import parse_runtime_from_instruction
+from .headers import normalize_headers
+from .browser_setup import setup_browser
+from .page_context import extract_page_context
+from .actions import execute_action
+from .human_verify import handle_human_verification, looks_like_human_verify_text
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +83,8 @@ class CurllmExecutor:
         use_bql: bool = False,
         headers: Optional[Dict] = None,
     ) -> Dict[str, Any]:
+        # Parse optional runtime params embedded in JSON instruction
+        instruction, runtime = parse_runtime_from_instruction(instruction)
         run_logger = RunLogger(instruction=instruction, url=url)
         run_logger.log_heading(f"curllm run: {datetime.now().isoformat()}")
         run_logger.log_kv("Model", config.ollama_model)
@@ -95,7 +103,9 @@ class CurllmExecutor:
             host = urlparse(url).hostname if url else None
             if host and any(h in host for h in ["allegro.pl", "allegro.com"]):
                 stealth_mode = True
-            browser_context = await self._setup_browser(stealth_mode, storage_key=host)
+            # Normalize headers for Playwright context
+            norm_headers = normalize_headers(headers)
+            browser_context = await self._setup_browser(stealth_mode, storage_key=host, headers=norm_headers)
             run_logger.log_text("Browser context initialized.")
 
             agent = self._create_agent(
@@ -112,6 +122,7 @@ class CurllmExecutor:
                 stealth_mode=stealth_mode,
                 captcha_solver=captcha_solver,
                 run_logger=run_logger,
+                runtime=runtime,
             )
 
             if browser_context is not None:
@@ -195,50 +206,16 @@ class CurllmExecutor:
                 logger.warning(f"browser_use.Agent init failed: {e}. Falling back to LocalAgent.")
         return LocalAgent(browser_context, self.llm, config.max_steps, visual_mode, task=instruction)
 
-    async def _setup_browser(self, stealth_mode: bool, storage_key: Optional[str] = None):
-        if config.use_browserless:
-            return await self._setup_browserless()
-        else:
-            return await self._setup_playwright(stealth_mode, storage_key)
-
-    async def _setup_playwright(self, stealth_mode: bool, storage_key: Optional[str] = None):
-        from playwright.async_api import async_playwright  # lazy import
-        playwright = await async_playwright().start()
-        launch_args = {"headless": bool(config.headless), "args": ["--no-sandbox", "--disable-dev-shm-usage"]}
-        if stealth_mode:
-            launch_args["args"].extend(self.stealth_config.get_chrome_args())
-        if config.proxy:
-            launch_args["proxy"] = {"server": config.proxy}
-        browser = await playwright.chromium.launch(**launch_args)
-        storage_path = None
-        if storage_key:
-            storage_dir = Path(os.getenv("CURLLM_STORAGE_DIR", "./workspace/storage"))
-            try:
-                storage_dir.mkdir(parents=True, exist_ok=True)
-            except Exception:
-                alt = Path("/tmp/curllm_workspace/storage")
-                alt.mkdir(parents=True, exist_ok=True)
-                storage_dir = alt
-            storage_path = storage_dir / f"{storage_key}.json"
-        vw = 1366 + int(random.random() * 700)
-        vh = 768 + int(random.random() * 400)
-        context_args = {
-            "viewport": {"width": vw, "height": vh},
-            "user_agent": self.stealth_config.get_user_agent() if stealth_mode else None,
-            "locale": config.locale,
-            "timezone_id": config.timezone_id,
-            "extra_http_headers": {"Accept-Language": f"{config.locale},en;q=0.8"},
-        }
-        if storage_path and storage_path.exists():
-            context_args["storage_state"] = str(storage_path)
-        context = await browser.new_context(**context_args)
-        if stealth_mode:
-            await self.stealth_config.apply_to_context(context)
-        setattr(context, "_curllm_browser", browser)
-        setattr(context, "_curllm_playwright", playwright)
-        if storage_path:
-            setattr(context, "_curllm_storage_path", str(storage_path))
-        return context
+    async def _setup_browser(self, stealth_mode: bool, storage_key: Optional[str] = None, headers: Optional[Dict[str, str]] = None):
+        return await setup_browser(
+            use_browserless=config.use_browserless,
+            browserless_url=config.browserless_url,
+            stealth_mode=stealth_mode,
+            storage_key=storage_key,
+            headers=headers,
+            stealth_config=self.stealth_config,
+            config=config,
+        )
 
     async def _setup_browserless(self):
         import websockets  # lazy import
@@ -254,6 +231,7 @@ class CurllmExecutor:
         stealth_mode: bool,
         captcha_solver: bool,
         run_logger: RunLogger,
+        runtime: Dict[str, Any],
     ) -> Dict:
         result: Dict[str, Any] = {"data": None, "steps": 0, "screenshots": []}
         lower_instr = (instruction or "").lower()
@@ -266,9 +244,15 @@ class CurllmExecutor:
             except Exception:
                 pass
             try:
-                await self._handle_human_verification(page, run_logger)
+                await handle_human_verification(page, run_logger)
             except Exception:
                 pass
+            # Optional initial scroll to load content
+            if runtime.get("scroll_load"):
+                try:
+                    await self._auto_scroll(page, steps=4, delay_ms=600)
+                except Exception:
+                    pass
             # Attempt widget CAPTCHA solving right after navigation if enabled
             if captcha_solver:
                 try:
@@ -464,15 +448,16 @@ class CurllmExecutor:
                 result["screenshots"].append(screenshot_path)
                 visual_analysis = await self.vision_analyzer.analyze(screenshot_path)
                 if captcha_solver and visual_analysis.get("has_captcha"):
-                    await self._handle_captcha(page, screenshot_path)
+                    await handle_captcha(page, screenshot_path, run_logger)
             # Try handle human verification banners/buttons each step
             try:
-                await self._handle_human_verification(page, run_logger)
+                await handle_human_verification(page, run_logger)
             except Exception:
                 pass
             # Try widget CAPTCHA solving per step if enabled
             if captcha_solver:
                 try:
+                    await handle_widget_captcha(page, current_url=url, run_logger=run_logger)
                     # Try to obtain current URL from page if available
                     cur_url = None
                     try:
@@ -482,7 +467,11 @@ class CurllmExecutor:
                     await self._handle_widget_captcha(page, current_url=cur_url, run_logger=run_logger)
                 except Exception:
                     pass
-            page_context = await self._extract_page_context(page)
+            page_context = await self._extract_page_context(
+                page,
+                include_dom=bool(runtime.get("include_dom_html")),
+                dom_max_chars=int(runtime.get("dom_max_chars", 20000) or 20000),
+            )
             try:
                 sig = f"{page_context.get('url','')}|{page_context.get('title','')}|{(page_context.get('text','') or '')[:500]}"
                 if last_sig is None:
@@ -568,7 +557,12 @@ class CurllmExecutor:
             if action.get("type") == "complete":
                 result["data"] = action.get("extracted_data", page_context)
                 break
-            await self._execute_action(page, action)
+            # Respect no_click runtime flag
+            if runtime.get("no_click") and str(action.get("type")) == "click":
+                if run_logger:
+                    run_logger.log_text("Skipping click due to no_click=true")
+            else:
+                await self._execute_action(page, action, runtime)
             if run_logger:
                 run_logger.log_text(f"Executed action: {action.get('type')}")
             if await self._detect_honeypot(page):
@@ -641,36 +635,8 @@ class CurllmExecutor:
         await page.screenshot(path=str(filename))
         return str(filename)
 
-    async def _extract_page_context(self, page) -> Dict:
-        return await page.evaluate(
-            """
-            () => {
-                return {
-                    title: document.title,
-                    url: window.location.href,
-                    text: document.body.innerText.substring(0, 5000),
-                    forms: Array.from(document.forms).map(f => ({
-                        id: f.id,
-                        action: f.action,
-                        fields: Array.from(f.elements).map(e => ({
-                            name: e.name,
-                            type: e.type,
-                            value: e.value,
-                            visible: e.offsetParent !== null
-                        }))
-                    })),
-                    links: Array.from(document.links).slice(0, 50).map(l => ({
-                        href: l.href,
-                        text: l.innerText
-                    })),
-                    buttons: Array.from(document.querySelectorAll('button')).map(b => ({
-                        text: b.innerText,
-                        onclick: b.onclick ? 'has handler' : null
-                    }))
-                };
-            }
-            """
-        )
+    async def _extract_page_context(self, page, include_dom: bool = False, dom_max_chars: int = 20000) -> Dict:
+        return await extract_page_context(page, include_dom=include_dom, dom_max_chars=dom_max_chars)
 
     async def _generate_action(self, instruction: str, page_context: Dict, step: int, run_logger: RunLogger | None = None) -> Dict:
         context_str = json.dumps(page_context, indent=2)[:3000]
@@ -679,11 +645,14 @@ class CurllmExecutor:
             f"Instruction: {instruction}\n"
             f"Current Step: {step}\n"
             f"Page Context: {context_str}\n\n"
+            "If 'interactive' or 'dom_preview' are present, prefer using selectors for existing elements.\n"
             "Generate a JSON action:\n"
             "{\n"
             "    \"type\": \"click|fill|scroll|wait|complete\",\n"
             "    \"selector\": \"CSS selector if applicable\",\n"
             "    \"value\": \"value to fill if applicable\",\n"
+            "    \"waitFor\": \"optional selector to wait for\",\n"
+            "    \"timeoutMs\": 8000\n"
             "    \"extracted_data\": \"data if task is complete\"\n"
             "}\n\n"
             "Response (JSON only):"
@@ -708,26 +677,15 @@ class CurllmExecutor:
         except json.JSONDecodeError:
             return {"type": "wait"}
 
-    async def _execute_action(self, page, action: Dict):
-        action_type = action.get("type")
-        if action_type == "click":
-            try:
-                await page.wait_for_timeout(200 + int(random.random()*400))
-            except Exception:
-                pass
-            await page.click(action["selector"], timeout=5000)
-        elif action_type == "fill":
-            await page.fill(action["selector"], action["value"])
-            await page.wait_for_timeout(150 + int(random.random()*350))
-        elif action_type == "scroll":
-            dy = 300 + int(random.random()*700)
-            try:
-                await page.mouse.wheel(0, dy)
-            except Exception:
-                await page.evaluate(f"window.scrollBy(0, {dy})")
-            await page.wait_for_timeout(500 + int(random.random()*800))
-        elif action_type == "wait":
-            await page.wait_for_timeout(800 + int(random.random()*1200))
+    async def _execute_action(self, page, action: Dict, runtime: Dict[str, Any]):
+        return await execute_action(page, action, runtime)
+
+    # Backward-compat wrappers for tests
+    def _looks_like_human_verify_text(self, txt: str) -> bool:  # noqa: N802
+        return looks_like_human_verify_text(txt)
+
+    async def _handle_human_verification(self, page, run_logger: RunLogger | None = None):  # noqa: N802
+        return await handle_human_verification(page, run_logger)
 
     async def _detect_honeypot(self, page) -> bool:
         honeypots = await page.evaluate(
