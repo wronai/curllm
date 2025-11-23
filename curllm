@@ -5,12 +5,26 @@
 # Version: 1.0.0
 #============================================================================
 
+# Load .env if present
+if [ -f ".env" ]; then
+    set -a
+    . ./.env
+    set +a
+fi
+
 # Default configuration
 CURLLM_API_HOST="${CURLLM_API_HOST:-http://localhost:8000}"
 CURLLM_OLLAMA_HOST="${CURLLM_OLLAMA_HOST:-http://localhost:11434}"
 CURLLM_MODEL="${CURLLM_MODEL:-qwen2.5:7b}"
 CURLLM_BROWSERLESS="${CURLLM_BROWSERLESS:-false}"
 CURLLM_DEBUG="${CURLLM_DEBUG:-false}"
+
+if [[ "$CURLLM_API_HOST" == "http://localhost:8000" ]] && [ -f /tmp/curllm_api_port ]; then
+    CURLLM_API_HOST="http://localhost:$(cat /tmp/curllm_api_port)"
+fi
+if [[ "$CURLLM_OLLAMA_HOST" == "http://localhost:11434" ]] && [ -f /tmp/ollama_port ]; then
+    CURLLM_OLLAMA_HOST="http://localhost:$(cat /tmp/ollama_port)"
+fi
 
 # Color codes
 RED='\033[0;31m'
@@ -155,6 +169,8 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+
+
 # Function to check if services are running
 check_services() {
     local all_good=true
@@ -198,10 +214,16 @@ check_services() {
 start_services() {
     echo -e "${BLUE}Starting curllm services...${NC}"
     
-    # Start Ollama if not running
+    PORT=${CURLLM_API_PORT:-$(if [ -f /tmp/curllm_api_port ]; then cat /tmp/curllm_api_port; else echo 8000; fi)}
+    while ss -ltn | grep -q ":${PORT}\b"; do PORT=$((PORT+1)); done
+    OPORT=${CURLLM_OLLAMA_PORT:-$(if [ -f /tmp/ollama_port ]; then cat /tmp/ollama_port; else echo 11434; fi)}
+    while ss -ltn | grep -q ":${OPORT}\b"; do OPORT=$((OPORT+1)); done
+    echo ${PORT} > /tmp/curllm_api_port
+    echo ${OPORT} > /tmp/ollama_port
+
     if ! pgrep -x "ollama" > /dev/null; then
         echo "Starting Ollama..."
-        ollama serve > /tmp/ollama.log 2>&1 &
+        OLLAMA_HOST="127.0.0.1:${OPORT}" ollama serve > /tmp/ollama.log 2>&1 &
         sleep 2
     fi
     
@@ -212,12 +234,12 @@ start_services() {
     fi
     
     # Start API server
-    if ! curl -s "${CURLLM_API_HOST}/health" > /dev/null 2>&1; then
+    if ! curl -s "http://localhost:${PORT}/health" > /dev/null 2>&1; then
         echo "Starting curllm API server..."
         # Find Python script location
         SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
         if [ -f "$SCRIPT_DIR/curllm_server.py" ]; then
-            python3 "$SCRIPT_DIR/curllm_server.py" > /tmp/curllm.log 2>&1 &
+            CURLLM_API_PORT=${PORT} CURLLM_OLLAMA_HOST="http://localhost:${OPORT}" python3 "$SCRIPT_DIR/curllm_server.py" > /tmp/curllm.log 2>&1 &
             echo $! > /tmp/curllm.pid
             sleep 3
         else

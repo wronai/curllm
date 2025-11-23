@@ -33,6 +33,28 @@
 
 ## 🚀 Quick Start
 
+```shell
+make install
+```
+
+```shell
+Installing curllm dependencies...
+╔════════════════════════════════════════════╗
+║       curllm Installation Script           ║
+║   Browser Automation with Local LLM        ║
+╚════════════════════════════════════════════╝
+
+[1/7] Checking system requirements...
+✓ Python 3.13.5 found
+✓ GPU detected: NVIDIA GeForce RTX 4060, 8188 MiB
+✓ Docker is installed
+
+[2/7] Installing Ollama...
+✓ Ollama is already installed
+
+...
+```
+
 ### 1. Installation
 
 ```bash
@@ -48,6 +70,7 @@ chmod +x install.sh
 pip install -r requirements.txt
 ollama pull qwen2.5:7b
 ```
+
 
 ### 2. Start Services
 

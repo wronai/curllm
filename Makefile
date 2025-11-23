@@ -43,18 +43,23 @@ setup: install
 # Service management
 start:
 	@echo "Starting curllm services..."
-	@if ! pgrep -x "ollama" > /dev/null; then \
-		ollama serve > /tmp/ollama.log 2>&1 & \
-		echo "Started Ollama service"; \
+	@PORT=$${CURLLM_API_PORT:-$$(if [ -f /tmp/curllm_api_port ]; then cat /tmp/curllm_api_port; else echo 8000; fi)}; \
+	while ss -ltn | grep -q ":$${PORT}\\b"; do PORT=$$((PORT+1)); done; \
+	OPORT=$${CURLLM_OLLAMA_PORT:-$$(if [ -f /tmp/ollama_port ]; then cat /tmp/ollama_port; else echo 11434; fi)}; \
+	while ss -ltn | grep -q ":$${OPORT}\\b"; do OPORT=$$((OPORT+1)); done; \
+	echo $$PORT > /tmp/curllm_api_port; echo $$OPORT > /tmp/ollama_port; \
+	if ! pgrep -x "ollama" > /dev/null; then \
+		OLLAMA_HOST="127.0.0.1:$${OPORT}" ollama serve > /tmp/ollama.log 2>&1 & \
+		echo "Started Ollama service on port $$OPORT"; \
 		sleep 2; \
-	fi
-	@if ! curl -s http://localhost:8000/health > /dev/null 2>&1; then \
-		python3 curllm_server.py > /tmp/curllm.log 2>&1 & \
+	fi; \
+	if ! curl -s http://localhost:$${PORT}/health > /dev/null 2>&1; then \
+		CURLLM_OLLAMA_HOST="http://localhost:$${OPORT}" CURLLM_API_PORT=$${PORT} python3 curllm_server.py > /tmp/curllm.log 2>&1 & \
 		echo $$! > /tmp/curllm.pid; \
-		echo "Started curllm API server"; \
+		echo "Started curllm API server on port $$PORT"; \
 		sleep 3; \
-	fi
-	@echo "Services started. Check status with: curllm --status"
+	fi; \
+	echo "Services started. Check status with: curllm --status"
 
 stop:
 	@echo "Stopping curllm services..."
@@ -64,6 +69,7 @@ stop:
 		echo "Stopped curllm API server"; \
 	fi
 	@pkill -f "ollama serve" 2>/dev/null || true
+	@docker compose stop browserless redis 2>/dev/null || docker-compose stop browserless redis 2>/dev/null || true
 	@echo "Services stopped"
 
 restart: stop start
@@ -71,13 +77,15 @@ restart: stop start
 status:
 	@echo "Service Status:"
 	@echo "==============="
-	@if pgrep -x "ollama" > /dev/null; then \
-		echo "✓ Ollama: Running"; \
+	@OPORT=$$(if [ -f /tmp/ollama_port ]; then cat /tmp/ollama_port; else echo 11434; fi); \
+	if pgrep -x "ollama" > /dev/null; then \
+		echo "✓ Ollama: Running on :$${OPORT}"; \
 	else \
 		echo "✗ Ollama: Not running"; \
 	fi
-	@if curl -s http://localhost:8000/health > /dev/null 2>&1; then \
-		echo "✓ curllm API: Running"; \
+	@PORT=$$(if [ -f /tmp/curllm_api_port ]; then cat /tmp/curllm_api_port; else echo 8000; fi); \
+	if curl -s http://localhost:$${PORT}/health > /dev/null 2>&1; then \
+		echo "✓ curllm API: Running on :$${PORT}"; \
 	else \
 		echo "✗ curllm API: Not running"; \
 	fi

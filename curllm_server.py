@@ -19,13 +19,19 @@ from typing import Dict, List, Optional, Any
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import aiohttp
+from dotenv import load_dotenv
 
 # Browser automation imports
-from browser_use import Agent, Browser
-from browser_use.browser.context import BrowserContext
+try:
+    from browser_use import Agent
+except Exception:
+    class Agent:
+        def __init__(self, browser, llm, max_steps, visual_mode):
+            self.browser = browser
+            self.llm = llm
+            self.max_steps = max_steps
+            self.visual_mode = visual_mode
 from langchain_ollama import OllamaLLM
-from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
 from playwright.async_api import async_playwright
 from PIL import Image
 import cv2
@@ -52,13 +58,19 @@ class Config:
     ollama_model: str = os.getenv("CURLLM_MODEL", "qwen2.5:7b")
     browserless_url: str = os.getenv("BROWSERLESS_URL", "ws://localhost:3000")
     use_browserless: bool = os.getenv("CURLLM_BROWSERLESS", "false").lower() == "true"
-    max_steps: int = 20
-    screenshot_dir: Path = Path("/tmp/curllm_screenshots")
+    max_steps: int = int(os.getenv("CURLLM_MAX_STEPS", "20"))
+    screenshot_dir: Path = Path(os.getenv("CURLLM_SCREENSHOT_DIR", "/tmp/curllm_screenshots"))
     enable_debug: bool = os.getenv("CURLLM_DEBUG", "false").lower() == "true"
+    api_port: int = int(os.getenv("CURLLM_API_PORT", os.getenv("API_PORT", "8000")))
+    num_ctx: int = int(os.getenv("CURLLM_NUM_CTX", "8192"))
+    num_predict: int = int(os.getenv("CURLLM_NUM_PREDICT", "512"))
+    temperature: float = float(os.getenv("CURLLM_TEMPERATURE", "0.3"))
+    top_p: float = float(os.getenv("CURLLM_TOP_P", "0.9"))
     
     def __post_init__(self):
         self.screenshot_dir.mkdir(exist_ok=True)
 
+load_dotenv()
 config = Config()
 
 # ============================================================================
@@ -79,10 +91,10 @@ class CurllmExecutor:
         return OllamaLLM(
             base_url=config.ollama_host,
             model=config.ollama_model,
-            temperature=0.3,
-            top_p=0.9,
-            num_predict=512,
-            num_ctx=8192
+            temperature=config.temperature,
+            top_p=config.top_p,
+            num_predict=config.num_predict,
+            num_ctx=config.num_ctx
         )
     
     async def execute_workflow(
@@ -283,38 +295,28 @@ class CurllmExecutor:
     
     async def _generate_action(self, instruction: str, page_context: Dict, step: int) -> Dict:
         """Generate next action using LLM"""
-        
-        prompt = PromptTemplate(
-            input_variables=["instruction", "context", "step"],
-            template="""You are a browser automation expert. Analyze the current page and determine the next action.
-
-Instruction: {instruction}
-Current Step: {step}
-Page Context: {context}
-
-Generate a JSON action:
-{{
-    "type": "click|fill|scroll|wait|complete",
-    "selector": "CSS selector if applicable",
-    "value": "value to fill if applicable",
-    "extracted_data": "data if task is complete"
-}}
-
-Response (JSON only):"""
+        context_str = json.dumps(page_context, indent=2)[:3000]
+        prompt_text = (
+            "You are a browser automation expert. Analyze the current page and determine the next action.\n\n"
+            f"Instruction: {instruction}\n"
+            f"Current Step: {step}\n"
+            f"Page Context: {context_str}\n\n"
+            "Generate a JSON action:\n"
+            "{\n"
+            "    \"type\": \"click|fill|scroll|wait|complete\",\n"
+            "    \"selector\": \"CSS selector if applicable\",\n"
+            "    \"value\": \"value to fill if applicable\",\n"
+            "    \"extracted_data\": \"data if task is complete\"\n"
+            "}\n\n"
+            "Response (JSON only):"
         )
-        
-        chain = LLMChain(llm=self.llm, prompt=prompt)
-        
-        response = await chain.ainvoke({
-            "instruction": instruction,
-            "context": json.dumps(page_context, indent=2)[:3000],
-            "step": step
-        })
-        
+
+        response = await self.llm.ainvoke(prompt_text)
+
+        text = response["text"] if isinstance(response, dict) and "text" in response else str(response)
         try:
-            return json.loads(response["text"])
+            return json.loads(text)
         except json.JSONDecodeError:
-            # Fallback parsing
             return {"type": "wait"}
     
     async def _execute_action(self, page, action: Dict):
@@ -716,7 +718,7 @@ if __name__ == '__main__':
         sys.exit(1)
     
     # Start Flask server
-    logger.info(f"Starting curllm API server on port 8000...")
+    logger.info(f"Starting curllm API server on port {config.api_port}...")
     logger.info(f"Model: {config.ollama_model}")
     logger.info(f"Visual mode: Available")
     logger.info(f"Stealth mode: Available")
@@ -724,6 +726,6 @@ if __name__ == '__main__':
     
     app.run(
         host='0.0.0.0',
-        port=8000,
+        port=config.api_port,
         debug=config.enable_debug
     )

@@ -92,17 +92,17 @@ fi
 source venv/bin/activate
 
 # Upgrade pip
-pip install --upgrade pip > /dev/null 2>&1
+pip install --upgrade pip
 
 # Install Python dependencies
 echo "Installing Python packages..."
-pip install -r requirements.txt > /dev/null 2>&1
+pip install -r requirements.txt
 echo -e "${GREEN}✓ Python packages installed${NC}"
 
 # Install Playwright browsers
 echo "Installing Playwright browsers..."
 playwright install chromium > /dev/null 2>&1
-playwright install-deps chromium > /dev/null 2>&1
+playwright install-deps chromium > /dev/null 2>&1 || true
 echo -e "${GREEN}✓ Playwright browsers installed${NC}"
 
 echo ""
@@ -182,22 +182,65 @@ chmod +x curllm
 chmod +x curllm_server.py
 
 # Create symlink for global access
-sudo ln -sf $(pwd)/curllm /usr/local/bin/curllm 2>/dev/null || \
+sudo -n ln -sf $(pwd)/curllm /usr/local/bin/curllm 2>/dev/null || \
     ln -sf $(pwd)/curllm ~/.local/bin/curllm 2>/dev/null || \
     echo -e "${YELLOW}⚠ Could not create global symlink. Add $(pwd) to PATH${NC}"
 
 echo -e "${GREEN}✓ curllm command installed${NC}"
+
+# Create .env from example if missing and set defaults
+if [ ! -f .env ]; then
+    if [ -f .env.example ]; then
+        cp .env.example .env
+    else
+        touch .env
+    fi
+fi
+
+# Ensure CURLLM_MODEL is set to the downloaded default model
+if grep -q '^CURLLM_MODEL=' .env; then
+    sed -i "s/^CURLLM_MODEL=.*/CURLLM_MODEL=${DEFAULT_MODEL}/" .env
+else
+    echo "CURLLM_MODEL=${DEFAULT_MODEL}" >> .env
+fi
 
 # Optional: Setup Docker services
 if [ "$DOCKER_AVAILABLE" = true ]; then
     echo ""
     echo -e "${BLUE}[7/7] Setting up Docker services...${NC}"
     
-    read -p "Would you like to start Browserless container? (y/n) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        docker-compose up -d browserless redis
-        echo -e "${GREEN}✓ Docker services started${NC}"
+    if [ -t 0 ]; then
+        read -p "Would you like to start Browserless container? (y/n) " -n 1 -r || true
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            BROWSERLESS_PORT_ENV=${BROWSERLESS_PORT:-3000}
+            while ss -ltn | grep -q ":$BROWSERLESS_PORT_ENV\\b"; do BROWSERLESS_PORT_ENV=$((BROWSERLESS_PORT_ENV+1)); done
+            REDIS_PORT_ENV=${REDIS_PORT:-6379}
+            while ss -ltn | grep -q ":$REDIS_PORT_ENV\\b"; do REDIS_PORT_ENV=$((REDIS_PORT_ENV+1)); done
+            echo $BROWSERLESS_PORT_ENV > /tmp/curllm_browserless_port
+            echo $REDIS_PORT_ENV > /tmp/curllm_redis_port
+            # Persist selected ports to .env
+            if grep -q '^BROWSERLESS_PORT=' .env; then
+                sed -i "s/^BROWSERLESS_PORT=.*/BROWSERLESS_PORT=${BROWSERLESS_PORT_ENV}/" .env
+            else
+                echo "BROWSERLESS_PORT=${BROWSERLESS_PORT_ENV}" >> .env
+            fi
+            if grep -q '^REDIS_PORT=' .env; then
+                sed -i "s/^REDIS_PORT=.*/REDIS_PORT=${REDIS_PORT_ENV}/" .env
+            else
+                echo "REDIS_PORT=${REDIS_PORT_ENV}" >> .env
+            fi
+            if grep -q '^BROWSERLESS_URL=' .env; then
+                sed -i "s#^BROWSERLESS_URL=.*#BROWSERLESS_URL=ws://localhost:${BROWSERLESS_PORT_ENV}#" .env
+            else
+                echo "BROWSERLESS_URL=ws://localhost:${BROWSERLESS_PORT_ENV}" >> .env
+            fi
+            BROWSERLESS_PORT=$BROWSERLESS_PORT_ENV REDIS_PORT=$REDIS_PORT_ENV docker compose up -d browserless redis 2>/dev/null || \
+            BROWSERLESS_PORT=$BROWSERLESS_PORT_ENV REDIS_PORT=$REDIS_PORT_ENV docker-compose up -d browserless redis
+            echo -e "${GREEN}✓ Docker services started on ports browserless:$BROWSERLESS_PORT_ENV redis:$REDIS_PORT_ENV${NC}"
+        fi
+    else
+        echo -e "${YELLOW}Non-interactive shell, skipping Docker setup${NC}"
     fi
 else
     echo ""

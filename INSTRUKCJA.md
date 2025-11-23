@@ -65,8 +65,8 @@ python3 curllm_server.py &
 
 ### 1. Prosta ekstrakcja danych
 ```bash
-curllm "https://shop.example.com" \
-  -d "znajdź wszystkie produkty poniżej 100 PLN"
+curllm "https://ceneo.pl" \
+  -d "znajdź wszystkie produkty poniżej 200 PLN"
 ```
 
 ### 2. Wypełnianie formularzy z CAPTCHA
