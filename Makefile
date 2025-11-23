@@ -1,0 +1,210 @@
+# Makefile for curllm project
+
+.PHONY: help install setup start stop test clean docker-build docker-up docker-down benchmark
+
+# Default target
+help:
+	@echo "curllm - Browser Automation with Local LLM"
+	@echo ""
+	@echo "Available targets:"
+	@echo "  make install      - Install all dependencies"
+	@echo "  make setup        - Complete setup (install + pull models)"
+	@echo "  make start        - Start all services"
+	@echo "  make stop         - Stop all services"
+	@echo "  make test         - Run tests"
+	@echo "  make benchmark    - Run performance benchmarks"
+	@echo "  make clean        - Clean temporary files"
+	@echo ""
+	@echo "Docker targets:"
+	@echo "  make docker-build - Build Docker images"
+	@echo "  make docker-up    - Start Docker services"
+	@echo "  make docker-down  - Stop Docker services"
+	@echo ""
+	@echo "Development:"
+	@echo "  make dev          - Start in development mode"
+	@echo "  make lint         - Run code linting"
+	@echo "  make format       - Format code"
+
+# Installation targets
+install:
+	@echo "Installing curllm dependencies..."
+	@chmod +x install.sh
+	@./install.sh
+
+setup: install
+	@echo "Setting up curllm..."
+	@ollama pull qwen2.5:7b
+	@ollama pull mistral:7b-instruct-q4_0
+	@playwright install chromium
+	@mkdir -p ~/.config/curllm
+	@mkdir -p /tmp/curllm_screenshots
+	@echo "Setup complete!"
+
+# Service management
+start:
+	@echo "Starting curllm services..."
+	@if ! pgrep -x "ollama" > /dev/null; then \
+		ollama serve > /tmp/ollama.log 2>&1 & \
+		echo "Started Ollama service"; \
+		sleep 2; \
+	fi
+	@if ! curl -s http://localhost:8000/health > /dev/null 2>&1; then \
+		python3 curllm_server.py > /tmp/curllm.log 2>&1 & \
+		echo $$! > /tmp/curllm.pid; \
+		echo "Started curllm API server"; \
+		sleep 3; \
+	fi
+	@echo "Services started. Check status with: curllm --status"
+
+stop:
+	@echo "Stopping curllm services..."
+	@if [ -f /tmp/curllm.pid ]; then \
+		kill $$(cat /tmp/curllm.pid) 2>/dev/null || true; \
+		rm /tmp/curllm.pid; \
+		echo "Stopped curllm API server"; \
+	fi
+	@pkill -f "ollama serve" 2>/dev/null || true
+	@echo "Services stopped"
+
+restart: stop start
+
+status:
+	@echo "Service Status:"
+	@echo "==============="
+	@if pgrep -x "ollama" > /dev/null; then \
+		echo "✓ Ollama: Running"; \
+	else \
+		echo "✗ Ollama: Not running"; \
+	fi
+	@if curl -s http://localhost:8000/health > /dev/null 2>&1; then \
+		echo "✓ curllm API: Running"; \
+	else \
+		echo "✗ curllm API: Not running"; \
+	fi
+	@if docker ps | grep -q "browserless"; then \
+		echo "✓ Browserless: Running"; \
+	else \
+		echo "✗ Browserless: Not running"; \
+	fi
+
+# Testing
+test:
+	@echo "Running tests..."
+	@python3 -m pytest tests/ -v
+
+test-integration:
+	@echo "Running integration tests..."
+	@python3 examples.py
+
+benchmark:
+	@echo "Running performance benchmark..."
+	@python3 -c "import asyncio; from examples import benchmark_models; asyncio.run(benchmark_models())"
+
+# Docker management
+docker-build:
+	@echo "Building Docker images..."
+	@docker-compose build
+
+docker-up:
+	@echo "Starting Docker services..."
+	@docker-compose up -d
+	@echo "Waiting for services to be ready..."
+	@sleep 10
+	@docker-compose ps
+
+docker-down:
+	@echo "Stopping Docker services..."
+	@docker-compose down
+
+docker-logs:
+	@docker-compose logs -f --tail=100
+
+docker-clean:
+	@docker-compose down -v
+	@docker system prune -f
+
+# Development
+dev:
+	@echo "Starting in development mode..."
+	@CURLLM_DEBUG=true python3 curllm_server.py
+
+watch:
+	@echo "Watching for changes..."
+	@while true; do \
+		inotifywait -e modify *.py; \
+		echo "Restarting server..."; \
+		make restart; \
+	done
+
+lint:
+	@echo "Running linters..."
+	@python3 -m flake8 *.py --max-line-length=120
+	@python3 -m pylint *.py --disable=C0114,C0115,C0116
+
+format:
+	@echo "Formatting code..."
+	@python3 -m black *.py --line-length=120
+	@python3 -m isort *.py
+
+# Utilities
+clean:
+	@echo "Cleaning temporary files..."
+	@rm -rf __pycache__ *.pyc
+	@rm -rf .pytest_cache
+	@rm -rf /tmp/curllm_screenshots/*
+	@rm -f /tmp/curllm.log /tmp/ollama.log
+	@echo "Cleaned!"
+
+logs:
+	@echo "=== Ollama Logs ==="
+	@tail -n 50 /tmp/ollama.log 2>/dev/null || echo "No Ollama logs"
+	@echo ""
+	@echo "=== curllm API Logs ==="
+	@tail -n 50 /tmp/curllm.log 2>/dev/null || echo "No API logs"
+
+# Model management
+models-list:
+	@echo "Available models:"
+	@ollama list
+
+models-pull:
+	@echo "Pulling recommended models..."
+	@ollama pull qwen2.5:7b
+	@ollama pull mistral:7b-instruct-q4_0
+	@ollama pull llama3.2:3b
+	@ollama pull phi3:mini
+
+models-clean:
+	@echo "Removing unused models..."
+	@ollama rm $$(ollama list | tail -n +2 | awk '{print $$1}' | grep -v "qwen2.5:7b")
+
+# Quick examples
+example-extract:
+	@curllm "https://example.com" -d "extract all email addresses"
+
+example-form:
+	@curllm --visual --stealth -d "fill contact form with test data" https://example.com/contact
+
+example-bql:
+	@curllm --bql -d 'query { page(url: "https://example.com") { title links { href text } } }'
+
+# Release
+release:
+	@echo "Preparing release..."
+	@python3 -m build
+	@twine check dist/*
+
+publish: release
+	@echo "Publishing to PyPI..."
+	@twine upload dist/*
+
+# Installation from scratch
+bootstrap:
+	@echo "Bootstrapping curllm from scratch..."
+	@curl -fsSL https://ollama.ai/install.sh | sh
+	@pip install --user pipx
+	@pipx install playwright
+	@playwright install chromium
+	@make setup
+	@make start
+	@echo "Bootstrap complete! curllm is ready to use."

@@ -1,0 +1,126 @@
+version: '3.8'
+
+services:
+  # Browserless Chrome with stealth mode and BQL support
+  browserless:
+    image: browserless/chrome:latest
+    container_name: curllm_browserless
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # Performance settings
+      MAX_CONCURRENT_SESSIONS: 10
+      MAX_QUEUE_LENGTH: 20
+      CONNECTION_TIMEOUT: 60000
+      MAX_SESSION_TIME: 300000
+      
+      # Stealth and anti-detection
+      ENABLE_STEALTH: "true"
+      ENABLE_CORS: "true"
+      BLOCK_ADS: "true"
+      IGNORE_DEFAULT_ARGS: "--disable-dev-shm-usage,--disable-blink-features=AutomationControlled"
+      
+      # BQL (Browser Query Language) settings
+      ENABLE_API_GET: "true"
+      WORKSPACE_DELETE_EXPIRED: "true"
+      WORKSPACE_EXPIRE_DAYS: 1
+      
+      # Resource limits
+      DEFAULT_LAUNCH_ARGS: '["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-accelerated-2d-canvas","--no-first-run","--no-zygote","--disable-gpu"]'
+      
+      # Security
+      TOKEN: "${BROWSERLESS_TOKEN:-}"  # Optional authentication token
+      
+    volumes:
+      - ./downloads:/downloads
+      - ./workspace:/workspace
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Ollama service for local LLM
+  ollama:
+    image: ollama/ollama:latest
+    container_name: curllm_ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    environment:
+      OLLAMA_HOST: "0.0.0.0"
+      OLLAMA_NUM_PARALLEL: 4
+      OLLAMA_MAX_LOADED_MODELS: 2
+      OLLAMA_KEEP_ALIVE: "5m"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis for caching and session management
+  redis:
+    image: redis:alpine
+    container_name: curllm_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  # curllm API server
+  curllm-api:
+    build: .
+    container_name: curllm_api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      CURLLM_OLLAMA_HOST: "http://ollama:11434"
+      CURLLM_MODEL: "${CURLLM_MODEL:-qwen2.5:7b}"
+      BROWSERLESS_URL: "ws://browserless:3000"
+      CURLLM_BROWSERLESS: "true"
+      REDIS_URL: "redis://redis:6379"
+      PYTHONUNBUFFERED: 1
+    depends_on:
+      - ollama
+      - browserless
+      - redis
+    volumes:
+      - ./screenshots:/tmp/curllm_screenshots
+      - ./logs:/var/log/curllm
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  ollama_data:
+  redis_data:
+
+networks:
+  default:
+    name: curllm_network
+    driver: bridge
