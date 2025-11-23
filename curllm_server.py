@@ -66,7 +66,7 @@ class Config:
     browserless_url: str = os.getenv("BROWSERLESS_URL", "ws://localhost:3000")
     use_browserless: bool = os.getenv("CURLLM_BROWSERLESS", "false").lower() == "true"
     max_steps: int = int(os.getenv("CURLLM_MAX_STEPS", "20"))
-    screenshot_dir: Path = Path(os.getenv("CURLLM_SCREENSHOT_DIR", "/tmp/curllm_screenshots"))
+    screenshot_dir: Path = Path(os.getenv("CURLLM_SCREENSHOT_DIR", "./screenshots"))
     enable_debug: bool = os.getenv("CURLLM_DEBUG", "false").lower() == "true"
     api_port: int = int(os.getenv("CURLLM_API_PORT", os.getenv("API_PORT", "8000")))
     num_ctx: int = int(os.getenv("CURLLM_NUM_CTX", "8192"))

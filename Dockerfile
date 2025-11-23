@@ -41,7 +41,7 @@ COPY curllm /usr/local/bin/curllm
 RUN chmod +x /usr/local/bin/curllm
 
 # Create necessary directories
-RUN mkdir -p /tmp/curllm_screenshots /var/log/curllm
+RUN mkdir -p ./screenshots /var/log/curllm
 
 # Expose port
 EXPOSE 8000

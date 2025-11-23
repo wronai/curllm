@@ -154,7 +154,7 @@ model: $DEFAULT_MODEL
 ollama_host: http://localhost:11434
 api_port: 8000
 max_steps: 20
-screenshot_dir: /tmp/curllm_screenshots
+screenshot_dir: ./screenshots
 
 # Features
 visual_mode: false

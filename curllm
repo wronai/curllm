@@ -472,8 +472,7 @@ main() {
     
     # Check services before running
     if ! check_services > /dev/null 2>&1; then
-        echo -e "${YELLOW}Services not ready. Checking status...${NC}"
-        check_services
+        { echo -e "${YELLOW}Services not ready. Checking status...${NC}"; check_services; } 1>&2
         exit 1
     fi
     

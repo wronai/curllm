@@ -448,7 +448,7 @@ top_p: 0.9
 
 # Browser settings
 max_steps: 20
-screenshot_dir: /tmp/curllm_screenshots
+screenshot_dir: ./screenshots
 headless: true
 
 # Features

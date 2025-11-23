@@ -47,7 +47,8 @@ setup: install
 # Service management
 start:
 	@echo "Starting curllm services..."
-	@PORT=$${CURLLM_API_PORT:-$$(if [ -f /tmp/curllm_api_port ]; then cat /tmp/curllm_api_port; else echo 8000; fi)}; \
+	@PY=$$(if [ -x venv/bin/python3 ]; then echo venv/bin/python3; else echo python3; fi); \
+	PORT=$${CURLLM_API_PORT:-$$(if [ -f /tmp/curllm_api_port ]; then cat /tmp/curllm_api_port; else echo 8000; fi)}; \
 	while ss -ltn | grep -q ":$${PORT}\\b"; do PORT=$$((PORT+1)); done; \
 	OPORT=$${CURLLM_OLLAMA_PORT:-$$(if [ -f /tmp/ollama_port ]; then cat /tmp/ollama_port; else echo 11434; fi)}; \
 	while ss -ltn | grep -q ":$${OPORT}\\b"; do OPORT=$$((OPORT+1)); done; \
@@ -72,10 +73,18 @@ start:
 		done; \
 	fi; \
 	if ! curl -s http://localhost:$${PORT}/health > \/dev\/null 2>&1; then \
-		CURLLM_OLLAMA_HOST="http://localhost:$${OPORT}" CURLLM_API_PORT=$${PORT} CURLLM_DEBUG=false python3 curllm_server.py > /tmp/curllm.log 2>&1 & \
+		CURLLM_OLLAMA_HOST="http://localhost:$${OPORT}" CURLLM_API_PORT=$${PORT} CURLLM_DEBUG=false $$PY curllm_server.py > /tmp/curllm.log 2>&1 & \
 		echo $$! > /tmp/curllm.pid; \
 		echo "Started curllm API server on port $$PORT"; \
-		sleep 3; \
+		for i in $$(seq 1 20); do \
+		  if curl -s "http://localhost:$${PORT}/health" > /dev/null 2>&1; then echo "API healthy on :$${PORT}"; break; fi; \
+		  sleep 1; \
+		done; \
+		if ! curl -s "http://localhost:$${PORT}/health" > /dev/null 2>&1; then \
+		  echo "Failed to start API on :$${PORT}"; \
+		  echo "--- /tmp/curllm.log (tail) ---"; \
+		  tail -n 120 /tmp/curllm.log 2>/dev/null || true; \
+		fi; \
 	fi; \
 	echo "Services started. Check status with: curllm --status"
 
@@ -104,6 +113,7 @@ stop:
 		done; \
 	fi
 	@pkill -f "ollama serve" 2>/dev/null || true
+	@pkill -f "curllm_server.py" 2>/dev/null || true
 	@docker compose stop browserless redis 2>/dev/null || docker-compose stop browserless redis 2>/dev/null || true
 	@echo "Services stopped"
 
@@ -248,23 +258,10 @@ release:
 
 publish: release
 	@echo "Publishing to PyPI..."
-	@echo "Using TWINE_USERNAME=__token__ and TWINE_PASSWORD (or PYPI_TOKEN) from environment"
-	@set -e; \
-	if [ -z "$$TWINE_PASSWORD" ] && [ -z "$$PYPI_TOKEN" ]; then \
-		echo "Error: Set TWINE_PASSWORD or PYPI_TOKEN environment variable"; exit 1; \
-	fi; \
-	if [ -n "$$PYPI_TOKEN" ]; then export TWINE_USERNAME=__token__; export TWINE_PASSWORD=$$PYPI_TOKEN; fi; \
-	if [ -n "$$TWINE_PASSWORD" ] && [ -z "$$TWINE_USERNAME" ]; then export TWINE_USERNAME=__token__; fi; \
 	python3 -m twine upload --non-interactive dist/*
 
 publish-test: release
 	@echo "Publishing to TestPyPI..."
-	@set -e; \
-	if [ -z "$$TWINE_PASSWORD" ] && [ -z "$$PYPI_TOKEN" ]; then \
-		echo "Error: Set TWINE_PASSWORD or PYPI_TOKEN environment variable"; exit 1; \
-	fi; \
-	if [ -n "$$PYPI_TOKEN" ]; then export TWINE_USERNAME=__token__; export TWINE_PASSWORD=$$PYPI_TOKEN; fi; \
-	if [ -n "$$TWINE_PASSWORD" ] && [ -z "$$TWINE_USERNAME" ]; then export TWINE_USERNAME=__token__; fi; \
 	python3 -m twine upload --repository testpypi --non-interactive dist/*
 
 # Installation from scratch
