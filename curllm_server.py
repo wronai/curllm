@@ -355,6 +355,11 @@ class CurllmExecutor:
         if url:
             page = await agent.browser.new_page()
             await page.goto(url)
+            try:
+                await page.wait_for_load_state("domcontentloaded")
+                await page.wait_for_load_state("networkidle")
+            except Exception:
+                pass
         else:
             page = await agent.browser.new_page()
         
@@ -385,6 +390,16 @@ class CurllmExecutor:
                     run_logger.log_text(f"Initial screenshot saved: {shot_path}")
                 # Also reflect in data
                 result["data"] = {"screenshot_saved": shot_path}
+                # If it's purely a screenshot task, finish early
+                if not ("extract" in lower_instr or "product" in lower_instr or "produkt" in lower_instr):
+                    await page.close()
+                    return result
+        except Exception:
+            pass
+        
+        # Try to accept cookie banners if present
+        try:
+            await self._accept_cookies(page)
         except Exception:
             pass
         
@@ -497,6 +512,11 @@ class CurllmExecutor:
                     # default threshold if not parsed
                     if thr is None:
                         thr = 150
+                    # try to scroll to load more products
+                    try:
+                        await self._auto_scroll(page, steps=4, delay_ms=700)
+                    except Exception:
+                        pass
                     items = await page.evaluate(
                         """
                         (thr) => {
@@ -709,6 +729,52 @@ class CurllmExecutor:
             }
         """)
         return honeypots
+    
+    async def _accept_cookies(self, page):
+        """Attempt to accept cookie banners on common sites (best effort)"""
+        try:
+            # Try by accessible name
+            names = [
+                "Akceptuj", "Zgadzam się", "Accept", "I agree"
+            ]
+            for name in names:
+                try:
+                    btn = page.get_by_role("button", name=name)
+                    if await btn.count() > 0:
+                        await btn.first.click(timeout=1000)
+                        return
+                except Exception:
+                    pass
+            # Try common CSS selectors
+            selectors = [
+                'button:has-text("Akceptuj")',
+                'button:has-text("Zgadzam się")',
+                'button:has-text("Accept")',
+                'button:has-text("I agree")',
+                'button[aria-label*="accept" i]',
+                '#onetrust-accept-btn-handler',
+                '.cookie-accept', '.cookie-approve', '.cookies-accept',
+                'button[mode="primary"]'
+            ]
+            for sel in selectors:
+                try:
+                    loc = page.locator(sel)
+                    if await loc.count() > 0:
+                        await loc.first.click(timeout=1000)
+                        return
+                except Exception:
+                    pass
+        except Exception:
+            pass
+    
+    async def _auto_scroll(self, page, steps: int = 3, delay_ms: int = 500):
+        """Scroll down the page a few times to trigger lazy-loading"""
+        for _ in range(steps):
+            try:
+                await page.evaluate("window.scrollBy(0, window.innerHeight);")
+                await page.wait_for_timeout(delay_ms)
+            except Exception:
+                break
     
     async def _handle_captcha(self, page, screenshot_path: str):
         """Handle CAPTCHA solving"""

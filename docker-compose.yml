@@ -107,7 +107,7 @@ services:
       - redis
     volumes:
       - ./screenshots:/tmp/curllm_screenshots
-      - ./logs:/var/log/curllm
+      - ./logs:/app/logs
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s

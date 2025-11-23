@@ -42,5 +42,5 @@ Issues = "https://github.com/softreck/curllm/issues"
 
 [tool.setuptools]
 # Install non-Python CLI script and top-level modules
-scripts = ["curllm"]
+script-files = ["curllm"]
 py-modules = ["curllm_server", "bql_parser"]
