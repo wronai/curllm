@@ -96,81 +96,6 @@ EOF
     exit 0
 }
 
-# Parse arguments
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        -X|--request)
-            METHOD="$2"
-            shift 2
-            ;;
-        -d|--data)
-            DATA="$2"
-            shift 2
-            ;;
-        -H|--header)
-            HEADERS+=("$2")
-            shift 2
-            ;;
-        -o|--output)
-            OUTPUT_FILE="$2"
-            shift 2
-            ;;
-        -v|--verbose)
-            VERBOSE=true
-            shift
-            ;;
-        --visual)
-            VISUAL_MODE=true
-            shift
-            ;;
-        --stealth)
-            STEALTH_MODE=true
-            shift
-            ;;
-        --captcha)
-            CAPTCHA_SOLVER=true
-            shift
-            ;;
-        --bql)
-            USE_BQL=true
-            shift
-            ;;
-        --model)
-            CURLLM_MODEL="$2"
-            shift 2
-            ;;
-        --start-services)
-            start_services
-            exit 0
-            ;;
-        --stop-services)
-            stop_services
-            exit 0
-            ;;
-        --status)
-            check_status
-            exit 0
-            ;;
-        --install)
-            install_dependencies
-            exit 0
-            ;;
-        -h|--help)
-            show_help
-            ;;
-        --version)
-            echo "curllm version $VERSION"
-            exit 0
-            ;;
-        *)
-            URL="$1"
-            shift
-            ;;
-    esac
-done
-
-
-
 # Function to check if services are running
 check_services() {
     local all_good=true
@@ -220,11 +145,42 @@ start_services() {
     while ss -ltn | grep -q ":${OPORT}\b"; do OPORT=$((OPORT+1)); done
     echo ${PORT} > /tmp/curllm_api_port
     echo ${OPORT} > /tmp/ollama_port
+    # Persist selected ports and hosts to .env for future runs
+    if [ ! -f .env ]; then touch .env; fi
+    if grep -q '^CURLLM_API_PORT=' .env; then
+        sed -i "s/^CURLLM_API_PORT=.*/CURLLM_API_PORT=${PORT}/" .env
+    else
+        echo "CURLLM_API_PORT=${PORT}" >> .env
+    fi
+    if grep -q '^CURLLM_OLLAMA_PORT=' .env; then
+        sed -i "s/^CURLLM_OLLAMA_PORT=.*/CURLLM_OLLAMA_PORT=${OPORT}/" .env
+    else
+        echo "CURLLM_OLLAMA_PORT=${OPORT}" >> .env
+    fi
+    if grep -q '^CURLLM_API_HOST=' .env; then
+        sed -i "s#^CURLLM_API_HOST=.*#CURLLM_API_HOST=http://localhost:${PORT}#" .env
+    else
+        echo "CURLLM_API_HOST=http://localhost:${PORT}" >> .env
+    fi
+    if grep -q '^CURLLM_OLLAMA_HOST=' .env; then
+        sed -i "s#^CURLLM_OLLAMA_HOST=.*#CURLLM_OLLAMA_HOST=http://localhost:${OPORT}#" .env
+    else
+        echo "CURLLM_OLLAMA_HOST=http://localhost:${OPORT}" >> .env
+    fi
 
     if ! pgrep -x "ollama" > /dev/null; then
         echo "Starting Ollama..."
         OLLAMA_HOST="127.0.0.1:${OPORT}" ollama serve > /tmp/ollama.log 2>&1 &
         sleep 2
+    else
+        # Detect existing Ollama port (prefer current env/.env, then common defaults)
+        for p in "${CURLLM_OLLAMA_PORT}" $(cat /tmp/ollama_port 2>/dev/null) 11434 11435 11436; do
+            if [ -n "$p" ] && curl -s "http://localhost:${p}/api/tags" > /dev/null 2>&1; then
+                OPORT="$p"
+                echo ${OPORT} > /tmp/ollama_port
+                break
+            fi
+        done
     fi
     
     # Pull model if needed
@@ -337,6 +293,46 @@ install_dependencies() {
     echo "Run 'curllm --start-services' to begin"
 }
 
+## Argument parsing (after functions are defined so function calls work)
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -X|--request)
+            METHOD="$2"; shift 2;;
+        -d|--data)
+            DATA="$2"; shift 2;;
+        -H|--header)
+            HEADERS+=("$2"); shift 2;;
+        -o|--output)
+            OUTPUT_FILE="$2"; shift 2;;
+        -v|--verbose)
+            VERBOSE=true; shift;;
+        --visual)
+            VISUAL_MODE=true; shift;;
+        --stealth)
+            STEALTH_MODE=true; shift;;
+        --captcha)
+            CAPTCHA_SOLVER=true; shift;;
+        --bql)
+            USE_BQL=true; shift;;
+        --model)
+            CURLLM_MODEL="$2"; shift 2;;
+        --start-services)
+            start_services; exit 0;;
+        --stop-services)
+            stop_services; exit 0;;
+        --status)
+            check_status; exit 0;;
+        --install)
+            install_dependencies; exit 0;;
+        -h|--help)
+            show_help;;
+        --version)
+            echo "curllm version $VERSION"; exit 0;;
+        *)
+            URL="$1"; shift;;
+    esac
+done
+
 # Main execution
 main() {
     # Check if URL or instruction is provided
@@ -354,11 +350,12 @@ main() {
     fi
     
     # Build request payload
+    DATA_JSON=$( [ -z "$DATA" ] && echo '""' || printf '%s' "$DATA" | jq -Rs '.' )
     PAYLOAD=$(cat <<EOF
 {
     "method": "$METHOD",
     "url": "$URL",
-    "data": $( [ -z "$DATA" ] && echo '""' || echo "$DATA" ),
+    "data": $DATA_JSON,
     "visual_mode": $VISUAL_MODE,
     "stealth_mode": $STEALTH_MODE,
     "captcha_solver": $CAPTCHA_SOLVER,

@@ -27,7 +27,7 @@
 - **CPU**: Modern processor (Intel i5/AMD Ryzen 5 or better)
 
 ### Software
-- Python 3.8+
+- Python 3.11+ (tested on 3.13)
 - Docker (optional, for Browserless features)
 - CUDA toolkit (for GPU acceleration)
 
@@ -75,18 +75,18 @@ ollama pull qwen2.5:7b
 ### 2. Start Services
 
 ```bash
-# Start all required services
+# Start all required services (auto-selects free ports and saves them to .env)
 curllm --start-services
 
-# Check status
+# Check status (reads ports from .env)
 curllm --status
 ```
 
 ### 3. Basic Usage
 
 ```bash
-# Simple extraction
-curllm "https://example.com" -d "extract all email addresses"
+# Simple extraction (ensure services are running)
+curllm "https://example.com" -d "extract all links"
 
 # Form automation with authentication
 curllm -X POST --visual --stealth \
@@ -95,13 +95,10 @@ curllm -X POST --visual --stealth \
   https://app.example.com
 
 # BQL query for structured data
-curllm --bql -d 'query { 
-  page(url: "https://news.ycombinator.com") { 
-    articles: select(css: ".athing") {
-      title: text(css: ".storylink")
-      points: text(css: ".score")
-      comments: attr(css: ".subtext a:last-child", name: "href")
-    }
+curllm --bql -d 'query {
+  page(url: "https://news.ycombinator.com") {
+    title
+    links: select(css: "a.storylink, a.titlelink") { text url: attr(name: "href") }
   }
 }'
 ```
@@ -111,7 +108,7 @@ curllm --bql -d 'query {
 ### Extract Data from Dynamic Pages
 
 ```bash
-curllm --visual "https://shop.example.com" \
+curllm --visual "https://shop.com" \
   -d "Find all products under $50 and extract names, prices, and images"
 ```
 
@@ -129,7 +126,7 @@ curllm --visual --captcha \
 ```bash
 curllm --stealth --visual \
   -d "Fill contact form: name=John Doe, email=john@example.com, message=Hello" \
-  https://contact-form.com
+  https://www.prototypowanie.pl/kontakt/
 ```
 
 ### Complex Workflow Automation
@@ -149,14 +146,33 @@ curllm -X POST --visual --stealth --captcha \
 
 ## 🔧 Configuration
 
-### Environment Variables
+### Environment Variables (.env)
 
 ```bash
-export CURLLM_MODEL="qwen2.5:7b"          # LLM model to use
-export CURLLM_OLLAMA_HOST="http://localhost:11434"  # Ollama API endpoint
-export CURLLM_BROWSERLESS="true"          # Enable Browserless features
-export CURLLM_DEBUG="true"                # Debug mode
-export CAPTCHA_API_KEY="your_2captcha_key"  # For CAPTCHA solving
+# The installer creates .env (from .env.example). Key variables:
+# Ports and hosts (auto-maintained when starting services)
+CURLLM_API_PORT=8000
+CURLLM_API_HOST=http://localhost:8000
+CURLLM_OLLAMA_PORT=11434
+CURLLM_OLLAMA_HOST=http://localhost:11434
+
+# Model and runtime
+CURLLM_MODEL=qwen2.5:7b
+CURLLM_MAX_STEPS=20
+CURLLM_NUM_CTX=8192
+CURLLM_NUM_PREDICT=512
+CURLLM_TEMPERATURE=0.3
+CURLLM_TOP_P=0.9
+CURLLM_DEBUG=false
+
+# Browserless (optional)
+CURLLM_BROWSERLESS=false
+BROWSERLESS_URL=ws://localhost:3000
+BROWSERLESS_PORT=3000
+REDIS_PORT=6379
+
+# CAPTCHA (optional)
+CAPTCHA_API_KEY=
 ```
 
 ### Configuration File

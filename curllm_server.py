@@ -713,9 +713,8 @@ if __name__ == '__main__':
         response = requests.get(f"{config.ollama_host}/api/tags")
         logger.info(f"✓ Connected to Ollama at {config.ollama_host}")
     except:
-        logger.error(f"✗ Cannot connect to Ollama at {config.ollama_host}")
-        logger.error("  Please start Ollama: ollama serve")
-        sys.exit(1)
+        logger.warning(f"✗ Cannot connect to Ollama at {config.ollama_host}")
+        logger.warning("  The API server will start, but requests may fail until Ollama is running (run: 'ollama serve').")
     
     # Start Flask server
     logger.info(f"Starting curllm API server on port {config.api_port}...")

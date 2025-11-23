@@ -48,10 +48,24 @@ start:
 	OPORT=$${CURLLM_OLLAMA_PORT:-$$(if [ -f /tmp/ollama_port ]; then cat /tmp/ollama_port; else echo 11434; fi)}; \
 	while ss -ltn | grep -q ":$${OPORT}\\b"; do OPORT=$$((OPORT+1)); done; \
 	echo $$PORT > /tmp/curllm_api_port; echo $$OPORT > /tmp/ollama_port; \
+	if [ ! -f .env ]; then touch .env; fi; \
+	if grep -q '^CURLLM_API_PORT=' .env; then sed -i "s/^CURLLM_API_PORT=.*/CURLLM_API_PORT=$$PORT/" .env; else echo "CURLLM_API_PORT=$$PORT" >> .env; fi; \
+	if grep -q '^CURLLM_OLLAMA_PORT=' .env; then sed -i "s/^CURLLM_OLLAMA_PORT=.*/CURLLM_OLLAMA_PORT=$$OPORT/" .env; else echo "CURLLM_OLLAMA_PORT=$$OPORT" >> .env; fi; \
+	if grep -q '^CURLLM_API_HOST=' .env; then sed -i "s#^CURLLM_API_HOST=.*#CURLLM_API_HOST=http://localhost:$$PORT#" .env; else echo "CURLLM_API_HOST=http://localhost:$$PORT" >> .env; fi; \
+	if grep -q '^CURLLM_OLLAMA_HOST=' .env; then sed -i "s#^CURLLM_OLLAMA_HOST=.*#CURLLM_OLLAMA_HOST=http://localhost:$$OPORT#" .env; else echo "CURLLM_OLLAMA_HOST=http://localhost:$$OPORT" >> .env; fi; \
 	if ! pgrep -x "ollama" > /dev/null; then \
 		OLLAMA_HOST="127.0.0.1:$${OPORT}" ollama serve > /tmp/ollama.log 2>&1 & \
 		echo "Started Ollama service on port $$OPORT"; \
 		sleep 2; \
+	else \
+		for p in "$$CURLLM_OLLAMA_PORT" $$(cat /tmp/ollama_port 2>/dev/null) 11434 11435 11436; do \
+			if [ -n "$$p" ] && curl -s "http://localhost:$$p/api/tags" > /dev/null 2>&1; then \
+				OPORT="$$p"; echo $$OPORT > /tmp/ollama_port; \
+				sed -i "s/^CURLLM_OLLAMA_PORT=.*/CURLLM_OLLAMA_PORT=$$OPORT/" .env 2>/dev/null || echo "CURLLM_OLLAMA_PORT=$$OPORT" >> .env; \
+				sed -i "s#^CURLLM_OLLAMA_HOST=.*#CURLLM_OLLAMA_HOST=http://localhost:$$OPORT#" .env 2>/dev/null || echo "CURLLM_OLLAMA_HOST=http://localhost:$$OPORT" >> .env; \
+				break; \
+			fi; \
+		done; \
 	fi; \
 	if ! curl -s http://localhost:$${PORT}/health > /dev/null 2>&1; then \
 		CURLLM_OLLAMA_HOST="http://localhost:$${OPORT}" CURLLM_API_PORT=$${PORT} python3 curllm_server.py > /tmp/curllm.log 2>&1 & \
