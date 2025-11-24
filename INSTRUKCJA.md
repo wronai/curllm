@@ -1,5 +1,7 @@
 # 🚀 curllm - Lokalna automatyzacja przeglądarki z LLM
 
+Docs: [Home](README.md) | [Instalacja](docs/Installation.md) | [Środowisko](docs/Environment.md) | [API](docs/API.md) | [Playwright+BQL](docs/Playwright_BQL.md) | [Przykłady](docs/EXAMPLES.md) | [Docker](docs/Docker.md) | [Devbox](docs/Devbox.md) | [Troubleshooting](docs/Troubleshooting.md)
+
 Stworzyłem kompletne narzędzie **curllm** - potężny system automatyzacji przeglądarki z lokalnym LLM, zoptymalizowany dla GPU 8GB VRAM.
 
 ## 📦 Co zostało dostarczone

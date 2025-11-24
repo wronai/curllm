@@ -1,6 +1,8 @@
 ![curllm.png](docs/curllm.png)
 # curllm - Browser Automation with Local LLM
 
+Docs: [Home](README.md) | [Installation](docs/Installation.md) | [Environment](docs/Environment.md) | [API](docs/API.md) | [Playwright+BQL](docs/Playwright_BQL.md) | [Examples](docs/EXAMPLES.md) | [Docker](docs/Docker.md) | [Devbox](docs/Devbox.md) | [Troubleshooting](docs/Troubleshooting.md) | [Instrukcja](INSTRUKCJA.md)
+
 <div align="center">
   <h3>🤖 Intelligent Browser Automation using 8GB GPU-Compatible Local LLMs</h3>
   <p>
@@ -306,6 +308,16 @@ output:
 }
 ```
 
+#### CSV
+```aiignore
+curllm "https://ceneo.pl" -d "Find all products under 150zł and extract names, prices and urls" --csv -o products.csv
+```
+output:
+```bash
+{"hints":[],"result":{"products":[{"name":"Bestseller\n4,6\n11\n\nSamsung Galaxy S25 FE 8/256GB Granatowy\n\n50+ kupionych ostatnio\nod3 099,00z\u0142","price":99,"url":"https://redirect.ceneo.pl/offers/187704844/16202?e=EOpjbVPvmeU84eOvTVLW8x9ZNVMTIBt6BegLfpT4JtAuOtYKLbGQbrXSM4NmcY%2BRz6ALdXwLYgWshZKWkyTjn3XyjS3rJCH84VGyVBmSHkswTiDjQqmQayxvwqGRLSOJnBq6ot4ekF%2F%2BEsNayEBatIkNShIeXEzld0Ey6kuXAEM%3D"},{"name":"Wysoko oceniany\n4,9\n70\n\nSamsung Galaxy S24 FE 5G SM-S721 8/256GB Grafitowy\n\n100+ kupionych ostatnio\nod2 099,00z\u0142","price":99,"url":"https://redirect.ceneo.pl/offers/173803420/4614?e=EOpjbVPvmeU84eOvTVLW8x9ZNVMTIBt6BegLfpT4JtBYUVKV5i3hyOO53nSTTXI879XpVF9JgtGZMVu8tB6dFEoljbAuHBlv8RiqctyP6FXFyMjZUqCYsEMrtqeHA1USJ1Yi4aDrGpaNOwvkZxAmAG39DS2I2EkFzNffhrBUS%2Fo%3D"},{"name":"Bestseller\n4,1\n4\n\nPucio urz\u0105dza wigili\u0119, czyli \u015bwi\u0105teczne s\u0142owa i zadania dla przedszkolak\u00f3w\n\n1000+ kupionych ostatnio\nod59,99z\u0142","price":59.99,"url":"https://redirect.ceneo.pl/offers/188774853/22637?e=EOpjbVPvmeU84eOvTVLW8x9ZNVMTIBt6BegLfpT4JtCwjwfoZvABCMIa%2FwfTTUpPn2TGG1oHS0v7VgJyOuKc9raN6uQ6jBgR%2FPPW8ERW6J6QjUMmEeHb%2BNtDGsfshcdH70cBYtw1D2SE%2FN0F5zfVhg%3D%3D"},{"name":"Bestseller\n4,9\n73\n\nNiacynobaza 25% Skoncentrowane serum z niacynamidem 30g\n\n1000+ kupionych ostatnio\nod21,79z\u0142","price":21.79,"url":"https://redirect.ceneo.pl/offers/182039369/9026?e=EOpjbVPvmeU84eOvTVLW8x9ZNVMTIBt6BegLfpT4JtBdxjmWJ83EL%2FoWyjTi%2BWLsUME0Fg5%2FYHYj0LgQ%2BkjesBf55uhlTbj8S%2BHLlYURuseZ97XU%2BzkPDEyOpwWqmUKHILflawW7xGGsXiYRQnaBGA%3D%3D"},{"name":"Bestseller\n4,9\n18\n\nApple AirPods Pro 3\n\n500+ kupionych ostatnio\nod1 039,00z\u0142","price":39,"url":"https://redirect.ceneo.pl/offers/187595793/24403?e=EOpjbVPvmeU84eOvTVLW8x9ZNVMTIBt6BegLfpT4JtAkD2hcmhNvx6EXlTCEYiO4k9XIBhExoCKlfHvs3zr2WFCGCs6TRUhrGe0Cw6AswYDDrsb1yxU%2F4OhoFhdqcMg9MLbGyIfKcrwsvZ0As7BdoNgzYl2rMwwdwB3bFPb8f58%3D"},{"name":"Bestseller\n4,9\n290\n\nMagne B6 Forte 180tabl.\n\n1000+ kupionych ostatnio\nod50,98z\u0142","price":50.98,"url":"https://redirect.ceneo.pl/offers/179038790/9026?e=EOpjbVPvmeU84eOvTVLW8x9ZNVMTIBt6BegLfpT4JtDGOm1atwU81LhBgOjKTKO7NpOiWFioy7ean1a4wxT9kE3EWRUXGOyVbr3qk0xP649ruexm0e%2FSQ5EvODmj%2FH2sVWCqRVtnidxJykYq6fSjIg%3D%3D"},{"name":"4,9\n2304\n\nSamsung Galaxy S24 SM-S921 8/256GB Czarny\n\n100+ kupionych ostatnio\nod3 111,96z\u0142","price":111.96,"url":"https://redirect.ceneo.pl/offers/163090033/10772?e=EOpjbVPvmeU84eOvTVLW8x9ZNVMTIBt6BegLfpT4JtBdtqKfjUTK3TO2nvgxSCzNmsIXa5uveW0C%2BYGXclFTh7oeF0wt1XREvis059kiKl4MxfdWMfHPydpQRXZ58z4%2F56oCukbzagJ66HKzONrOZNifhOrShgpxPL0mh37ZobU%3D"},{"name":"Superceny do 100z\u0142\nWi\u0119cej supercen do 100z\u0142 \u2794","price":100,"url":"https://www.ceneo.pl/;n100;discount.htm#tag=insp-superceny-gfx"}]},"run_log":"logs/run-20251124-093441.md","screenshots":[],"steps_taken":0,"success":true,"suggested_commands":[],"timestamp":"2025-11-24T09:35:51.950884"}
+✓ CSV exported to products.csv
+```
+![csv.png](docs/csv.png)
 
 ### Examples .env and autoload
 

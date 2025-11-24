@@ -1,0 +1,18 @@
+{
+  "result": {
+    "products": [
+      {
+        "name": "Bestseller\n4,9\n414\n\nIbuvit D3 4000Iu 150kaps.\n\n1000+ kupionych ostatnio\nod41,18z\u0142",
+        "price": 41.18,
+        "url": "https://redirect.ceneo.pl/offers/164000259/9026?e=EOpjbVPvmeU84eOvTVLW8x9ZNVMTIBt6BegLfpT4JtD%2BafUImi8vsfWXXtr8DMq0X88TaxMLTJxeJJJaUCdmGyCBcPvOgXaqbCITGHMyX4V962NVaZY%2Bh2BDFZdla0ceoMYEHuJZOUGcft4g2WWpqA%3D%3D"
+      }
+    ]
+  },
+  "run_log": "logs/run-20251124-082824.md",
+  "screenshots": [
+    "screenshots/www.ceneo.pl/step_0_1763969385.938158.png"
+  ],
+  "steps_taken": 1,
+  "success": true,
+  "timestamp": "2025-11-24T08:29:48.844432"
+}

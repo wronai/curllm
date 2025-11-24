@@ -49,6 +49,10 @@ URL=""
 DATA=""
 HEADERS=()
 OUTPUT_FILE=""
+EXPORT_HTML=false
+EXPORT_XML=false
+EXPORT_CSV=false
+EXPORT_XLS=false
 VERBOSE=false
 VISUAL_MODE=false
 STEALTH_MODE=false
@@ -75,6 +79,10 @@ AUTOMATION OPTIONS:
     --captcha              Enable CAPTCHA solving
     --bql                  Use BQL (Browser Query Language) mode
     --model MODEL          LLM model to use (default: qwen2.5:7b)
+    --html                 Export response data (auto-detected table) to HTML file
+    --xml                  Export response data (auto-detected table) to XML file
+    --csv                  Export response data (auto-detected table) to CSV file
+    --xls|--excel          Export response data to an Excel-compatible .xls (HTML table)
     
 SERVICE OPTIONS:
     --start-services       Start required services (Ollama, API server)
@@ -421,6 +429,103 @@ install_dependencies() {
     echo "Run 'curllm --start-services' to begin"
 }
 
+#############################################
+# Export helpers (require jq)
+#############################################
+
+need_jq() {
+    if ! command -v jq >/dev/null 2>&1; then
+        echo -e "${RED}Export requires 'jq' installed. Please install jq and retry.${NC}" 1>&2
+        return 1
+    fi
+    return 0
+}
+
+# Detect an array of rows to tabulate. Prefer common keys under .result or root.
+# If an array of scalars is found, convert to objects with a single 'value' column.
+json_select_rows() {
+    jq -r '
+      def first_array(s): limit(1; s | .. | arrays);
+      def pick:
+        . as $root
+        | ($root.result? // $root) as $b
+        | ($b.products? // $b.articles? // $b.items? // $b.links? // $b.data? // $b.emails? // $b.phones? // first_array($b)) // first_array($root);
+      def to_objects($arr):
+        if ($arr|type=="array" and ($arr|length>0) and (($arr[0]|type)!="object"))
+        then [ $arr[] | {value:.} ] else $arr end;
+      (pick // []) as $arr
+      | to_objects($arr)
+    '
+}
+
+export_csv() {
+    local outfile="$1"; shift || true
+    need_jq || return 1
+    printf '%s' "$RESPONSE" | json_select_rows | jq -r '
+      def headers: (map(keys) | add | unique);
+      . as $rows | ($rows | headers) as $h
+      | ($h | @csv),
+        ($rows[] | [ $h[] as $k | (.[ $k ] // "") ] | @csv)
+    ' > "$outfile"
+    echo -e "${GREEN}✓ CSV exported to${NC} $outfile" 1>&2
+}
+
+export_html() {
+    local outfile="$1"; shift || true
+    need_jq || return 1
+    local table
+    if ! table=$(printf '%s' "$RESPONSE" | json_select_rows | jq -r '
+      def headers: (map(keys) | add | unique);
+      def esc($s): ($s|tostring|gsub("&";"&amp;")|gsub("<";"&lt;")|gsub(">";"&gt;")|gsub("\"";"&quot;"));
+      . as $rows | ($rows | headers) as $h
+      | "<table border=\"1\" cellspacing=\"0\" cellpadding=\"4\"><thead><tr>"
+        + ($h | map("<th>" + (esc(.)) + "</th>") | join(""))
+        + "</tr></thead><tbody>"
+        + ($rows
+            | map(
+                . as $r
+                | "<tr>" + (
+                    $h | map("<td>" + (esc(($r[.] // ""))) + "</td>") | join("")
+                  ) + "</tr>"
+              )
+            | join("")
+          )
+        + "</tbody></table>"
+    '); then
+        echo -e "${RED}Failed to generate HTML export (jq error).${NC}" 1>&2
+        return 1
+    fi
+    {
+      echo "<!DOCTYPE html>"
+      echo "<html><head><meta charset=\"utf-8\"><title>curllm export</title>"
+      echo "<style>table{border-collapse:collapse;font-family:sans-serif}th,td{border:1px solid #999;padding:4px 6px}</style>"
+      echo "</head><body>"
+      echo "$table"
+      echo "</body></html>"
+    } > "$outfile"
+    echo -e "${GREEN}✓ HTML exported to${NC} $outfile" 1>&2
+}
+
+export_xml() {
+    local outfile="$1"; shift || true
+    need_jq || return 1
+    printf '%s' "$RESPONSE" | json_select_rows | jq -r '
+      def esc($s): ($s|tostring|gsub("&";"&amp;")|gsub("<";"&lt;")|gsub(">";"&gt;")|gsub("\"";"&quot;"));
+      "<rows>" +
+      ( .[] |
+        "<row>" + ( to_entries | map("<" + .key + ">" + esc(.value) + "</" + .key + ">") | join("") ) + "</row>"
+      ) +
+      "</rows>"
+    ' > "$outfile"
+    echo -e "${GREEN}✓ XML exported to${NC} $outfile" 1>&2
+}
+
+export_xls() {
+    local outfile="$1"; shift || true
+    # Generate HTML table but save with .xls extension for Excel compatibility
+    export_html "$outfile"
+}
+
 ## Argument parsing (after functions are defined so function calls work)
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -452,6 +557,14 @@ while [[ $# -gt 0 ]]; do
             check_status; exit 0;;
         --install)
             install_dependencies; exit 0;;
+        --html)
+            EXPORT_HTML=true; shift;;
+        --xml)
+            EXPORT_XML=true; shift;;
+        --csv)
+            EXPORT_CSV=true; shift;;
+        --xls|--excel)
+            EXPORT_XLS=true; shift;;
         -h|--help)
             show_help;;
         --version)
@@ -520,11 +633,37 @@ EOF
         { echo -e "${BLUE}Response:${NC}"; echo "$RESPONSE" | jq .; } 1>&2
     fi
     echo "$RESPONSE"
-    
-    # Save to file if requested
-    if [ -n "$OUTPUT_FILE" ]; then
-        echo "$RESPONSE" > "$OUTPUT_FILE"
-        { echo -e "${GREEN}Output saved to: $OUTPUT_FILE${NC}"; } 1>&2
+
+    # Export handling
+    HAS_EXPORT=false
+    if [ "$EXPORT_HTML" = true ] || [ "$EXPORT_XML" = true ] || [ "$EXPORT_CSV" = true ] || [ "$EXPORT_XLS" = true ]; then
+        HAS_EXPORT=true
+    fi
+    if [ "$HAS_EXPORT" = true ]; then
+        # Determine output filenames
+        TS=$(date +%Y%m%d-%H%M%S)
+        if [ "$EXPORT_HTML" = true ]; then
+            OUT_HTML=${OUTPUT_FILE:-curllm_export_${TS}.html}
+            export_html "$OUT_HTML"
+        fi
+        if [ "$EXPORT_XML" = true ]; then
+            OUT_XML=${OUTPUT_FILE:-curllm_export_${TS}.xml}
+            export_xml "$OUT_XML"
+        fi
+        if [ "$EXPORT_CSV" = true ]; then
+            OUT_CSV=${OUTPUT_FILE:-curllm_export_${TS}.csv}
+            export_csv "$OUT_CSV"
+        fi
+        if [ "$EXPORT_XLS" = true ]; then
+            OUT_XLS=${OUTPUT_FILE:-curllm_export_${TS}.xls}
+            export_xls "$OUT_XLS"
+        fi
+    else
+        # Save JSON to file if requested and no export flags were used
+        if [ -n "$OUTPUT_FILE" ]; then
+            echo "$RESPONSE" > "$OUTPUT_FILE"
+            { echo -e "${GREEN}Output saved to: $OUTPUT_FILE${NC}"; } 1>&2
+        fi
     fi
 }
 

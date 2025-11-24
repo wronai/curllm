@@ -33,6 +33,7 @@ from .runtime import parse_runtime_from_instruction
 from .headers import normalize_headers
 from .browser_setup import setup_browser
 from .wordpress import WordPressAutomation
+from .proxy import resolve_proxy
 from .page_context import extract_page_context
 from .actions import execute_action
 from .human_verify import handle_human_verification, looks_like_human_verify_text
@@ -132,11 +133,13 @@ class CurllmExecutor:
                 stealth_mode = True
             # Normalize headers for Playwright context
             norm_headers = normalize_headers(headers)
+            # Resolve proxy rotation (per-host key) if provided
+            resolved_proxy = resolve_proxy(proxy, rotation_key=host) if proxy else None
             browser_context = await self._setup_browser(
                 stealth_mode,
                 storage_key=host,
                 headers=norm_headers,
-                proxy_config=proxy,
+                proxy_config=resolved_proxy,
                 session_id=session_id,
             )
             run_logger.log_text("Browser context initialized.")

@@ -177,6 +177,30 @@ Script:
 
 ---
 
+## Export results (CSV/HTML/XML/XLS)
+
+Use the CLI export flags to transform JSON results into tabular formats.
+
+Requires: `jq`.
+
+```bash
+# CSV
+curllm "https://ceneo.pl" -d "Find all products under 150zł and extract names, prices and urls" \
+  --csv -o products.csv
+
+# HTML table
+curllm "https://example.com" -d "extract all links" --html -o links.html
+
+# XML
+curllm "https://example.com" -d "extract all emails" --xml -o emails.xml
+
+# Excel-compatible (.xls generated as HTML table)
+curllm "https://ceneo.pl" -d "Find all products under 150zł and extract names, prices and urls" \
+  --xls -o products.xls
+```
+
+If `-o` is not provided, files are saved as `curllm_export_YYYYMMDD-HHMMSS.(csv|html|xml|xls)`.
+
 ## Tips
 
 - Always start services first: `curllm --start-services` and verify with `curllm --status`.
