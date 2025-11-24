@@ -18,6 +18,7 @@ CURLLM_OLLAMA_HOST="${CURLLM_OLLAMA_HOST:-http://localhost:11434}"
 CURLLM_MODEL="${CURLLM_MODEL:-qwen2.5:7b}"
 CURLLM_BROWSERLESS="${CURLLM_BROWSERLESS:-false}"
 CURLLM_DEBUG="${CURLLM_DEBUG:-false}"
+CURLLM_AUTO_RESTART_OLD_MODEL="${CURLLM_AUTO_RESTART_OLD_MODEL:-false}"
 
 if [[ "$CURLLM_API_HOST" == "http://localhost:8000" ]] && [ -f /tmp/curllm_api_port ]; then
     CURLLM_API_HOST="http://localhost:$(cat /tmp/curllm_api_port)"
@@ -81,6 +82,9 @@ AUTOMATION OPTIONS:
     --captcha              Enable CAPTCHA solving
     --bql                  Use BQL (Browser Query Language) mode
     --model MODEL          LLM model to use (default: qwen2.5:7b)
+    --auto-restart-old-model
+                          If the run log or /health shows old default model (qwen2.5:7b),
+                          automatically restart services and print /health.
     --proxy VALUE         Proxy config:
                           - rotate:public | rotate:registry
                           - file:/path/to/list.txt | /path/to/list.txt
@@ -587,6 +591,8 @@ while [[ $# -gt 0 ]]; do
             USE_BQL=true; shift;;
         --model)
             CURLLM_MODEL="$2"; shift 2;;
+        --auto-restart-old-model)
+            CURLLM_AUTO_RESTART_OLD_MODEL=true; shift;;
         --proxy)
             PROXY_ARG="$2"; shift 2;;
         --session)
@@ -702,6 +708,29 @@ EOF
         { echo -e "${BLUE}Response:${NC}"; echo "$RESPONSE" | jq .; } 1>&2
     fi
     echo "$RESPONSE"
+    # Auto-restart services if run used old default model (qwen2.5:7b)
+    if [ "$CURLLM_AUTO_RESTART_OLD_MODEL" = true ]; then
+        # Prefer run log check
+        RUN_LOG=$(printf '%s' "$RESPONSE" | jq -r '.run_log // empty')
+        NEED_RESTART=false
+        if [ -n "$RUN_LOG" ] && [ -f "$RUN_LOG" ]; then
+            if grep -q "- Model: qwen2.5:7b" "$RUN_LOG"; then
+                NEED_RESTART=true
+            fi
+        else
+            # Fallback to /health check
+            HL=$(curl -s "${CURLLM_API_HOST}/health" | jq -r '.model // empty')
+            if [ "$HL" = "qwen2.5:7b" ]; then
+                NEED_RESTART=true
+            fi
+        fi
+        if [ "$NEED_RESTART" = true ]; then
+            { echo -e "${YELLOW}Detected old default model in use (qwen2.5:7b). Restarting services...${NC}"; } 1>&2
+            stop_services
+            start_services
+            { echo -e "${BLUE}/health after restart:${NC}"; curl -s "${CURLLM_API_HOST}/health" | jq .; } 1>&2
+        fi
+    fi
 
     # Detect server error and skip export
     if printf '%s' "$RESPONSE" | jq -e '(.success == false) or (.error != null)' >/dev/null 2>&1; then

@@ -127,6 +127,11 @@ async def _step_visual(executor, page, step: int, domain_dir, captcha_solver: bo
     last_visual_analysis: Optional[Dict[str, Any]] = None
     screenshot_path = await executor._take_screenshot(page, step, target_dir=domain_dir)
     result["screenshots"].append(screenshot_path)
+    if run_logger:
+        try:
+            run_logger.log_image(screenshot_path, alt=f"Step {step+1} screenshot")
+        except Exception:
+            run_logger.log_text(f"Screenshot saved: {screenshot_path}")
     visual_analysis = await executor.vision_analyzer.analyze(screenshot_path)
     last_screenshot_path = screenshot_path
     last_visual_analysis = visual_analysis if isinstance(visual_analysis, dict) else {"raw": str(visual_analysis)}

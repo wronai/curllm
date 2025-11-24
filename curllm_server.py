@@ -463,7 +463,10 @@ class CurllmExecutor:
                 shot_path = await self._take_screenshot(page, 0, target_dir=domain_dir)
                 result["screenshots"].append(shot_path)
                 if run_logger:
-                    run_logger.log_text(f"Initial screenshot saved: {shot_path}")
+                    try:
+                        run_logger.log_image(shot_path, alt="Initial screenshot")
+                    except Exception:
+                        run_logger.log_text(f"Initial screenshot saved: {shot_path}")
                 # Also reflect in data
                 result["data"] = {"screenshot_saved": shot_path}
                 # If it's purely a screenshot task, finish early
@@ -599,6 +602,11 @@ class CurllmExecutor:
             if visual_mode:
                 screenshot_path = await self._take_screenshot(page, step, target_dir=domain_dir)
                 result["screenshots"].append(screenshot_path)
+                if run_logger:
+                    try:
+                        run_logger.log_image(screenshot_path, alt=f"Step {step + 1} screenshot")
+                    except Exception:
+                        run_logger.log_text(f"Screenshot saved: {screenshot_path}")
                 
                 # Analyze visual state
                 visual_analysis = await self.vision_analyzer.analyze(screenshot_path)

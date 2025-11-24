@@ -158,7 +158,10 @@ async def open_page_with_prechecks(
             shot_path = await take_screenshot(page, 0, target_dir=domain_dir)
             result.setdefault("screenshots", []).append(shot_path)
             if run_logger:
-                run_logger.log_text(f"Initial screenshot saved: {shot_path}")
+                try:
+                    run_logger.log_image(shot_path, alt="Initial screenshot")
+                except Exception:
+                    run_logger.log_text(f"Initial screenshot saved: {shot_path}")
             result["data"] = {"screenshot_saved": shot_path}
             if not ("extract" in lower_instr or "product" in lower_instr or "produkt" in lower_instr):
                 return page, domain_dir, stealth_mode, result
