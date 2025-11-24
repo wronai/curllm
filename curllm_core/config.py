@@ -26,6 +26,7 @@ class Config:
     locale: str = os.getenv("CURLLM_LOCALE", os.getenv("LOCALE", "pl-PL"))
     timezone_id: str = os.getenv("CURLLM_TIMEZONE", os.getenv("TIMEZONE", "Europe/Warsaw"))
     proxy: Optional[str] = (os.getenv("CURLLM_PROXY") or os.getenv("HTTPS_PROXY") or os.getenv("HTTP_PROXY") or None)
+    validation_enabled: bool = os.getenv("CURLLM_VALIDATION", "true").lower() == "true"
 
     def __post_init__(self):
         self.screenshot_dir.mkdir(parents=True, exist_ok=True)

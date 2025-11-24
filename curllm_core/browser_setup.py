@@ -9,18 +9,56 @@ from datetime import datetime, timedelta
 from .browserless import BrowserlessContext
 
 class SessionManager:
-    def __init__(self, base_dir: Path = Path("./workspace/sessions")):
+    def __init__(self, base_dir: Path = None):
+        if base_dir is None:
+            base = Path(os.getenv("CURLLM_WORKSPACE", "./workspace"))
+            base_dir = base / "sessions"
         self.base_dir = base_dir
-        self.base_dir.mkdir(parents=True, exist_ok=True)
+        # Ensure directory exists and is writable, otherwise fallback
+        self._ensure_writable_base()
+
+    def _ensure_writable_base(self):
+        candidates = [
+            self.base_dir,
+            Path(os.path.expanduser("~")) / ".cache" / "curllm" / "sessions",
+            Path("/tmp/curllm/sessions"),
+        ]
+        for cand in candidates:
+            try:
+                cand.mkdir(parents=True, exist_ok=True)
+                test = cand / ".writetest"
+                with open(test, "w") as f:
+                    f.write("ok")
+                try:
+                    test.unlink(missing_ok=True)  # type: ignore[arg-type]
+                except Exception:
+                    pass
+                self.base_dir = cand
+                return
+            except Exception:
+                continue
+        # If all fail, keep original; writes may fail later but that's unrecoverable here
 
     def get_session_path(self, session_id: str) -> Path:
         return self.base_dir / f"{session_id}.json"
 
     def save_session_metadata(self, session_id: str, metadata: Dict):
-        meta_path = self.base_dir / f"{session_id}.meta.json"
         metadata["last_updated"] = datetime.now().isoformat()
-        with open(meta_path, 'w') as f:
-            json.dump(metadata, f, indent=2)
+        meta_path = self.base_dir / f"{session_id}.meta.json"
+        try:
+            with open(meta_path, 'w') as f:
+                json.dump(metadata, f, indent=2)
+        except Exception:
+            # Try fallback bases if write failed (e.g., permission denied)
+            old = self.base_dir
+            self._ensure_writable_base()
+            if self.base_dir != old:
+                meta_path = self.base_dir / f"{session_id}.meta.json"
+                try:
+                    with open(meta_path, 'w') as f:
+                        json.dump(metadata, f, indent=2)
+                except Exception:
+                    pass
 
     def load_session_metadata(self, session_id: str) -> Optional[Dict]:
         meta_path = self.base_dir / f"{session_id}.meta.json"
@@ -108,7 +146,20 @@ async def setup_playwright(
                 storage_path = old_storage
     elif storage_key:
         storage_dir = Path(os.getenv("CURLLM_STORAGE_DIR", "./workspace/storage"))
-        storage_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            storage_dir.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            try:
+                sfb = Path(os.path.expanduser("~")) / ".cache" / "curllm" / "storage"
+                sfb.mkdir(parents=True, exist_ok=True)
+                storage_dir = sfb
+            except Exception:
+                try:
+                    sfb2 = Path("/tmp/curllm/storage")
+                    sfb2.mkdir(parents=True, exist_ok=True)
+                    storage_dir = sfb2
+                except Exception:
+                    pass
         storage_path = storage_dir / f"{storage_key}.json"
 
     vw = 1366 + int(random.random() * 700)

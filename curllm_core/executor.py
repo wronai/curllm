@@ -39,7 +39,7 @@ from .actions import execute_action
 from .human_verify import handle_human_verification, looks_like_human_verify_text
 from .captcha_widget import handle_captcha_image as _handle_captcha_image_widget, handle_widget_captcha as _handle_widget_captcha
 from .page_utils import auto_scroll as _auto_scroll, accept_cookies as _accept_cookies, is_block_page as _is_block_page
-from .extraction import generic_fastpath, direct_fastpath, product_heuristics, fallback_extract, extract_articles_eval
+from .extraction import generic_fastpath, direct_fastpath, product_heuristics, fallback_extract, extract_articles_eval, validate_with_llm
 from .captcha_slider import attempt_slider_challenge
 from .slider_plugin import try_external_slider_solver
 from .bql import BQLExecutor
@@ -129,7 +129,7 @@ class CurllmExecutor:
                 run_logger.log_code("text", instruction)
 
             host = urlparse(url).hostname if url else None
-            if host and any(h in host for h in ["allegro.pl", "allegro.com"]):
+            if host and any(h in host for h in ["allegro.pl", "allegro.com", "ceneo.pl", "ceneo.com"]):
                 stealth_mode = True
             # Normalize headers for Playwright context
             norm_headers = normalize_headers(headers)
@@ -174,6 +174,15 @@ class CurllmExecutor:
                         pass
                     if result_data is None:
                         result_data = bql_result.get("data", bql_result)
+
+                    # Validation pass (LLM) if enabled
+                    try:
+                        if config.validation_enabled and result_data is not None:
+                            v = await validate_with_llm(self.llm, instruction, result_data, run_logger)
+                            if v is not None:
+                                result_data = v
+                    except Exception:
+                        pass
 
                     # Close browser resources before returning
                     if browser_context is not None:
@@ -299,6 +308,16 @@ class CurllmExecutor:
                         await pw.stop()
                 except Exception as e:
                     logger.warning(f"Error closing Playwright resources: {e}")
+
+            # Validation pass (LLM) before finalizing
+            try:
+                final_data = result.get("data")
+                if config.validation_enabled and final_data is not None:
+                    v = await validate_with_llm(self.llm, instruction, final_data, run_logger)
+                    if v is not None:
+                        result["data"] = v
+            except Exception:
+                pass
 
             res = {
                 "success": True,
@@ -450,7 +469,16 @@ class CurllmExecutor:
         if "product" in lower_instr or "produkt" in lower_instr:
             ms = await self._multi_stage_product_extract(instruction, page, run_logger)
             if ms is not None:
-                result["data"] = ms
+                data_ms = ms
+                # Validation pass (LLM) if enabled
+                try:
+                    if config.validation_enabled and data_ms is not None:
+                        v = await validate_with_llm(self.llm, instruction, data_ms, run_logger)
+                        if v is not None:
+                            data_ms = v
+                except Exception:
+                    pass
+                result["data"] = data_ms
                 await page.close()
                 return result
         last_sig = None
@@ -626,7 +654,15 @@ class CurllmExecutor:
                 if looks_articles and runtime.get("no_click") and (page_context.get("headings") or page_context.get("article_candidates")):
                     det_items = await extract_articles_eval(page)
                     if det_items:
-                        result["data"] = {"articles": det_items}
+                        data_det = {"articles": det_items}
+                        try:
+                            if config.validation_enabled:
+                                v = await validate_with_llm(self.llm, instruction, data_det, run_logger)
+                                if v is not None:
+                                    data_det = v
+                        except Exception:
+                            pass
+                        result["data"] = data_det
                         if run_logger:
                             run_logger.log_text(f"Deterministic articles extracted: {len(det_items)}")
                         break

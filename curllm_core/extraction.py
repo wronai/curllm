@@ -172,6 +172,8 @@ async def product_heuristics(instruction: str, page, run_logger=None) -> Optiona
               ) || nameFromLink;
             }
             if (!name || !url) continue;
+            const isPdf = /\.pdf(\?|$)/i.test(url);
+            if (isPdf || url.includes('custom_document')) continue;
             const isProductUrl = /\d{4,}/.test(url) || url.includes('/p/') || url.includes('/product/') || url.includes('.htm');
             if (!isProductUrl) continue;
             const key = url;
@@ -194,7 +196,8 @@ async def product_heuristics(instruction: str, page, run_logger=None) -> Optiona
                 and item.get("name")
                 and len(item["name"]) > 5
                 and not any(skip in item["name"].lower() for skip in [
-                    "szukaj","koszyk","kategorie","zobacz","pokaż","następne","poprzednie"
+                    "szukaj","koszyk","kategorie","zobacz","pokaż","następne","poprzednie",
+                    "regulamin","polityka","privacy","terms","cookie","dostawa","zwrot","reklamac","faq","pomoc"
                 ])
             ):
                 valid_items.append(item)
@@ -208,6 +211,43 @@ async def product_heuristics(instruction: str, page, run_logger=None) -> Optiona
                     pass
             return data
     return None
+
+async def validate_with_llm(llm, instruction: str, data: Any, run_logger=None) -> Optional[Any]:
+    try:
+        payload = {
+            "instruction": instruction,
+            "data": data,
+        }
+        prompt = (
+            "You are a strict validator of extracted web data. "
+            "Given the user's instruction and the extracted JSON data, return a corrected JSON that strictly follows the instruction. "
+            "If the instruction requests product listings under a price threshold (e.g., under 150zł), include only items that are real products with a numeric price <= the threshold. "
+            "Exclude legal/policy documents, categories, banners, and placeholders like 'Regulamin', 'Polityka', 'Cookie', 'FAQ'. "
+            "Preserve fields: name (string), price (number), url (absolute URL). "
+            "Prefer a top-level object with key 'products' when the instruction concerns products; otherwise sanitize existing keys. "
+            "Output ONLY valid JSON, no comments, no extra text.\n\n"
+            f"Instruction:\n{instruction}\n\n"
+            f"Extracted JSON:\n{json.dumps(data, ensure_ascii=False)}\n\n"
+            "Return corrected JSON only:"
+        )
+        resp = await llm.ainvoke(prompt)
+        text = resp.get("text", "")
+        s = text.strip()
+        # Try to locate JSON object boundaries if model added prose
+        first = s.find("{")
+        last = s.rfind("}")
+        if 0 <= first < last:
+            s = s[first:last+1]
+        out = json.loads(s)
+        if run_logger:
+            try:
+                run_logger.log_text("Validation pass applied.")
+                run_logger.log_code("json", json.dumps(out, ensure_ascii=False, indent=2)[:2000])
+            except Exception:
+                pass
+        return out
+    except Exception:
+        return None
 
 async def fallback_extract(instruction: str, page, run_logger=None) -> Dict[str, Any]:
     lower_instr = (instruction or "").lower()

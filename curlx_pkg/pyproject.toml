@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "curlx"
+version = "0.1.0"
+description = "curlx: Proxy manager companion for curllm (register, spawn, list)"
+readme = "README.md"
+authors = [ { name = "Tom Sapletta" } ]
+license = { text = "Apache-2.0" }
+requires-python = ">=3.11"
+keywords = ["proxy", "automation", "curllm", "ssh"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: POSIX :: Linux",
+  "Environment :: Console",
+  "Topic :: Internet :: Proxy Servers",
+]
+dependencies = [
+  "requests",
+]
+
+[project.urls]
+Homepage = "https://github.com/wronai/curllm"
+Issues = "https://github.com/wronai/curllm/issues"
+
+[project.scripts]
+curlx = "curlx.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+pythonpath = ["src"]

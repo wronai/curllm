@@ -250,6 +250,30 @@ start_services() {
     fi
     dbg "Updated .env (API ${PORT}, OLLAMA ${OPORT})"
 
+    # Prepare workspace directories to avoid permission issues (with fallbacks and suppressed stderr)
+    WS_DEFAULT="${CURLLM_WORKSPACE:-$PWD/workspace}"
+    if ! mkdir -p "$WS_DEFAULT"/sessions "$WS_DEFAULT"/storage "$WS_DEFAULT"/proxy 2>/dev/null; then
+        WS_FALLBACK1="${HOME}/.cache/curllm/workspace"
+        if ! mkdir -p "$WS_FALLBACK1"/sessions "$WS_FALLBACK1"/storage "$WS_FALLBACK1"/proxy 2>/dev/null; then
+            WS_FALLBACK2="/tmp/curllm/workspace"
+            mkdir -p "$WS_FALLBACK2"/sessions "$WS_FALLBACK2"/storage "$WS_FALLBACK2"/proxy 2>/dev/null || true
+            WS_DEFAULT="$WS_FALLBACK2"
+        else
+            WS_DEFAULT="$WS_FALLBACK1"
+        fi
+    fi
+    if [ ! -f .env ]; then touch .env; fi
+    if grep -q '^CURLLM_WORKSPACE=' .env; then
+        sed -i "s#^CURLLM_WORKSPACE=.*#CURLLM_WORKSPACE=$WS_DEFAULT#" .env
+    else
+        echo "CURLLM_WORKSPACE=$WS_DEFAULT" >> .env
+    fi
+    if grep -q '^CURLLM_STORAGE_DIR=' .env; then
+        sed -i "s#^CURLLM_STORAGE_DIR=.*#CURLLM_STORAGE_DIR=$WS_DEFAULT/storage#" .env
+    else
+        echo "CURLLM_STORAGE_DIR=$WS_DEFAULT/storage" >> .env
+    fi
+
     if ! pgrep -x "ollama" > /dev/null; then
         echo "Starting Ollama..."
         OLLAMA_HOST="127.0.0.1:${OPORT}" ollama serve > /tmp/ollama.log 2>&1 &
@@ -671,6 +695,16 @@ EOF
         { echo -e "${BLUE}Response:${NC}"; echo "$RESPONSE" | jq .; } 1>&2
     fi
     echo "$RESPONSE"
+
+    # Detect server error and skip export
+    if printf '%s' "$RESPONSE" | jq -e '(.success == false) or (.error != null)' >/dev/null 2>&1; then
+        { echo -e "${RED}Server returned an error; skipping export.${NC}"; } 1>&2
+        if [ -n "$OUTPUT_FILE" ]; then
+            echo "$RESPONSE" > "$OUTPUT_FILE"
+            { echo -e "${YELLOW}Response saved to: $OUTPUT_FILE${NC}"; } 1>&2
+        fi
+        exit 1
+    fi
 
     # Export handling
     HAS_EXPORT=false

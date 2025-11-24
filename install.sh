@@ -191,6 +191,9 @@ sudo -n ln -sf $(pwd)/curllm /usr/local/bin/curllm 2>/dev/null || \
 
 echo -e "${GREEN}✓ curllm command installed${NC}"
 
+# Ensure scripts are executable
+chmod +x scripts/*.sh 2>/dev/null || true
+
 # Create .env from example if missing and set defaults
 if [ ! -f .env ]; then
     if [ -f .env.example ]; then
@@ -248,6 +251,25 @@ if [ "$DOCKER_AVAILABLE" = true ]; then
 else
     echo ""
     echo -e "${BLUE}[7/7] Skipping Docker setup (not installed)${NC}"
+fi
+
+# Prepare writable workspace to avoid permission errors
+WS_DIR="${CURLLM_WORKSPACE:-$PWD/workspace}"
+mkdir -p "$WS_DIR"/sessions "$WS_DIR"/storage "$WS_DIR"/proxy 2>/dev/null || true
+if grep -q '^CURLLM_WORKSPACE=' .env; then
+    sed -i "s#^CURLLM_WORKSPACE=.*#CURLLM_WORKSPACE=$WS_DIR#" .env
+else
+    echo "CURLLM_WORKSPACE=$WS_DIR" >> .env
+fi
+if grep -q '^CURLLM_STORAGE_DIR=' .env; then
+    sed -i "s#^CURLLM_STORAGE_DIR=.*#CURLLM_STORAGE_DIR=$WS_DIR/storage#" .env
+else
+    echo "CURLLM_STORAGE_DIR=$WS_DIR/storage" >> .env
+fi
+
+# Warn if jq is missing (used for export features)
+if ! command -v jq >/dev/null 2>&1; then
+    echo -e "${YELLOW}⚠ 'jq' not found. CLI export flags (--csv/--html/--xml/--xls) require jq. Install via your package manager.${NC}"
 fi
 
 echo ""

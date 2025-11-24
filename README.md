@@ -957,6 +957,41 @@ curllm --visual --captcha ...
 export SCREENSHOT_QUALITY=100
 ```
 
+## curlx: Proxy companion
+
+curlx to osobna paczka Python wspierająca curllm w zarządzaniu proxy (rejestracja, lista, uruchamianie serwerów proxy na zdalnych hostach przez SSH).
+
+Instalacja (dev):
+
+```bash
+pip install -e ./curlx_pkg
+```
+
+Użycie:
+
+```bash
+# Rejestracja istniejących proxy (host:port) w rejestrze curllm
+curlx register --host 203.0.113.10 --ports 3128,3129 --server http://localhost:8000
+
+# Lista zarejestrowanych proxy
+curlx list --server http://localhost:8000
+
+# Uruchomienie proxy.py na zdalnym hoście przez SSH i rejestracja w curllm
+curlx spawn --host ubuntu@203.0.113.10 --ports 3128,3129 --server http://localhost:8000
+```
+
+Integracja z curllm (rotacja z rejestru):
+
+```bash
+curllm --proxy rotate:registry "https://example.com" -d "extract links"
+```
+
+Zmienne środowiskowe:
+
+- CURLLM_API_HOST — domyślny host API curllm (np. http://localhost:8000)
+- SSH_BIN — polecenie SSH (domyślnie: ssh)
+- PY_BIN_REMOTE — Python na hoście zdalnym (domyślnie: python3)
+
 ## 🗺️ Roadmap
 
 - [ ] CLI `--proxy` flag with rotation presets (public/list/file)
