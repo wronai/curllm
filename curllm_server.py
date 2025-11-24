@@ -484,7 +484,7 @@ class CurllmExecutor:
             lower_instr = (instruction or "").lower()
             generic_triggers = ("extract" in lower_instr or "scrape" in lower_instr)
             specific_keywords = ["link", "email", "mail", "phone", "tel", "telefon", "product", "produkt", "form", "screenshot", "captcha", "bql"]
-            if generic_triggers and not any(k in lower_instr for k in specific_keywords):
+            if False and generic_triggers and not any(k in lower_instr for k in specific_keywords):
                 ctx = await self._extract_page_context(page)
                 try:
                     text = await page.evaluate("() => document.body.innerText")
@@ -568,7 +568,7 @@ class CurllmExecutor:
                     return p.replace(" ", "").replace("-", "")
                 phones = list(sorted(set([_norm(p) for p in (phones_text + phones_tel) if p])))
                 direct["phones"] = phones[:100]
-            if direct:
+            if False and direct:
                 # Apply 'only' filter if requested
                 if "only" in lower_instr and ("email" in lower_instr or "mail" in lower_instr or "phone" in lower_instr or "tel" in lower_instr or "telefon" in lower_instr):
                     filtered = {}

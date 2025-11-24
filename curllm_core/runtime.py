@@ -30,6 +30,9 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+_diff_fields_env = os.getenv("CURLLM_DIFF_FIELDS", "href,title,url").strip()
+_diff_fields_default = [s.strip() for s in _diff_fields_env.split(",") if s.strip()] if _diff_fields_env else ["href", "title", "url"]
+
 DEFAULT_RUNTIME: Dict[str, Any] = {
     "include_dom_html": _env_bool("CURLLM_INCLUDE_DOM_HTML", True),
     "dom_max_chars": _env_int("CURLLM_DOM_MAX_CHARS", 30000),
@@ -41,6 +44,14 @@ DEFAULT_RUNTIME: Dict[str, Any] = {
     "no_click": _env_bool("CURLLM_NO_CLICK", False),
     "scroll_load": _env_bool("CURLLM_SCROLL_LOAD", True),
     "fastpath": _env_bool("CURLLM_FASTPATH", False),
+    "refine_instruction": _env_bool("CURLLM_REFINE_INSTRUCTION", False),
+    # result storage and diffing
+    "store_results": _env_bool("CURLLM_STORE_RESULTS", False),
+    "result_key": os.getenv("CURLLM_RESULT_KEY"),
+    "diff_mode": os.getenv("CURLLM_DIFF_MODE", "none"),  # none|new|changed|delta|all
+    "diff_fields": _diff_fields_default,
+    "keep_history": _env_int("CURLLM_KEEP_HISTORY", 10),
+    "include_prev_results": _env_bool("CURLLM_INCLUDE_PREV_RESULTS", False),
     "use_external_slider_solver": _env_bool("CURLLM_USE_EXTERNAL_SLIDER_SOLVER", True),
     "stall_limit": _env_int("CURLLM_STALL_LIMIT", 5),
     "planner_growth_per_step": _env_int("CURLLM_PLANNER_GROWTH_PER_STEP", 2000),

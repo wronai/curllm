@@ -40,6 +40,7 @@ from .diagnostics import diagnose_url_issue as _diagnose_url_issue_func
 from .navigation import open_page_with_prechecks as _open_page_with_prechecks_func
 from .rerun_cmd import build_rerun_curl as _build_rerun_curl_func
 from .task_runner import run_task as _run_task
+from .result_store import apply_diff_and_store as _apply_diff_and_store
 
 logger = logging.getLogger(__name__)
 
@@ -169,10 +170,32 @@ class CurllmExecutor:
 
                     # Validation pass (LLM) if enabled
                     try:
-                        if config.validation_enabled and result_data is not None and _should_validate(instruction, result_data):
+                        if config.validation_enabled and result_data is not None:
                             v = await validate_with_llm(self.llm, instruction, result_data, run_logger)
                             if v is not None:
                                 result_data = v
+                    except Exception:
+                        pass
+
+                    # Store and diff (if configured)
+                    try:
+                        mode = str((runtime.get("diff_mode") or "none")).strip().lower()
+                        store = bool(runtime.get("store_results")) or (mode in ("new", "changed", "delta", "all"))
+                        if store:
+                            fields = runtime.get("diff_fields") or ["href", "title", "url"]
+                            keep = int(runtime.get("keep_history", 10) or 10)
+                            result_key = runtime.get("result_key")
+                            out_data, meta = _apply_diff_and_store(url, instruction, result_key, result_data, fields, keep, mode)
+                            result_data = out_data
+                            try:
+                                run_logger.log_kv("diff.prev_count", str(meta.get("prev_count")))
+                                run_logger.log_kv("diff.curr_count", str(meta.get("curr_count")))
+                                run_logger.log_kv("diff.new_count", str(meta.get("new_count")))
+                                run_logger.log_kv("diff.changed_count", str(meta.get("changed_count")))
+                                run_logger.log_kv("diff.removed_count", str(meta.get("removed_count")))
+                                run_logger.log_kv("diff.store_key", str(meta.get("store_key")))
+                            except Exception:
+                                pass
                     except Exception:
                         pass
 
@@ -301,15 +324,31 @@ class CurllmExecutor:
                 except Exception as e:
                     logger.warning(f"Error closing Playwright resources: {e}")
 
-            # Validation pass (LLM) before finalizing
+            # Validation pass (LLM) before finalizing (always when enabled)
             try:
                 final_data = result.get("data")
-                if config.validation_enabled and final_data is not None and _should_validate(instruction, final_data):
+                if config.validation_enabled and final_data is not None:
                     v = await validate_with_llm(self.llm, instruction, final_data, run_logger)
                     if v is not None:
                         result["data"] = v
             except Exception:
                 pass
+
+            # Store and diff (if configured)
+            try:
+                final_data2 = result.get("data")
+                mode = str((runtime.get("diff_mode") or "none")).strip().lower()
+                store = bool(runtime.get("store_results")) or (mode in ("new", "changed", "delta", "all"))
+                diff_meta = None
+                if store and final_data2 is not None:
+                    fields = runtime.get("diff_fields") or ["href", "title", "url"]
+                    keep = int(runtime.get("keep_history", 10) or 10)
+                    result_key = runtime.get("result_key")
+                    out_data, meta = _apply_diff_and_store(url, instruction, result_key, final_data2, fields, keep, mode)
+                    result["data"] = out_data
+                    diff_meta = meta
+            except Exception:
+                diff_meta = None
 
             res = {
                 "success": True,
@@ -321,6 +360,11 @@ class CurllmExecutor:
                 "hints": (result.get("meta", {}) or {}).get("hints", []),
                 "suggested_commands": (result.get("meta", {}) or {}).get("suggested_commands", []),
             }
+            try:
+                if diff_meta:
+                    res["diff"] = diff_meta
+            except Exception:
+                pass
             run_logger.log_text("Run finished successfully.")
             return res
 
@@ -428,7 +472,7 @@ class CurllmExecutor:
     async def _generate_action(self, instruction: str, page_context: Dict, step: int, run_logger: RunLogger | None = None, runtime: Dict[str, Any] | None = None) -> Dict:
         from .llm_planner import generate_action
         rt = runtime or {}
-        max_chars = int(rt.get("planner_max_cap", 20000) or 20000)
+        max_chars = int(rt.get("planner_base_chars", rt.get("planner_max_cap", 20000)) or 20000)
         growth = int(rt.get("planner_growth_per_step", 2000) or 2000)
         max_cap = int(rt.get("planner_max_cap", 20000) or 20000)
         return await generate_action(self.llm, instruction, page_context, step, run_logger, max_chars=max_chars, growth_per_step=growth, max_cap=max_cap)

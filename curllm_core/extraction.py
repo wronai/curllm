@@ -395,6 +395,63 @@ async def validate_with_llm(llm, instruction: str, data: Any, run_logger=None, d
     except Exception:
         return None
 
+
+async def refine_instruction_llm(llm, instruction: str, page_context: Dict[str, Any], run_logger=None) -> Optional[str]:
+    try:
+        title = (page_context or {}).get("title") or ""
+        url = (page_context or {}).get("url") or ""
+        links = (page_context or {}).get("links") or []
+        # Keep a tiny sample of links to help the model infer patterns
+        sample_links = []
+        try:
+            if isinstance(links, list):
+                sample_links = links[:20]
+        except Exception:
+            sample_links = []
+        dom_preview = (page_context or {}).get("dom_preview") or ""
+        if isinstance(dom_preview, str) and len(dom_preview) > 4000:
+            dom_preview = dom_preview[:4000]
+
+        prompt = (
+            "You are an instruction refiner. Improve the user's web extraction instruction to be precise and deterministic. "
+            "Use the provided page context (title, url, sample links, and DOM preview) to add concrete details like: "
+            "URL patterns (e.g., href contains '/rfp/'), required CSS selectors, and whether to return only certain fields. "
+            "Keep the user's intent intact, but make it specific and machine-executable. "
+            "Return ONLY a JSON object: {\"refined_instruction\": string}. No extra text.\n\n"
+            f"Original instruction:\n{instruction}\n\n"
+            f"Page title: {title}\nURL: {url}\n\n"
+            f"Sample links (truncated):\n{json.dumps(sample_links, ensure_ascii=False)[:2000]}\n\n"
+            + ("DOM preview (truncated):\n" + dom_preview if dom_preview else "") +
+            "\n\nRespond with JSON only."
+        )
+        resp = await llm.ainvoke(prompt)
+        text = resp.get("text", "") if isinstance(resp, dict) else str(resp)
+        s = text.strip()
+        first = s.find("{")
+        last = s.rfind("}")
+        if 0 <= first < last:
+            s = s[first:last+1]
+        obj = json.loads(s)
+        refined = obj.get("refined_instruction") if isinstance(obj, dict) else None
+        if isinstance(refined, str) and refined.strip():
+            if run_logger:
+                try:
+                    run_logger.log_text("Instruction refined via LLM")
+                    run_logger.log_code("text", refined[:2000])
+                except Exception:
+                    pass
+            return refined
+    except Exception:
+        try:
+            low = (instruction or "").lower()
+            links = (page_context or {}).get("links") or []
+            has_rfp = any(isinstance(l, dict) and "/rfp/" in str(l.get("href", "")) for l in (links or []))
+            if has_rfp and any(w in low for w in ["offer", "offers", "oferta", "oferty", "zlecenia", "zlecenie"]):
+                return (instruction or "").strip() + " Return only links (array of {text, href}) where href contains '/rfp/'."
+        except Exception:
+            pass
+    return None
+
 async def fallback_extract(instruction: str, page, run_logger=None) -> Dict[str, Any]:
     lower_instr = (instruction or "").lower()
     fallback: Dict[str, Any] = {}

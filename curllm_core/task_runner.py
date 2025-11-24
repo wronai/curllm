@@ -15,11 +15,16 @@ from .extraction import (
     extract_articles_eval,
     validate_with_llm,
     extract_links_by_selectors,
+    _extract_emails as _tool_extract_emails,
+    _extract_phones as _tool_extract_phones,
+    _extract_all_anchors as _tool_extract_all_anchors,
+    refine_instruction_llm,
 )
 from .human_verify import handle_human_verification, looks_like_human_verify_text
 from .page_utils import auto_scroll as _auto_scroll, accept_cookies as _accept_cookies
 from .captcha_slider import attempt_slider_challenge
 from .slider_plugin import try_external_slider_solver
+from .result_store import previous_for_context as _previous_for_context
 
 
 async def _try_early_form_fill(executor, instruction: str, page, domain_dir, run_logger, result: Dict[str, Any], lower_instr: str) -> Optional[Dict[str, Any]]:
@@ -46,7 +51,7 @@ async def _try_early_articles(executor, instruction: str, page, run_logger, resu
             if det_items:
                 data_det = {"articles": det_items}
                 try:
-                    if config.validation_enabled and executor and executor.llm and (executor._should_validate(instruction, data_det)):
+                    if config.validation_enabled and executor and executor.llm:
                         try:
                             dom_html = await page.content()
                         except Exception:
@@ -225,7 +230,75 @@ def _progress_and_maybe_break(executor, page_context: Dict[str, Any], last_sig: 
         return last_sig, no_progress, progressive_depth, False
 
 
-async def _planner_cycle(executor, instruction: str, page_context: Dict[str, Any], step: int, run_logger, runtime: Dict[str, Any], page):
+async def _execute_tool(executor, page, instruction: str, tool_name: str, args: Dict[str, Any], runtime: Dict[str, Any], run_logger):
+    try:
+        tn = str(tool_name or "").strip().lower()
+        # Simple extractors
+        if tn == "extract.emails":
+            emails = await _tool_extract_emails(page)
+            return {"emails": emails}
+        if tn == "extract.links":
+            links = await _tool_extract_all_anchors(page)
+            return {"links": links}
+        if tn == "extract.phones":
+            phones = await _tool_extract_phones(page)
+            return {"phones": phones}
+        # Articles
+        if tn == "articles.extract":
+            items = await extract_articles_eval(page)
+            return {"articles": items or []}
+        # Products (heuristics)
+        if tn == "products.heuristics":
+            thr = None
+            try:
+                v = args.get("threshold") if isinstance(args, dict) else None
+                thr = int(v) if v is not None else None
+            except Exception:
+                thr = None
+            instr = instruction or ""
+            if thr is not None:
+                instr = f"{instr} under {thr}"
+            data = await product_heuristics(instr, page, run_logger)
+            return data or {"products": []}
+        # DOM snapshot
+        if tn == "dom.snapshot":
+            include_dom = bool(args.get("include_dom", runtime.get("include_dom_html", False))) if isinstance(args, dict) else bool(runtime.get("include_dom_html", False))
+            max_chars = int(args.get("max_chars", runtime.get("dom_max_chars", 20000))) if isinstance(args, dict) else int(runtime.get("dom_max_chars", 20000))
+            pc = await executor._extract_page_context(page, include_dom=include_dom, dom_max_chars=max_chars)
+            return {"page_context": pc}
+        # Cookies accept
+        if tn == "cookies.accept":
+            try:
+                await _accept_cookies(page)
+                return {"accepted": True}
+            except Exception as e:
+                return {"accepted": False, "error": str(e)}
+        # Human verify
+        if tn == "human.verify":
+            ok = False
+            try:
+                hv = await handle_human_verification(page, run_logger)
+                ok = bool(hv)
+            except Exception:
+                ok = False
+            return {"ok": ok}
+        # Form fill
+        if tn == "form.fill":
+            try:
+                if isinstance(args, dict) and args:
+                    try:
+                        await page.evaluate("(data) => { window.__curllm_canonical = Object.assign({}, window.__curllm_canonical||{}, data); }", args)
+                    except Exception:
+                        pass
+                det = await executor._deterministic_form_fill(instruction, page, run_logger)
+                return {"form_fill": det}
+            except Exception as e:
+                return {"form_fill": {"submitted": False, "error": str(e)}}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def _planner_cycle(executor, instruction: str, page_context: Dict[str, Any], step: int, run_logger, runtime: Dict[str, Any], page, tool_history: list[Dict[str, Any]]):
     action = await executor._generate_action(
         instruction=instruction,
         page_context=page_context,
@@ -252,6 +325,22 @@ async def _planner_cycle(executor, instruction: str, page_context: Dict[str, Any
             except Exception:
                 pass
         return True, data
+    # Tool call branch
+    if action.get("type") == "tool":
+        tool_name = action.get("tool_name")
+        args = action.get("args") or {}
+        tool_res = await _execute_tool(executor, page, instruction, str(tool_name or ""), args if isinstance(args, dict) else {}, runtime, run_logger)
+        if run_logger:
+            try:
+                run_logger.log_text(f"Tool executed: {tool_name}")
+                run_logger.log_code("json", json.dumps(tool_res))
+            except Exception:
+                pass
+        try:
+            tool_history.append({"tool": tool_name, "args": args, "result": tool_res})
+        except Exception:
+            pass
+        return False, None
     # Respect no_click runtime flag
     if runtime.get("no_click") and str(action.get("type")) == "click":
         if run_logger:
@@ -267,7 +356,19 @@ async def _maybe_products_heuristics(instruction: str, page, run_logger, result:
     try:
         res_products = await product_heuristics(instruction, page, run_logger)
         if res_products is not None:
-            result["data"] = res_products
+            data_ms = res_products
+            try:
+                if config.validation_enabled and getattr(executor, "llm", None):
+                    try:
+                        dom_html = await page.content()
+                    except Exception:
+                        dom_html = None
+                    v = await validate_with_llm(executor.llm, instruction, data_ms, run_logger, dom_html=dom_html)
+                    if v is not None:
+                        data_ms = v
+            except Exception:
+                pass
+            result["data"] = data_ms
             return True
     except Exception:
         pass
@@ -282,7 +383,7 @@ async def _maybe_articles_no_click(executor, instruction: str, page, run_logger,
             if det_items:
                 data_det = {"articles": det_items}
                 try:
-                    if config.validation_enabled and executor._should_validate(instruction, data_det):
+                    if config.validation_enabled and getattr(executor, "llm", None):
                         try:
                             dom_html = await page.content()
                         except Exception:
@@ -374,27 +475,31 @@ async def run_task(
     except Exception:
         pass
 
-    # Early exits
-    early_res = await _try_early_form_fill(executor, instruction, page, domain_dir, run_logger, result, lower_instr)
-    if early_res is not None:
-        await page.close()
-        return early_res
-    early_res = await _try_early_articles(executor, instruction, page, run_logger, result, lower_instr)
-    if early_res is not None:
-        await page.close()
-        return early_res
-    early_res = await _try_selector_links(instruction, page, run_logger, result)
-    if early_res is not None:
-        await page.close()
-        return early_res
-    early_res = await _try_fastpaths(instruction, page, run_logger, result, runtime)
-    if early_res is not None:
-        await page.close()
-        return early_res
-    early_res = await _try_product_extraction(executor, instruction, page, run_logger, result, lower_instr)
-    if early_res is not None:
-        await page.close()
-        return early_res
+    try:
+        if bool(runtime.get("refine_instruction")) and getattr(executor, "llm", None):
+            pc = await executor._extract_page_context(
+                page,
+                include_dom=bool(runtime.get("include_dom_html")),
+                dom_max_chars=int(runtime.get("dom_max_chars", 20000) or 20000),
+            )
+            refined = await refine_instruction_llm(executor.llm, instruction, pc, run_logger)
+            if isinstance(refined, str) and refined.strip():
+                instruction = refined
+                lower_instr = (instruction or "").lower()
+                if run_logger:
+                    run_logger.log_text("Instruction refined; continuing with refined instruction.")
+    except Exception:
+        pass
+
+    prev_ctx: Optional[Dict[str, Any]] = None
+    try:
+        if bool(runtime.get("include_prev_results")):
+            fields = runtime.get("diff_fields") or ["href", "title", "url"]
+            prev_ctx = _previous_for_context(url, instruction, runtime.get("result_key"), fields)
+    except Exception:
+        prev_ctx = None
+
+    # Planner-only mode: skip all early shortcuts (form/articles/selector/direct/product)
 
     # Planner loop
     last_sig: Optional[str] = None
@@ -403,6 +508,7 @@ async def run_task(
     progressive_depth = 1
     last_screenshot_path: Optional[str] = None
     last_visual_analysis: Optional[Dict[str, Any]] = None
+    tool_history: list[Dict[str, Any]] = []
     for step in range(config.max_steps):
         result["steps"] = step + 1
         if run_logger:
@@ -417,6 +523,15 @@ async def run_task(
             pass
 
         page_context = await _step_page_context(executor, page, runtime, last_screenshot_path, last_visual_analysis)
+        if prev_ctx:
+            try:
+                page_context["previous_results"] = prev_ctx
+            except Exception:
+                pass
+        try:
+            page_context["tool_history"] = list(tool_history)
+        except Exception:
+            pass
         page_context = await _remediate_if_empty(page, runtime, run_logger, page_context)
 
         # progress
@@ -443,16 +558,8 @@ async def run_task(
             except Exception:
                 pass
 
-        # Product heuristics shortcut
-        if await _maybe_products_heuristics(instruction, page, run_logger, result):
-            break
-
-        # Deterministic articles shortcut
-        if await _maybe_articles_no_click(executor, instruction, page, run_logger, page_context, runtime, result):
-            break
-
         # Planner step
-        done, data = await _planner_cycle(executor, instruction, page_context, step, run_logger, runtime, page)
+        done, data = await _planner_cycle(executor, instruction, page_context, step, run_logger, runtime, page, tool_history)
         if done:
             result["data"] = data
             break
