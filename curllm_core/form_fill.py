@@ -25,7 +25,6 @@ def parse_form_pairs(instruction: str | None) -> Dict[str, str]:
 async def deterministic_form_fill(instruction: str, page, run_logger=None) -> Optional[Dict[str, Any]]:
     try:
         raw_pairs = parse_form_pairs(instruction)
-        # Normalize keys to canonical fields
         canonical: Dict[str, str] = {}
         for k, v in raw_pairs.items():
             lk = k.lower()
@@ -40,6 +39,16 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None) -> Op
                 canonical["subject"] = v
             elif any(x in lk for x in ["phone", "telefon", "tel"]):
                 canonical["phone"] = v
+        try:
+            cc = await page.evaluate("() => (window.__curllm_canonical||null)")
+            if isinstance(cc, dict):
+                for k in ["name","email","subject","phone","message"]:
+                    v = cc.get(k)
+                    if isinstance(v, str) and v.strip():
+                        canonical[k] = v.strip()
+        except Exception:
+            pass
+
         # Mark target fields in DOM and obtain stable selectors
         selectors = await page.evaluate(
             r"""
@@ -240,9 +249,37 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None) -> Op
                     except Exception:
                         diag_last = None
                     if isinstance(diag_last, dict):
-                        if diag_last.get("invalid_email") and selectors.get("email") and canonical.get("email"):
+                        if diag_last.get("invalid_email") and selectors.get("email"):
                             try:
-                                await page.fill(str(selectors["email"]), canonical["email"])
+                                host = await page.evaluate("() => (location.hostname||'')")
+                            except Exception:
+                                host = ""
+                            try:
+                                local = (canonical.get("email") or "user").split("@")[0] or "user"
+                            except Exception:
+                                local = "user"
+                            try:
+                                dom = host.lstrip('www.') if isinstance(host, str) else ""
+                            except Exception:
+                                dom = ""
+                            fallback_email = f"{local}@{dom}" if dom else (canonical.get("email") or "user@example.com")
+                            try:
+                                await page.fill(str(selectors["email"]), fallback_email)
+                                canonical["email"] = fallback_email
+                            except Exception:
+                                pass
+                            try:
+                                await page.evaluate(
+                                    """
+                                    () => {
+                                      const qs = '[data-curllm-target="email"]';
+                                      document.querySelectorAll(qs).forEach(el => {
+                                        try { el.dispatchEvent(new Event('input', {bubbles:true})); } catch(e){}
+                                        try { el.blur(); } catch(e){}
+                                      });
+                                    }
+                                    """
+                                )
                             except Exception:
                                 pass
                         if diag_last.get("consent_required") and selectors.get("consent"):

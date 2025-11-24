@@ -88,6 +88,44 @@ async def _extract_all_anchors(page) -> list[Dict[str, str]]:
     )
 
 
+async def _extract_anchors_filtered(page, selector: Optional[str], href_includes: Optional[str], href_regex: Optional[str], text_regex: Optional[str], limit: Optional[int]) -> list[Dict[str, str]]:
+    return await page.evaluate(
+        r"""
+            (sel, inc, hrefRe, textRe, limit) => {
+                const out = [];
+                const seen = new Set();
+                let reH = null;
+                let reT = null;
+                try { if (hrefRe) reH = new RegExp(hrefRe, 'i'); } catch (e) { reH = null; }
+                try { if (textRe) reT = new RegExp(textRe, 'i'); } catch (e) { reT = null; }
+                let nodes = [];
+                try {
+                  nodes = sel ? Array.from(document.querySelectorAll(sel)) : Array.from(document.querySelectorAll('a[href]'));
+                } catch (e) {
+                  nodes = Array.from(document.querySelectorAll('a[href]'));
+                }
+                nodes.forEach(a => {
+                    const text = (a.innerText||'').trim();
+                    const href = a.href;
+                    if (!href) return;
+                    if (inc && !href.includes(inc)) return;
+                    if (reH && !reH.test(href)) return;
+                    if (reT && !reT.test(text)) return;
+                    if (seen.has(href)) return; seen.add(href);
+                    out.push({text, href});
+                });
+                const lim = (typeof limit === 'number' && limit > 0) ? limit : 200;
+                return out.slice(0, lim);
+            }
+        """,
+        selector,
+        href_includes,
+        href_regex,
+        text_regex,
+        limit,
+    )
+
+
 async def _extract_emails(page) -> list[str]:
     text = await page.evaluate("() => document.body.innerText")
     emails_text = list(set(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", text)))

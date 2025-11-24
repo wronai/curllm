@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import os
 from typing import Any, Dict
 
 from .logger import RunLogger
@@ -7,6 +8,39 @@ from .logger import RunLogger
 async def generate_action(llm: Any, instruction: str, page_context: Dict, step: int, run_logger: RunLogger | None = None, max_chars: int = 8000, growth_per_step: int = 2000, max_cap: int = 20000) -> Dict:
     adaptive_chars = min(max_chars + (step * growth_per_step), max_cap)
     context_str = json.dumps(page_context, indent=2)[:adaptive_chars]
+
+    th_summary = ""
+    try:
+        th = page_context.get("tool_history") or []
+        if isinstance(th, list) and th:
+            parts = []
+            for item in th[-3:]:
+                try:
+                    name = item.get("tool")
+                    res = item.get("result") or {}
+                    if isinstance(res, dict):
+                        if "links" in res and isinstance(res.get("links"), list):
+                            cnt = len(res.get("links") or [])
+                            sample = []
+                            for e in (res.get("links") or [])[:5]:
+                                try:
+                                    sample.append(e.get("href") or e.get("url"))
+                                except Exception:
+                                    continue
+                            parts.append(f"{name}: links={cnt} sample={sample}")
+                        elif "form_fill" in res:
+                            ff = res.get("form_fill") or {}
+                            sub = ff.get("submitted")
+                            parts.append(f"{name}: form_fill.submitted={sub}")
+                        else:
+                            keys = list(res.keys())
+                            parts.append(f"{name}: keys={keys}")
+                except Exception:
+                    continue
+            if parts:
+                th_summary = "\nTool History (summary):\n- " + "\n- ".join(parts) + "\n"
+    except Exception:
+        th_summary = ""
 
     product_context = ""
     if "product" in (instruction or "").lower() or "cen" in (instruction or "").lower():
@@ -27,23 +61,36 @@ async def generate_action(llm: Any, instruction: str, page_context: Dict, step: 
             "If you see category links but no products, return type=\"click\" on relevant category.\n"
         )
 
+    offers_context = ""
+    low_instr = (instruction or "").lower()
+    if any(k in low_instr for k in ["offer", "offers", "oferta", "oferty", "zlecenia", "zlecenie", "rfp"]):
+        offers_context = (
+            "\n"
+            "IMPORTANT: You are extracting offers/zlecenia links with titles.\n"
+            "- Prefer calling extract.links with filtering, e.g.:\n"
+            "  - href_includes: 'rfp' or 'zlecen' or domain-specific segment\n"
+            "  - href_regex: '(?:/rfp/|/zlecen|/zlecenia|/zapytanie|/oferta)'\n"
+            "- Keep only meaningful entries (exclude navigation like login, privacy, categories).\n"
+            "- When you have the list of links, return type='complete' with extracted_data = {\"links\": links}.\n"
+        )
+
     tools_desc = (
         "Available tools you MAY call by returning type='tool':\n"
         "- extract.emails(args: {}): returns {emails: string[]}\n"
-        "- extract.links(args: {}): returns {links: [{text, href}]}\n"
+        "- extract.links(args: {selector?: string, href_includes?: string, href_regex?: string, text_regex?: string, limit?: number}): returns {links: [{text, href}]}\n"
         "- extract.phones(args: {}): returns {phones: string[]}\n"
         "- articles.extract(args: {}): returns {articles: [{title, url}]}\n"
         "- products.heuristics(args: {threshold?: number}): returns {products: [{name, price, url}]}\n"
         "- dom.snapshot(args: {include_dom?: boolean, max_chars?: number}): returns a 'page_context' snapshot\n"
         "- cookies.accept(args: {}): attempts to accept cookie banners, returns {accepted: boolean}\n"
         "- human.verify(args: {}): tries to bypass human verification, returns {ok: boolean}\n"
-        "- form.fill(args: {name?: string, email?: string, subject?: string, phone?: string, message?: string}): returns {submitted: boolean, errors?: object}\n"
+        "- form.fill(args: {name?: string, email?: string, subject?: string, phone?: string, message?: string}): returns {form_fill: {submitted: boolean, errors?: object}}\n"
         "When you decide to call a tool, respond with an action of shape: {\n"
         "  \"type\": \"tool\", \n"
         "  \"tool_name\": \"one of the above\",\n"
         "  \"args\": { ... },\n"
         "  \"reason\": \"why you call this tool now\"\n"
-        "}. After seeing tool results in next context (tools/tool_history), decide next action.\n"
+        "}. Use any results present under page_context.tool_history to decide the next step. If tool_history already contains the requested data, return type='complete' with extracted_data.\n"
     )
 
     prompt_text = (
@@ -51,12 +98,15 @@ async def generate_action(llm: Any, instruction: str, page_context: Dict, step: 
         f"Instruction: {instruction}\n"
         f"Current Step: {step + 1}\n"
         f"Page Context (truncated to {len(context_str)} chars): {context_str}\n\n"
+        f"{th_summary}"
         f"{product_context}\n"
+        f"{offers_context}\n"
         f"{tools_desc}\n\n"
         "Analyze the DOM structure in 'dom_preview' and 'interactive' fields carefully.\n"
         "The 'headings' field shows main content structure.\n"
         "The 'article_candidates' may contain product links.\n\n"
-        "If you see enough data to complete the task, return type='complete' with extracted_data.\n"
+        "If you see enough data to complete the task (including from tool_history), return type='complete' with extracted_data.\n"
+        "If the task is to extract links/titles and tool_history already contains an array 'links', finalize with type='complete' and extracted_data = {\"links\": links}.\n"
         "If page needs interaction, return appropriate action (click/scroll/wait) or call a tool (type='tool').\n\n"
         "Generate a JSON action:\n"
         "{\n"
@@ -71,8 +121,20 @@ async def generate_action(llm: Any, instruction: str, page_context: Dict, step: 
         "Response (JSON only):"
     )
     if run_logger:
+        try:
+            _pl = int(os.getenv("CURLLM_LOG_PROMPT_CHARS", "1000") or 1000)
+        except Exception:
+            _pl = 1000
         run_logger.log_text(f"LLM Prompt (step {step + 1}, context: {len(context_str)} chars)")
-        run_logger.log_code("text", prompt_text[:1000] + "...[truncated]...")
+        try:
+            run_logger.log_text(
+                "Context limits: base={} (CURLLM_PLANNER_BASE_CHARS), growth_per_step={} (CURLLM_PLANNER_GROWTH_PER_STEP), max_cap={} (CURLLM_PLANNER_MAX_CAP); prompt_log_limit={} (CURLLM_LOG_PROMPT_CHARS)".format(
+                    max_chars, growth_per_step, max_cap, _pl
+                )
+            )
+        except Exception:
+            pass
+        run_logger.log_code("text", prompt_text[:_pl] + ("...[truncated]..." if len(prompt_text) > _pl else ""))
     try:
         response = await llm.ainvoke(prompt_text)
         text = response["text"] if isinstance(response, dict) and "text" in response else str(response)

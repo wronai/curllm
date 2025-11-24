@@ -18,6 +18,7 @@ from .extraction import (
     _extract_emails as _tool_extract_emails,
     _extract_phones as _tool_extract_phones,
     _extract_all_anchors as _tool_extract_all_anchors,
+    _extract_anchors_filtered as _tool_extract_anchors_filtered,
     refine_instruction_llm,
 )
 from .human_verify import handle_human_verification, looks_like_human_verify_text
@@ -238,19 +239,72 @@ def _progress_and_maybe_break(executor, page_context: Dict[str, Any], last_sig: 
 async def _execute_tool(executor, page, instruction: str, tool_name: str, args: Dict[str, Any], runtime: Dict[str, Any], run_logger):
     try:
         tn = str(tool_name or "").strip().lower()
+        if run_logger:
+            try:
+                run_logger.log_text(f"Tool call: {tn}")
+                if isinstance(args, dict) and args:
+                    run_logger.log_code("json", json.dumps(args))
+            except Exception:
+                pass
         # Simple extractors
         if tn == "extract.emails":
             emails = await _tool_extract_emails(page)
+            if run_logger:
+                try:
+                    run_logger.log_kv("emails_count", str(len(emails or [])))
+                except Exception:
+                    pass
             return {"emails": emails}
         if tn == "extract.links":
-            links = await _tool_extract_all_anchors(page)
+            sel = None
+            inc = None
+            href_re = None
+            text_re = None
+            lim = None
+            if isinstance(args, dict) and args:
+                sel = args.get("selector") or args.get("css")
+                inc = args.get("href_includes") or args.get("href_contains") or args.get("includes")
+                href_re = args.get("href_regex")
+                text_re = args.get("text_regex")
+                try:
+                    v = args.get("limit")
+                    lim = int(v) if v is not None else None
+                except Exception:
+                    lim = None
+            if sel or inc or href_re or text_re or lim:
+                links = await _tool_extract_anchors_filtered(page, sel, inc, href_re, text_re, lim)
+            else:
+                links = await _tool_extract_all_anchors(page)
+            if run_logger:
+                try:
+                    cnt = len(links or [])
+                    sample = []
+                    for e in (links or [])[:5]:
+                        try:
+                            sample.append(e.get("href") or e.get("url"))
+                        except Exception:
+                            continue
+                    run_logger.log_text(f"extract.links -> {cnt} items")
+                    run_logger.log_code("json", json.dumps({"sample": sample}))
+                except Exception:
+                    pass
             return {"links": links}
         if tn == "extract.phones":
             phones = await _tool_extract_phones(page)
+            if run_logger:
+                try:
+                    run_logger.log_kv("phones_count", str(len(phones or [])))
+                except Exception:
+                    pass
             return {"phones": phones}
         # Articles
         if tn == "articles.extract":
             items = await extract_articles_eval(page)
+            if run_logger:
+                try:
+                    run_logger.log_kv("articles_count", str(len(items or [])))
+                except Exception:
+                    pass
             return {"articles": items or []}
         # Products (heuristics)
         if tn == "products.heuristics":
@@ -264,19 +318,36 @@ async def _execute_tool(executor, page, instruction: str, tool_name: str, args: 
             if thr is not None:
                 instr = f"{instr} under {thr}"
             data = await product_heuristics(instr, page, run_logger)
+            if run_logger:
+                try:
+                    cnt = len((data or {}).get("products") or []) if isinstance(data, dict) else 0
+                    run_logger.log_kv("products_count", str(cnt))
+                except Exception:
+                    pass
             return data or {"products": []}
         # DOM snapshot
         if tn == "dom.snapshot":
             include_dom = bool(args.get("include_dom", runtime.get("include_dom_html", False))) if isinstance(args, dict) else bool(runtime.get("include_dom_html", False))
             max_chars = int(args.get("max_chars", runtime.get("dom_max_chars", 20000))) if isinstance(args, dict) else int(runtime.get("dom_max_chars", 20000))
             pc = await executor._extract_page_context(page, include_dom=include_dom, dom_max_chars=max_chars)
+            if run_logger:
+                try:
+                    dom_len = len((pc or {}).get("dom_preview") or "")
+                    inter_len = len((pc or {}).get("interactive") or [])
+                    run_logger.log_code("json", json.dumps({"dom_preview_len": dom_len, "interactive_count": inter_len}))
+                except Exception:
+                    pass
             return {"page_context": pc}
         # Cookies accept
         if tn == "cookies.accept":
             try:
                 await _accept_cookies(page)
+                if run_logger:
+                    run_logger.log_kv("cookies.accept", "true")
                 return {"accepted": True}
             except Exception as e:
+                if run_logger:
+                    run_logger.log_kv("cookies.accept", "false")
                 return {"accepted": False, "error": str(e)}
         # Human verify
         if tn == "human.verify":
@@ -286,6 +357,8 @@ async def _execute_tool(executor, page, instruction: str, tool_name: str, args: 
                 ok = bool(hv)
             except Exception:
                 ok = False
+            if run_logger:
+                run_logger.log_kv("human.verify", str(ok))
             return {"ok": ok}
         # Form fill
         if tn == "form.fill":
@@ -296,6 +369,14 @@ async def _execute_tool(executor, page, instruction: str, tool_name: str, args: 
                     except Exception:
                         pass
                 det = await executor._deterministic_form_fill(instruction, page, run_logger)
+                if run_logger and isinstance(det, dict):
+                    try:
+                        run_logger.log_code("json", json.dumps({
+                            "submitted": det.get("submitted"),
+                            "errors": det.get("errors"),
+                        }))
+                    except Exception:
+                        pass
                 return {"form_fill": det}
             except Exception as e:
                 return {"form_fill": {"submitted": False, "error": str(e)}}
@@ -314,6 +395,15 @@ async def _planner_cycle(executor, instruction: str, page_context: Dict[str, Any
     if run_logger:
         run_logger.log_text("Planned action:")
         run_logger.log_code("json", json.dumps(action))
+        try:
+            if action.get("type"):
+                run_logger.log_kv("action_type", str(action.get("type")))
+            if action.get("reason"):
+                run_logger.log_kv("action_reason", str(action.get("reason")))
+            if action.get("tool_name"):
+                run_logger.log_kv("tool_name", str(action.get("tool_name")))
+        except Exception:
+            pass
     if action.get("type") == "complete":
         data = action.get("extracted_data", page_context)
         try:
@@ -354,6 +444,15 @@ async def _planner_cycle(executor, instruction: str, page_context: Dict[str, Any
         await executor._execute_action(page, action, runtime)
     if run_logger:
         run_logger.log_text(f"Executed action: {action.get('type')}")
+        try:
+            sel = action.get("selector")
+            val = action.get("value") if isinstance(action.get("value"), (str, int, float)) else None
+            timeout = action.get("timeoutMs") or runtime.get("action_timeout_ms")
+            details = {k: v for k, v in {"selector": sel, "value": (str(val)[:80] if val is not None else None), "timeoutMs": timeout}.items() if v is not None}
+            if details:
+                run_logger.log_code("json", json.dumps(details))
+        except Exception:
+            pass
     return False, None
 
 
@@ -435,7 +534,9 @@ async def _finalize_fallback(executor, instruction: str, url: Optional[str], pag
                     filtered["emails"] = data["emails"]
                 if ("phone" in lower_instr2 or "tel" in lower_instr2 or "telefon" in lower_instr2) and "phones" in data:
                     filtered["phones"] = data["phones"]
-                result["data"] = filtered
+                if any(k in lower_instr2 for k in ["link", "oferta", "oferty", "zlecenia", "zlecenie", "rfp"]) and "links" in data:
+                    filtered["links"] = data["links"]
+                result["data"] = filtered or data
     except Exception:
         pass
 
@@ -558,8 +659,16 @@ async def run_task(
 
         if run_logger:
             try:
-                run_logger.log_text("Page context snapshot (truncated):")
-                run_logger.log_code("json", json.dumps(page_context, indent=2)[:LOG_PREVIEW_CHARS])
+                preview_len = LOG_PREVIEW_CHARS
+                dom_chars = int(runtime.get("dom_max_chars", 20000) or 20000)
+                dom_cap = int(runtime.get("dom_max_cap", 60000) or 60000)
+                incl = bool(runtime.get("include_dom_html", False))
+                run_logger.log_text(
+                    f"Page context snapshot (preview {preview_len} chars via CURLLM_LOG_PREVIEW_CHARS; "
+                    f"dom_max_chars={dom_chars} via CURLLM_DOM_MAX_CHARS; dom_max_cap={dom_cap} via CURLLM_DOM_MAX_CAP; "
+                    f"include_dom_html={incl} via CURLLM_INCLUDE_DOM_HTML)"
+                )
+                run_logger.log_code("json", json.dumps(page_context, indent=2)[:preview_len])
             except Exception:
                 pass
 
