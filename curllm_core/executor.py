@@ -32,6 +32,7 @@ from .stealth import StealthConfig
 from .runtime import parse_runtime_from_instruction
 from .headers import normalize_headers
 from .browser_setup import setup_browser
+from .wordpress import WordPressAutomation
 from .page_context import extract_page_context
 from .actions import execute_action
 from .human_verify import handle_human_verification, looks_like_human_verify_text
@@ -85,6 +86,9 @@ class CurllmExecutor:
         captcha_solver: bool = False,
         use_bql: bool = False,
         headers: Optional[Dict] = None,
+        proxy: Optional[Dict] = None,
+        session_id: Optional[str] = None,
+        wordpress_config: Optional[Dict] = None,
     ) -> Dict[str, Any]:
         # Parse optional runtime params embedded in JSON instruction
         instruction, runtime = parse_runtime_from_instruction(instruction)
@@ -128,7 +132,13 @@ class CurllmExecutor:
                 stealth_mode = True
             # Normalize headers for Playwright context
             norm_headers = normalize_headers(headers)
-            browser_context = await self._setup_browser(stealth_mode, storage_key=host, headers=norm_headers)
+            browser_context = await self._setup_browser(
+                stealth_mode,
+                storage_key=host,
+                headers=norm_headers,
+                proxy_config=proxy,
+                session_id=session_id,
+            )
             run_logger.log_text("Browser context initialized.")
 
             # If BQL mode, execute BQL directly and short-circuit
@@ -197,6 +207,57 @@ class CurllmExecutor:
                 except Exception as e:
                     run_logger.log_text("BQL execution error:")
                     run_logger.log_code("text", str(e))
+
+            # Optional WordPress automation short-circuit
+            if wordpress_config:
+                try:
+                    page = await browser_context.new_page()
+                    wp = WordPressAutomation(page, run_logger)
+                    logged = await wp.login(
+                        wordpress_config.get("url", url or ""),
+                        wordpress_config.get("username", ""),
+                        wordpress_config.get("password", ""),
+                    )
+                    if logged:
+                        if wordpress_config.get("action") == "create_post":
+                            post_url = await wp.create_post(
+                                title=wordpress_config.get("title", "New Post"),
+                                content=wordpress_config.get("content", ""),
+                                status=wordpress_config.get("status", "draft"),
+                                categories=wordpress_config.get("categories"),
+                                tags=wordpress_config.get("tags"),
+                                featured_image_path=wordpress_config.get("featured_image_path"),
+                            )
+                            out_res = {
+                                "success": True,
+                                "result": {"post_url": post_url, "success": bool(post_url)},
+                                "steps_taken": 0,
+                                "screenshots": [],
+                                "timestamp": datetime.now().isoformat(),
+                                "run_log": str(run_logger.path),
+                            }
+                            # Persist session if configured
+                            try:
+                                storage_path = getattr(browser_context, "_curllm_storage_path", None)
+                                if storage_path:
+                                    await browser_context.storage_state(path=storage_path)
+                                session_mgr = getattr(browser_context, "_curllm_session_manager", None)
+                                if session_mgr and session_id:
+                                    session_mgr.save_session_metadata(session_id, {
+                                        "type": "wordpress",
+                                        "url": wordpress_config.get("url", url or ""),
+                                        "username": wordpress_config.get("username", "")
+                                    })
+                            except Exception:
+                                pass
+                            try:
+                                await page.close()
+                            except Exception:
+                                pass
+                            run_logger.log_text("WordPress automation finished.")
+                            return out_res
+                except Exception as e:
+                    run_logger.log_text(f"WordPress automation error: {e}")
 
             agent = self._create_agent(
                 browser_context=browser_context,
@@ -321,7 +382,7 @@ class CurllmExecutor:
                 logger.warning(f"browser_use.Agent init failed: {e}. Falling back to LocalAgent.")
         return LocalAgent(browser_context, self.llm, config.max_steps, visual_mode, task=instruction)
 
-    async def _setup_browser(self, stealth_mode: bool, storage_key: Optional[str] = None, headers: Optional[Dict[str, str]] = None):
+    async def _setup_browser(self, stealth_mode: bool, storage_key: Optional[str] = None, headers: Optional[Dict[str, str]] = None, proxy_config: Optional[Dict[str, Any]] = None, session_id: Optional[str] = None):
         return await setup_browser(
             use_browserless=config.use_browserless,
             browserless_url=config.browserless_url,
@@ -330,6 +391,8 @@ class CurllmExecutor:
             headers=headers,
             stealth_config=self.stealth_config,
             config=config,
+            proxy_config=proxy_config,
+            session_id=session_id,
         )
 
     # browserless setup handled in browser_setup.setup_browser
@@ -382,7 +445,7 @@ class CurllmExecutor:
             except Exception as e:
                 run_logger.log_kv("direct_fastpath_error", str(e))
         if "product" in lower_instr or "produkt" in lower_instr:
-            ms = await self._multi_stage_product_extract(instruction, lower_instr, page, run_logger)
+            ms = await self._multi_stage_product_extract(instruction, page, run_logger)
             if ms is not None:
                 result["data"] = ms
                 await page.close()
@@ -524,7 +587,7 @@ class CurllmExecutor:
             except Exception:
                 pass
             try:
-                last_sig, no_progress, progressive_depth, should_break = await self._progress_tick(
+                last_sig, no_progress, progressive_depth, should_break = self._progress_tick(
                     page_context=page_context,
                     last_sig=last_sig,
                     no_progress=no_progress,
@@ -833,7 +896,7 @@ class CurllmExecutor:
             run_logger.log_kv("accept_cookies_error", str(e))
         return page, domain_dir, stealth_mode, None
 
-    async def _multi_stage_product_extract(self, instruction: str, lower_instr: str, page, run_logger: RunLogger | None):
+    async def _multi_stage_product_extract(self, instruction: str, page, run_logger: RunLogger | None):
         extraction_stages = [
             {"scroll_steps": 2, "wait_ms": 500},
             {"scroll_steps": 3, "wait_ms": 800},
@@ -860,7 +923,7 @@ class CurllmExecutor:
             run_logger.log_text("Multi-stage extraction incomplete, continuing with LLM planner")
         return None
 
-    async def _progress_tick(
+    def _progress_tick(
         self,
         page_context: Dict[str, Any],
         last_sig: Optional[str],
@@ -923,19 +986,11 @@ class CurllmExecutor:
                     cmd = self._build_rerun_curl(instruction, url or "", params)
                     result["meta"]["hints"].append("Stall limit reached. Consider increasing stall_limit and DOM cap and retry.")
                     result["meta"]["suggested_commands"].append(cmd)
-                    if page_context.get("status") == "human_verification":
-                        result["meta"]["hints"].append("Human verification detected. Consider retrying with human verification solver.")
-                        params = {
-                            "include_dom_html": True,
-                            "dom_max_chars": int(runtime.get("dom_max_cap", 60000) or 60000),
-                            "stall_limit": stall_limit + 2,
-                            "planner_growth_per_step": int(runtime.get("planner_growth_per_step", 2000)) + 1000,
-                            "planner_max_cap": int(runtime.get("planner_max_cap", 20000)) + 5000,
-                            "preset": "deep_scan",
-                            "human_verification": True,
-                        }
-                        cmd = self._build_rerun_curl(instruction, url or "", params)
-                        result["meta"]["suggested_commands"].append(cmd)
+                    status = page_context.get("status") or {}
+                    if bool(status.get("human_verify_possible")):
+                        result["meta"]["hints"].append("Human verification likely. Consider retrying with stealth and/or manual verification strategies.")
+                        cmd2 = self._build_rerun_curl(instruction, url or "", {**params}, top_level={"stealth_mode": True, "url": url or ""})
+                        result["meta"]["suggested_commands"].append(cmd2)
                 except Exception:
                     pass
                 return last_sig, no_progress, progressive_depth, True

@@ -1,40 +1,122 @@
 #!/usr/bin/env python3
 import os
 import random
+import json
 from pathlib import Path
 from typing import Dict, Optional
+from datetime import datetime, timedelta
 
 from .browserless import BrowserlessContext
 
-async def setup_browser(use_browserless: bool, browserless_url: str, stealth_mode: bool, storage_key: Optional[str], headers: Optional[Dict[str, str]], stealth_config, config):
+class SessionManager:
+    def __init__(self, base_dir: Path = Path("./workspace/sessions")):
+        self.base_dir = base_dir
+        self.base_dir.mkdir(parents=True, exist_ok=True)
+
+    def get_session_path(self, session_id: str) -> Path:
+        return self.base_dir / f"{session_id}.json"
+
+    def save_session_metadata(self, session_id: str, metadata: Dict):
+        meta_path = self.base_dir / f"{session_id}.meta.json"
+        metadata["last_updated"] = datetime.now().isoformat()
+        with open(meta_path, 'w') as f:
+            json.dump(metadata, f, indent=2)
+
+    def load_session_metadata(self, session_id: str) -> Optional[Dict]:
+        meta_path = self.base_dir / f"{session_id}.meta.json"
+        if meta_path.exists():
+            with open(meta_path, 'r') as f:
+                return json.load(f)
+        return None
+
+    def is_session_valid(self, session_id: str, max_age_hours: int = 24) -> bool:
+        metadata = self.load_session_metadata(session_id)
+        if not metadata:
+            return False
+        last_updated = datetime.fromisoformat(metadata["last_updated"])  # type: ignore[arg-type]
+        age = datetime.now() - last_updated
+        return age < timedelta(hours=max_age_hours)
+
+async def setup_browser(
+    use_browserless: bool,
+    browserless_url: str,
+    stealth_mode: bool,
+    storage_key: Optional[str],
+    headers: Optional[Dict[str, str]],
+    stealth_config,
+    config,
+    proxy_config: Optional[Dict] = None,
+    session_id: Optional[str] = None,
+):
     if use_browserless:
-        import websockets  # lazy
+        import websockets
         ws = await websockets.connect(browserless_url)
         return BrowserlessContext(ws)
-    return await setup_playwright(stealth_mode, storage_key, headers, stealth_config, config)
+    return await setup_playwright(
+        stealth_mode,
+        storage_key,
+        headers,
+        stealth_config,
+        config,
+        proxy_config,
+        session_id,
+    )
 
-async def setup_playwright(stealth_mode: bool, storage_key: Optional[str], headers: Optional[Dict[str, str]], stealth_config, config):
-    from playwright.async_api import async_playwright  # lazy import
+async def setup_playwright(
+    stealth_mode: bool,
+    storage_key: Optional[str],
+    headers: Optional[Dict[str, str]],
+    stealth_config,
+    config,
+    proxy_config: Optional[Dict] = None,
+    session_id: Optional[str] = None,
+):
+    from playwright.async_api import async_playwright
+    session_mgr = SessionManager()
     playwright = await async_playwright().start()
-    launch_args = {"headless": bool(config.headless), "args": ["--no-sandbox", "--disable-dev-shm-usage"]}
+    launch_args = {
+        "headless": bool(config.headless),
+        "args": [
+            "--no-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-blink-features=AutomationControlled",
+        ],
+    }
     if stealth_mode:
         launch_args["args"].extend(stealth_config.get_chrome_args())
-    if config.proxy:
+    if proxy_config:
+        if isinstance(proxy_config, str):
+            launch_args["proxy"] = {"server": proxy_config}
+        elif isinstance(proxy_config, dict):
+            proxy_settings: Dict[str, str] = {"server": str(proxy_config.get("server"))}
+            if proxy_config.get("username"):
+                proxy_settings["username"] = proxy_config.get("username", "")
+                proxy_settings["password"] = proxy_config.get("password", "")
+            if proxy_config.get("bypass"):
+                proxy_settings["bypass"] = proxy_config.get("bypass", "")
+            launch_args["proxy"] = proxy_settings
+    elif config.proxy:
         launch_args["proxy"] = {"server": config.proxy}
     browser = await playwright.chromium.launch(**launch_args)
+
     storage_path = None
-    if storage_key:
+    if session_id:
+        storage_path = session_mgr.get_session_path(session_id)
+        if not storage_path.exists() and storage_key:
+            old_storage = Path(f"./workspace/storage/{storage_key}.json")
+            if old_storage.exists():
+                storage_path = old_storage
+    elif storage_key:
         storage_dir = Path(os.getenv("CURLLM_STORAGE_DIR", "./workspace/storage"))
-        try:
-            storage_dir.mkdir(parents=True, exist_ok=True)
-        except Exception:
-            alt = Path("/tmp/curllm_workspace/storage")
-            alt.mkdir(parents=True, exist_ok=True)
-            storage_dir = alt
+        storage_dir.mkdir(parents=True, exist_ok=True)
         storage_path = storage_dir / f"{storage_key}.json"
+
     vw = 1366 + int(random.random() * 700)
     vh = 768 + int(random.random() * 400)
-    extra_headers: Dict[str, str] = {"Accept-Language": f"{config.locale},en;q=0.8"}
+    extra_headers: Dict[str, str] = {
+        "Accept-Language": f"{config.locale},en;q=0.8",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    }
     if headers:
         extra_headers.update(headers)
     user_agent = stealth_config.get_user_agent() if stealth_mode else (headers.get("User-Agent") if headers else None)
@@ -44,14 +126,22 @@ async def setup_playwright(stealth_mode: bool, storage_key: Optional[str], heade
         "locale": config.locale,
         "timezone_id": config.timezone_id,
         "extra_http_headers": extra_headers,
+        "accept_downloads": True,
+        "ignore_https_errors": proxy_config is not None,
     }
     if storage_path and storage_path.exists():
-        context_args["storage_state"] = str(storage_path)
+        try:
+            context_args["storage_state"] = str(storage_path)
+            if session_id and session_mgr.is_session_valid(session_id):
+                pass
+        except Exception:
+            pass
     context = await browser.new_context(**context_args)
     if stealth_mode:
         await stealth_config.apply_to_context(context)
     setattr(context, "_curllm_browser", browser)
     setattr(context, "_curllm_playwright", playwright)
-    if storage_path:
-        setattr(context, "_curllm_storage_path", str(storage_path))
+    setattr(context, "_curllm_storage_path", str(storage_path) if storage_path else None)
+    setattr(context, "_curllm_session_id", session_id)
+    setattr(context, "_curllm_session_manager", session_mgr)
     return context

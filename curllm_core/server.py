@@ -35,6 +35,9 @@ def execute():
     captcha_solver = data.get('captcha_solver', False)
     use_bql = data.get('use_bql', False)
     headers = data.get('headers', {})
+    proxy = data.get('proxy')
+    session_id = data.get('session_id')
+    wordpress_config = data.get('wordpress_config')
 
     def _run_in_new_loop():
         loop = asyncio.new_event_loop()
@@ -48,6 +51,9 @@ def execute():
                 captcha_solver=captcha_solver,
                 use_bql=use_bql,
                 headers=headers,
+                proxy=proxy,
+                session_id=session_id,
+                wordpress_config=wordpress_config,
             ))
         finally:
             try:
