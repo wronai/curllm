@@ -75,18 +75,41 @@ class CurllmExecutor:
         instruction, runtime = parse_runtime_from_instruction(instruction)
         run_logger = RunLogger(instruction=instruction, url=url)
         run_logger.log_heading(f"curllm run: {datetime.now().isoformat()}")
-        run_logger.log_kv("Model", config.ollama_model)
-        run_logger.log_kv("Ollama Host", config.ollama_host)
-        run_logger.log_kv("Visual Mode", str(visual_mode))
-        run_logger.log_kv("Stealth Mode", str(stealth_mode))
-        run_logger.log_kv("Use BQL", str(use_bql))
-        # Log runtime flags
+        run_logger.log_kv("CURLLM_MODEL", config.ollama_model)
+        run_logger.log_kv("CURLLM_OLLAMA_HOST", config.ollama_host)
+        run_logger.log_kv("VISUAL_MODE", str(visual_mode))
+        run_logger.log_kv("STEALTH_MODE", str(stealth_mode))
+        run_logger.log_kv("USE_BQL", str(use_bql))
+        # Log runtime flags with corresponding .env names
         try:
-            for k in [
-                "include_dom_html","dom_max_chars","smart_click","action_timeout_ms",
-                "wait_after_click_ms","no_click","scroll_load","fastpath"]:
+            env_map = {
+                "include_dom_html": "CURLLM_INCLUDE_DOM_HTML",
+                "dom_max_chars": "CURLLM_DOM_MAX_CHARS",
+                "dom_max_cap": "CURLLM_DOM_MAX_CAP",
+                "smart_click": "CURLLM_SMART_CLICK",
+                "action_timeout_ms": "CURLLM_ACTION_TIMEOUT_MS",
+                "wait_after_click_ms": "CURLLM_WAIT_AFTER_CLICK_MS",
+                "wait_after_nav_ms": "CURLLM_WAIT_AFTER_NAV_MS",
+                "no_click": "CURLLM_NO_CLICK",
+                "scroll_load": "CURLLM_SCROLL_LOAD",
+                "fastpath": "CURLLM_FASTPATH",
+                "refine_instruction": "CURLLM_REFINE_INSTRUCTION",
+                "use_external_slider_solver": "CURLLM_USE_EXTERNAL_SLIDER_SOLVER",
+                "stall_limit": "CURLLM_STALL_LIMIT",
+                "planner_growth_per_step": "CURLLM_PLANNER_GROWTH_PER_STEP",
+                "planner_max_cap": "CURLLM_PLANNER_MAX_CAP",
+                "planner_base_chars": "CURLLM_PLANNER_BASE_CHARS",
+                "store_results": "CURLLM_STORE_RESULTS",
+                "result_key": "CURLLM_RESULT_KEY",
+                "diff_mode": "CURLLM_DIFF_MODE",
+                "diff_fields": "CURLLM_DIFF_FIELDS",
+                "keep_history": "CURLLM_KEEP_HISTORY",
+                "include_prev_results": "CURLLM_INCLUDE_PREV_RESULTS",
+                "runtime_preset": "CURLLM_RUNTIME_PRESET",
+            }
+            for k, envk in env_map.items():
                 if k in runtime:
-                    run_logger.log_kv(f"runtime.{k}", str(runtime.get(k)))
+                    run_logger.log_kv(envk, str(runtime.get(k)))
         except Exception:
             pass
         # Auto-enable DOM snapshot if task looks like extraction and user didn't force it

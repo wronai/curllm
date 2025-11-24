@@ -194,11 +194,11 @@ class CurllmExecutor:
         # Prepare run logger
         run_logger = RunLogger(instruction=instruction, url=url)
         run_logger.log_heading(f"curllm run: {datetime.now().isoformat()}")
-        run_logger.log_kv("Model", config.ollama_model)
-        run_logger.log_kv("Ollama Host", config.ollama_host)
-        run_logger.log_kv("Visual Mode", str(visual_mode))
-        run_logger.log_kv("Stealth Mode", str(stealth_mode))
-        run_logger.log_kv("Use BQL", str(use_bql))
+        run_logger.log_kv("CURLLM_MODEL", config.ollama_model)
+        run_logger.log_kv("CURLLM_OLLAMA_HOST", config.ollama_host)
+        run_logger.log_kv("VISUAL_MODE", str(visual_mode))
+        run_logger.log_kv("STEALTH_MODE", str(stealth_mode))
+        run_logger.log_kv("USE_BQL", str(use_bql))
 
         browser_context = None
         try:
