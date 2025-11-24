@@ -96,12 +96,26 @@ async def generate_action(llm: Any, instruction: str, page_context: Dict, step: 
             except Exception:
                 sample_fields = []
             forms_context = (
-                "\nIMPORTANT: The instruction asks to fill a contact form and the page exposes form fields.\n"
-                "- Prefer calling form.fill with appropriate args: {name, email, subject, phone, message}.\n"
+                "\n⚠️ CRITICAL: The instruction asks to fill a contact form!\n\n"
+                "❌ DO NOT use type=\"fill\" - this is WRONG and will NOT work!\n"
+                "✅ You MUST use the form.fill TOOL:\n\n"
+                "```json\n"
+                "{\n"
+                "  \"type\": \"tool\",\n"
+                "  \"tool_name\": \"form.fill\",\n"
+                "  \"args\": {\n"
+                "    \"name\": \"John Doe\",\n"
+                "    \"email\": \"john@example.com\",\n"
+                "    \"phone\": \"+48123456789\",\n"
+                "    \"message\": \"Your message here\"\n"
+                "  },\n"
+                "  \"reason\": \"Filling contact form with user data\"\n"
+                "}\n"
+                "```\n\n"
                 f"- Detected fields (sample): {sample_fields}.\n"
-                "- After filling, the system will dispatch input/blur events and attempt submission + success detection.\n"
-                "- If email is invalid, a same-domain fallback will be attempted automatically.\n"
-                "- If you have enough to submit, do NOT extract links. Call form.fill now.\n"
+                "- After calling form.fill, the system will automatically submit and detect success.\n"
+                "- If email is invalid, fallback will be attempted automatically.\n"
+                "- If you have enough data, call form.fill NOW. Do NOT extract links.\n"
             )
     except Exception:
         forms_context = ""

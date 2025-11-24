@@ -159,41 +159,91 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None) -> Op
                 return C.length ? C[0].el : null;
               };
               const res = {};
-              const mark = (el, key) => { if (!el) return null; el.setAttribute('data-curllm-target', key); return `[data-curllm-target="${key}"]`; };
+              const marked = new Set();  // Track which elements are already marked
+              const mark = (el, key) => { 
+                if (!el) return null; 
+                // Don't mark if already marked with different key
+                if (el.hasAttribute('data-curllm-target') && el.getAttribute('data-curllm-target') !== key) {
+                  return null;
+                }
+                el.setAttribute('data-curllm-target', key); 
+                marked.add(el);
+                return `[data-curllm-target="${key}"]`; 
+              };
+              
+              // Find and mark REQUIRED fields first (with fallback)
               const nameEl = findField(['name','fullname','full name','imi','imię','nazw'], 'input');
               if (nameEl) res.name = mark(nameEl, 'name');
               const emailEl = findField(['email','e-mail','mail','adres'], 'email');
-              if (emailEl) res.email = mark(emailEl, 'email');
+              if (emailEl && !marked.has(emailEl)) res.email = mark(emailEl, 'email');
               const msgEl = findField(['message','wiadomo','treść','tresc','content','komentarz'], 'textarea');
-              if (msgEl) res.message = mark(msgEl, 'message');
-              // subject optional
-              const subjEl = findField(['subject','temat'], 'input');
-              if (subjEl) res.subject = mark(subjEl, 'subject');
-              // phone optional
+              if (msgEl && !marked.has(msgEl)) res.message = mark(msgEl, 'message');
+              
+              // Find OPTIONAL fields (NO fallback - only if exact match)
+              // For subject: only mark if found by keyword, NOT by fallback
+              const subjCandidates = [];
+              ['subject','temat'].forEach(k => {
+                try {
+                  document.querySelectorAll(`input[name*="${k}"], input[id*="${k}"], input[placeholder*="${k}"]`).forEach(el => {
+                    if (el && el.offsetParent !== null && !marked.has(el)) subjCandidates.push(el);
+                  });
+                } catch(e){}
+              });
+              if (subjCandidates.length > 0) {
+                res.subject = mark(subjCandidates[0], 'subject');
+              }
+              
+              // phone optional (with keyword match only)
               const phoneEl = findField(['phone','telefon','tel'], 'input');
-              if (phoneEl) res.phone = mark(phoneEl, 'phone');
-              // consent checkbox (GDPR/RODO)
-              const consentKeywords = ['zgod', 'akcept', 'regulamin', 'polityk', 'rodo', 'privacy', 'consent', 'agree'];
+              if (phoneEl && !marked.has(phoneEl)) res.phone = mark(phoneEl, 'phone');
+              // consent checkbox (GDPR/RODO) - enhanced detection
+              const consentKeywords = ['zgod', 'akcept', 'regulamin', 'polityk', 'rodo', 'privacy', 'consent', 'agree', 'terms', 'warunki', 'akceptuj', 'potwierdzam'];
               let consent = null;
-              // label-associated checkboxes
+              let consentScore = 0;
+              
+              // Try label-associated checkboxes first
               Array.from(document.querySelectorAll('label')).forEach(lb => {
                 const t = (lb.innerText||'').toLowerCase();
-                consentKeywords.forEach(k => {
-                  if (!consent && t.includes(k)) {
-                    const forId = lb.getAttribute('for');
-                    if (forId) {
-                      const cb = document.getElementById(forId);
-                      if (cb && cb.type === 'checkbox') consent = cb;
-                    } else {
-                      const cb2 = lb.querySelector('input[type="checkbox"]');
-                      if (cb2) consent = cb2;
-                    }
+                const matchCount = consentKeywords.filter(k => t.includes(k)).length;
+                if (matchCount > consentScore) {
+                  const forId = lb.getAttribute('for');
+                  let cb = null;
+                  if (forId) {
+                    cb = document.getElementById(forId);
+                  } else {
+                    cb = lb.querySelector('input[type="checkbox"]');
+                  }
+                  if (cb && cb.type === 'checkbox' && visible(cb)) {
+                    consent = cb;
+                    consentScore = matchCount;
+                  }
+                }
+              });
+              
+              // If not found by label, try checkbox attributes (name, id, aria-label)
+              if (!consent) {
+                Array.from(document.querySelectorAll('input[type="checkbox"]')).forEach(cb => {
+                  if (!visible(cb)) return;
+                  const name = (cb.getAttribute('name')||'').toLowerCase();
+                  const id = (cb.getAttribute('id')||'').toLowerCase();
+                  const ariaLabel = (cb.getAttribute('aria-label')||'').toLowerCase();
+                  const combined = name + ' ' + id + ' ' + ariaLabel;
+                  const matchCount = consentKeywords.filter(k => combined.includes(k)).length;
+                  if (matchCount > consentScore) {
+                    consent = cb;
+                    consentScore = matchCount;
                   }
                 });
-              });
-              if (!consent) {
-                consent = document.querySelector('input[type="checkbox"][required]') || document.querySelector('input[type="checkbox"]');
               }
+              
+              // Fallback: required checkbox
+              if (!consent) {
+                const reqCheckbox = document.querySelector('input[type="checkbox"][required]');
+                if (reqCheckbox && visible(reqCheckbox)) {
+                  consent = reqCheckbox;
+                }
+              }
+              
               if (consent && visible(consent)) {
                 res.consent = mark(consent, 'consent');
               }
@@ -215,22 +265,40 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None) -> Op
             run_logger.log_text(f"   Found selectors: {list(selectors.keys())}")
             for key, selector in selectors.items():
                 run_logger.log_text(f"   {key} → {selector}")
+            
+            # Warn about fields in instruction but not in form
+            instruction_fields = set(canonical.keys())
+            form_fields = set(selectors.keys())
+            missing_fields = instruction_fields - form_fields
+            if missing_fields:
+                run_logger.log_text(f"   ⚠️  Fields in instruction but NOT in form: {missing_fields}")
+                run_logger.log_text(f"      These will be SKIPPED (not filled)")
         
         filled: Dict[str, Any] = {"filled": {}, "submitted": False}
         # Fill fields using robust filling
         if canonical.get("name") and selectors.get("name"):
+            if run_logger:
+                run_logger.log_text(f"   ▶️  Filling name: '{canonical['name']}' → {selectors['name']}")
             if await _robust_fill_field(page, str(selectors["name"]), canonical["name"]):
                 filled["filled"]["name"] = True
         if canonical.get("email") and selectors.get("email"):
+            if run_logger:
+                run_logger.log_text(f"   ▶️  Filling email: '{canonical['email']}' → {selectors['email']}")
             if await _robust_fill_field(page, str(selectors["email"]), canonical["email"]):
                 filled["filled"]["email"] = True
         if canonical.get("subject") and selectors.get("subject"):
+            if run_logger:
+                run_logger.log_text(f"   ▶️  Filling subject: '{canonical['subject']}' → {selectors['subject']}")
             if await _robust_fill_field(page, str(selectors["subject"]), canonical["subject"]):
                 filled["filled"]["subject"] = True
         if canonical.get("phone") and selectors.get("phone"):
+            if run_logger:
+                run_logger.log_text(f"   ▶️  Filling phone: '{canonical['phone']}' → {selectors['phone']}")
             if await _robust_fill_field(page, str(selectors["phone"]), canonical["phone"]):
                 filled["filled"]["phone"] = True
         if canonical.get("message") and selectors.get("message"):
+            if run_logger:
+                run_logger.log_text(f"   ▶️  Filling message: '{canonical['message'][:50]}...' → {selectors['message']}")
             if await _robust_fill_field(page, str(selectors["message"]), canonical["message"]):
                 filled["filled"]["message"] = True
         # Consent checkbox if present
@@ -265,6 +333,19 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None) -> Op
                 diag_last: Dict[str, Any] | None = None
                 while attempts < 2:
                     attempts += 1
+                    
+                    # DEBUG: Take screenshot before submit to see validation errors
+                    if run_logger and attempts == 1:
+                        try:
+                            import time
+                            timestamp = str(time.time()).replace('.', '')
+                            screenshot_path = f"screenshots/debug_before_submit_{timestamp}.png"
+                            await page.screenshot(path=screenshot_path)
+                            run_logger.log_text(f"📸 Screenshot before submit (attempt {attempts}): {screenshot_path}")
+                        except Exception as e:
+                            if run_logger:
+                                run_logger.log_text(f"   ⚠️  Could not take screenshot: {e}")
+                    
                     try:
                         await page.click(str(selectors["submit"]))
                     except Exception:
@@ -320,26 +401,77 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None) -> Op
                         diag_last = None
                     if isinstance(diag_last, dict):
                         if diag_last.get("invalid_email") and selectors.get("email"):
+                            # Try multiple email formats if validation fails
                             try:
                                 host = await page.evaluate("() => (location.hostname||'')")
                             except Exception:
                                 host = ""
                             try:
-                                local = (canonical.get("email") or "user").split("@")[0] or "user"
-                            except Exception:
-                                local = "user"
-                            try:
                                 dom = host.lstrip('www.') if isinstance(host, str) else ""
                             except Exception:
                                 dom = ""
-                            fallback_email = f"{local}@{dom}" if dom else (canonical.get("email") or "user@example.com")
-                            if run_logger:
-                                run_logger.log_text(f"Attempting email fallback: {fallback_email}")
-                            if await _robust_fill_field(page, str(selectors["email"]), fallback_email):
-                                canonical["email"] = fallback_email
-                                filled["filled"]["email"] = True
+                            
+                            # Build fallback email list (try generic addresses first)
+                            fallback_emails = []
+                            if dom:
+                                fallback_emails.append(f"kontakt@{dom}")  # Generic contact
+                                fallback_emails.append(f"info@{dom}")     # Generic info
+                                fallback_emails.append(f"test@{dom}")     # Test account
+                            
+                            # Add original local part as last resort
+                            try:
+                                local = (canonical.get("email") or "user").split("@")[0] or "user"
+                                if dom:
+                                    fallback_emails.append(f"{local}@{dom}")
+                            except Exception:
+                                pass
+                            
+                            # Try each fallback email
+                            email_accepted = False
+                            for fallback_email in fallback_emails:
                                 if run_logger:
-                                    run_logger.log_text(f"Email fallback successful: {fallback_email}")
+                                    run_logger.log_text(f"⚠️  Attempting email fallback: {fallback_email}")
+                                
+                                if await _robust_fill_field(page, str(selectors["email"]), fallback_email):
+                                    canonical["email"] = fallback_email
+                                    filled["filled"]["email"] = True
+                                    
+                                    # Wait and check if still invalid
+                                    try:
+                                        await page.wait_for_timeout(500)
+                                    except:
+                                        pass
+                                    
+                                    # Re-check validation
+                                    try:
+                                        still_invalid = await page.evaluate(
+                                            """
+                                            () => {
+                                              const emailField = document.querySelector('[data-curllm-target="email"]');
+                                              if (!emailField) return false;
+                                              return emailField.getAttribute('aria-invalid') === 'true'
+                                                || emailField.classList.contains('wpcf7-not-valid')
+                                                || emailField.classList.contains('forminator-error');
+                                            }
+                                            """
+                                        )
+                                        if not still_invalid:
+                                            email_accepted = True
+                                            if run_logger:
+                                                run_logger.log_text(f"   ✅ Email fallback accepted: {fallback_email}")
+                                            break
+                                        else:
+                                            if run_logger:
+                                                run_logger.log_text(f"   ❌ Email fallback rejected: {fallback_email}")
+                                    except:
+                                        # Assume accepted if can't check
+                                        email_accepted = True
+                                        if run_logger:
+                                            run_logger.log_text(f"   ✓ Email fallback applied: {fallback_email}")
+                                        break
+                            
+                            if not email_accepted and run_logger:
+                                run_logger.log_text(f"   ⚠️  All email fallbacks rejected")
                         if diag_last.get("consent_required") and selectors.get("consent"):
                             try:
                                 await page.check(str(selectors["consent"]))

@@ -552,6 +552,30 @@ async def _planner_cycle(executor, instruction: str, page_context: Dict[str, Any
         run_logger.log_kv("fn:generate_action_ms", str(int((time.time() - _t_gen) * 1000)))
     except Exception:
         pass
+    # FALLBACK: Fix LLM mistake - type="fill" should be type="tool" + tool_name="form.fill"
+    if action.get("type") == "fill" and "tool_name" not in action:
+        # LLM returned wrong format: {"type": "fill", "name": "...", "email": "..."}
+        # Convert to correct format: {"type": "tool", "tool_name": "form.fill", "args": {...}}
+        if run_logger:
+            run_logger.log_text("⚠️  Auto-correcting: LLM returned type='fill' instead of type='tool' + tool_name='form.fill'")
+        
+        # Extract form field values from action
+        form_args = {}
+        for key in ["name", "email", "subject", "phone", "message"]:
+            if key in action:
+                form_args[key] = action[key]
+        
+        # Reconstruct as proper tool call
+        action = {
+            "type": "tool",
+            "tool_name": "form.fill",
+            "args": form_args,
+            "reason": action.get("reason", "Filling contact form (auto-corrected from type='fill')")
+        }
+        
+        if run_logger:
+            run_logger.log_text(f"   ✓ Corrected to: {{'type': 'tool', 'tool_name': 'form.fill', 'args': {form_args}}}")
+    
     if run_logger:
         run_logger.log_text("Planned action:")
         run_logger.log_code("json", json.dumps(action))
