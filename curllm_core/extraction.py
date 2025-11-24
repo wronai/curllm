@@ -234,16 +234,25 @@ async def product_heuristics(instruction: str, page, run_logger=None) -> Optiona
     items = await page.evaluate(
         r"""
         (thr) => {
+          const normPrice = (s) => {
+            s = String(s||'').replace(/\s+/g,'');
+            s = s.replace(/\.(?=\d{3}(?:[\.,]|$))/g,''); // remove thousands dots
+            s = s.replace(',', '.');
+            const n = parseFloat(s);
+            return isNaN(n) ? null : n;
+          };
           const asNumber = (t) => {
+            t = String(t||'');
+            // Require currency for all patterns to avoid picking ratings or counts
             const patterns = [
-              /(\d+(?:[,\.]\d{2})?)\s*(?:zł|PLN|złotych)/i,
-              /od\s*(\d+(?:[,\.]\d{2})?)/i,
-              /cena[:\s]*(\d+(?:[,\.]\d{2})?)/i
+              /(\d[\d\s]*(?:[\.,]\d{2})?)\s*(?:zł|PLN|złotych)/i,
+              /od\s*(\d[\d\s]*(?:[\.,]\d{2})?)\s*(?:zł|PLN)/i,
+              /cena[:\s]*(\d[\d\s]*(?:[\.,]\d{2})?)\s*(?:zł|PLN)/i,
             ];
             for (const pattern of patterns) {
-              const m = (t||'').match(pattern);
-              if (m) {
-                return parseFloat(m[1].replace(',', '.'));
+              const m = t.match(pattern);
+              if (m && m[1]) {
+                return normPrice(m[1]);
               }
             }
             return null;
@@ -272,14 +281,22 @@ async def product_heuristics(instruction: str, page, run_logger=None) -> Optiona
               name = lines.find(line => 
                 !/^\d+/.test(line) &&
                 !/zł|PLN/i.test(line) &&
-                line.length > 10 && line.length < 100
+                !/(Bestseller|Popularny teraz|Popularne marki|Reklama|POPRZEDNIE|NASTĘPNE|kupionych|komentarzy|comments|ocen)/i.test(line) &&
+                line.length > 5 && line.length < 140
               ) || nameFromLink;
             }
             if (!name || !url) continue;
             const isPdf = /\.pdf(\?|$)/i.test(url);
             if (isPdf || url.includes('custom_document')) continue;
-            const isProductUrl = /\d{4,}/.test(url) || url.includes('/p/') || url.includes('/product/') || url.includes('.htm');
-            if (!isProductUrl) continue;
+            // Only accept canonical Ceneo product pages: ceneo.pl/<digits>
+            try {
+              const u = new URL(url);
+              const hostOk = /(^|\.)ceneo\.pl$/i.test(u.hostname);
+              const pathOk = /\/(\d{4,})(?:[\/#?]|$)/.test(u.pathname + (u.search||'') + (u.hash||''));
+              if (!(hostOk && pathOk)) continue;
+            } catch (e) { continue; }
+            // Skip redirects and tracking endpoints
+            if (/redirect\.ceneo\.pl|GotoBoxUrl|from\?site=|lp,\d+/i.test(url)) continue;
             const key = url;
             if (!products.has(key)) {
               products.set(key, { name, price, url });
@@ -316,12 +333,13 @@ async def product_heuristics(instruction: str, page, run_logger=None) -> Optiona
             return data
     return None
 
-async def validate_with_llm(llm, instruction: str, data: Any, run_logger=None) -> Optional[Any]:
+async def validate_with_llm(llm, instruction: str, data: Any, run_logger=None, dom_html: Optional[str] = None) -> Optional[Any]:
     try:
         payload = {
             "instruction": instruction,
             "data": data,
         }
+        dom_section = ("\nDOM_HTML (truncated):\n" + dom_html[:60000]) if isinstance(dom_html, str) and dom_html else ""
         prompt = (
             "You are a strict validator of extracted web data. "
             "Given the user's instruction and the extracted JSON data, return a corrected JSON that strictly follows the instruction. "
@@ -333,6 +351,7 @@ async def validate_with_llm(llm, instruction: str, data: Any, run_logger=None) -
             "Output ONLY valid JSON, no comments, no extra text.\n\n"
             f"Instruction:\n{instruction}\n\n"
             f"Extracted JSON:\n{json.dumps(data, ensure_ascii=False)}\n\n"
+            + dom_section + "\n\n"
             "Return corrected JSON only:"
         )
         resp = await llm.ainvoke(prompt)

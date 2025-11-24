@@ -8,6 +8,7 @@ generated/
 screenshots/
 docs/marketing/
 wordpress.md
+*.html
 # Logs
 logs
 *.log
