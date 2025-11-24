@@ -3,10 +3,14 @@ import asyncio
 import json
 import logging
 import os
+import socket
+import ssl
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse
+import requests
 
 
 
@@ -145,6 +149,14 @@ def _should_validate(instruction: Optional[str], data: Optional[Any]) -> bool:
             if any(k in low for k in ["product", "produkt", "price", "zł", "pln", "title", "titles", "article", "articles", "news", "headline", "wpis", "artyku"]):
                 if runtime.get("fastpath"):
                     run_logger.log_kv("runtime.fastpath_forced", "False")
+                runtime["fastpath"] = False
+            # Also disable fastpaths for form-filling tasks
+            if any(k in low for k in [
+                "form", "formularz", "fill", "wypełnij", "wypelnij", "submit",
+                "contact", "kontakt", "send", "sent", "message", "wiadomość", "wiadomosc", "wyślij", "wyslij"
+            ]):
+                if runtime.get("fastpath"):
+                    run_logger.log_kv("runtime.fastpath_forced_form", "False")
                 runtime["fastpath"] = False
         except Exception:
             pass
@@ -476,6 +488,21 @@ def _should_validate(instruction: Optional[str], data: Optional[Any]) -> bool:
         if early is not None:
             await page.close()
             return early
+        # Early deterministic form-fill when instruction requests filling forms
+        try:
+            if any(k in lower_instr for k in ["form", "formularz", "fill", "wypełnij", "wypelnij", "submit"]):
+                det_form = await self._deterministic_form_fill(instruction, page, run_logger)
+                if isinstance(det_form, dict) and (det_form.get("submitted") is True):
+                    try:
+                        shot_path = await self._take_screenshot(page, 0, target_dir=domain_dir)
+                        result["screenshots"].append(shot_path)
+                    except Exception:
+                        shot_path = None
+                    result["data"] = {"form_fill": det_form, **({"screenshot_saved": shot_path} if shot_path else {})}
+                    await page.close()
+                    return result
+        except Exception:
+            pass
         # Early deep article-title extraction when the instruction asks for titles/articles/blog/news
         try:
             if any(k in lower_instr for k in ["title", "titles", "article", "artyku", "wpis", "blog", "news", "headline", "articl"]):
@@ -788,16 +815,33 @@ def _should_validate(instruction: Optional[str], data: Optional[Any]) -> bool:
         if result.get("data") is None:
             try:
                 lower_instr = (instruction or "").lower()
-                result["data"] = await fallback_extract(instruction, page, run_logger)
-                # ... (rest of the code remains the same)
-                data = result.get("data")
-                if isinstance(data, dict):
-                    filtered = {}
-                    if ("email" in lower_instr or "mail" in lower_instr) and "emails" in data:
-                        filtered["emails"] = data["emails"]
-                    if ("phone" in lower_instr or "tel" in lower_instr or "telefon" in lower_instr) and "phones" in data:
-                        filtered["phones"] = data["phones"]
-                    result["data"] = filtered
+                # For form-filling tasks, don't fallback to generic extraction (which would just list emails/phones)
+                if any(k in lower_instr for k in ["form", "formularz", "fill", "wypełnij", "wypelnij", "submit"]):
+                    result["data"] = {
+                        "error": {
+                            "type": "form_fill_failed",
+                            "message": "Could not locate or fill form fields within the allowed steps.",
+                        }
+                    }
+                    # Provide suggestions
+                    try:
+                        params = {"include_dom_html": True, "preset": "deep_scan", "action_timeout_ms": 20000}
+                        cmd = self._build_rerun_curl(instruction, url or "", params, top_level={"visual_mode": True, "stealth_mode": True, "url": url or ""})
+                        if cmd:
+                            result["meta"]["hints"].append("Form fill failed. Retry with visual+stealth and deep_scan, or increase timeouts.")
+                            result["meta"]["suggested_commands"].append(cmd)
+                    except Exception:
+                        pass
+                else:
+                    result["data"] = await fallback_extract(instruction, page, run_logger)
+                    data = result.get("data")
+                    if isinstance(data, dict):
+                        filtered = {}
+                        if ("email" in lower_instr or "mail" in lower_instr) and "emails" in data:
+                            filtered["emails"] = data["emails"]
+                        if ("phone" in lower_instr or "tel" in lower_instr or "telefon" in lower_instr) and "phones" in data:
+                            filtered["phones"] = data["phones"]
+                        result["data"] = filtered
             except Exception:
                 pass
         await page.close()
@@ -881,6 +925,281 @@ def _should_validate(instruction: Optional[str], data: Optional[Any]) -> bool:
         except Exception:
             return ""
 
+    def _diagnose_url_issue(self, url: str) -> Dict[str, Any]:
+        out: Dict[str, Any] = {"url": url}
+        try:
+            pr = urlparse(url)
+            host = pr.hostname or ""
+            scheme = pr.scheme or ""
+            out["host"] = host
+            out["scheme"] = scheme
+            # DNS resolution
+            try:
+                infos = socket.getaddrinfo(host, None)
+                ips = []
+                for i in infos:
+                    ip = i[4][0]
+                    if ip not in ips:
+                        ips.append(ip)
+                out["dns_resolves"] = True
+                out["ips"] = ips
+            except Exception as e:
+                out["dns_resolves"] = False
+                out["dns_error"] = str(e)
+                return out
+
+    def _parse_form_pairs(self, instruction: str | None) -> Dict[str, str]:
+        pairs: Dict[str, str] = {}
+        text = instruction or ""
+        # If JSON-like wrapper is used, parse to get inner instruction
+        try:
+            obj = json.loads(text)
+            if isinstance(obj, dict) and isinstance(obj.get("instruction"), str):
+                text = obj.get("instruction") or text
+        except Exception:
+            pass
+        # Extract key=value pairs separated by commas/semicolons/newlines
+        for m in re.finditer(r"([A-Za-ząćęłńóśźż\- ]+)\s*=\s*([^,;\n]+)", text, flags=re.IGNORECASE):
+            k = (m.group(1) or "").strip().lower()
+            v = (m.group(2) or "").strip()
+            if k and v:
+                pairs[k] = v
+        return pairs
+
+    async def _deterministic_form_fill(self, instruction: str, page, run_logger: RunLogger | None = None) -> Optional[Dict[str, Any]]:
+        try:
+            raw_pairs = self._parse_form_pairs(instruction)
+            # Normalize keys to canonical fields
+            canonical: Dict[str, str] = {}
+            for k, v in raw_pairs.items():
+                lk = k.lower()
+                if any(x in lk for x in ["email", "e-mail", "mail"]):
+                    canonical["email"] = v
+                elif any(x in lk for x in ["name", "imi", "nazw", "full name", "fullname", "first name", "last name"]):
+                    if "name" not in canonical:
+                        canonical["name"] = v
+                elif any(x in lk for x in ["message", "wiadomo", "treść", "tresc", "content", "komentarz"]):
+                    canonical["message"] = v
+                elif any(x in lk for x in ["subject", "temat"]):
+                    canonical["subject"] = v
+                elif any(x in lk for x in ["phone", "telefon", "tel"]):
+                    canonical["phone"] = v
+            # Mark target fields in DOM and obtain stable selectors
+            selectors = await page.evaluate(
+                r"""
+                () => {
+                  const visible = (el) => {
+                    if (!el) return false;
+                    const r = el.getBoundingClientRect();
+                    return r && r.width > 1 && r.height > 1 && !el.disabled && el.offsetParent !== null;
+                  };
+                  const intoView = (el) => { try { el.scrollIntoView({behavior:'auto', block:'center'}); } catch(e){} };
+                  const add = (arr, el, score) => { if (el && visible(el)) { intoView(el); arr.push({el, score}); } };
+                  const findField = (keywords, prefer) => {
+                    const C = [];
+                    const by = (sel, s) => { try { document.querySelectorAll(sel).forEach(el => add(C, el, s)); } catch(e){} };
+                    keywords.forEach(k => {
+                      by(`input[name*="${k}"]`, 12);
+                      by(`input[id*="${k}"]`, 11);
+                      by(`input[placeholder*="${k}"]`, 10);
+                      by(`input[aria-label*="${k}"]`, 10);
+                      by(`textarea[name*="${k}"]`, 12);
+                      by(`textarea[id*="${k}"]`, 11);
+                      by(`textarea[placeholder*="${k}"]`, 10);
+                      by(`textarea[aria-label*="${k}"]`, 10);
+                    });
+                    // label association
+                    Array.from(document.querySelectorAll('label')).forEach(lb => {
+                      const t = (lb.innerText||'').toLowerCase();
+                      keywords.forEach(k => {
+                        if (t.includes(k)) {
+                          const forId = lb.getAttribute('for');
+                          let el = null;
+                          if (forId) el = document.getElementById(forId);
+                          if (!el) el = lb.querySelector('input,textarea');
+                          add(C, el, 13);
+                        }
+                      });
+                    });
+                    if (C.length === 0 && prefer === 'input') {
+                      by('input[type="email"]', 9);
+                      by('input[type="text"]', 5);
+                    }
+                    C.sort((a,b)=>b.score-a.score);
+                    return C.length ? C[0].el : null;
+                  };
+                  const res = {};
+                  const mark = (el, key) => { if (!el) return null; el.setAttribute('data-curllm-target', key); return `[data-curllm-target="${key}"]`; };
+                  const nameEl = findField(['name','fullname','full name','imi','imię','nazw'], 'input');
+                  if (nameEl) res.name = mark(nameEl, 'name');
+                  const emailEl = findField(['email','e-mail','mail'], 'input');
+                  if (emailEl) res.email = mark(emailEl, 'email');
+                  const msgEl = findField(['message','wiadomo','treść','tresc','content','komentarz'], 'textarea');
+                  if (msgEl) res.message = mark(msgEl, 'message');
+                  // subject optional
+                  const subjEl = findField(['subject','temat'], 'input');
+                  if (subjEl) res.subject = mark(subjEl, 'subject');
+                  // phone optional
+                  const phoneEl = findField(['phone','telefon','tel'], 'input');
+                  if (phoneEl) res.phone = mark(phoneEl, 'phone');
+                  // consent checkbox (GDPR/RODO)
+                  const consentKeywords = ['zgod', 'akcept', 'regulamin', 'polityk', 'rodo', 'privacy', 'consent', 'agree'];
+                  let consent = null;
+                  // label-associated checkboxes
+                  Array.from(document.querySelectorAll('label')).forEach(lb => {
+                    const t = (lb.innerText||'').toLowerCase();
+                    consentKeywords.forEach(k => {
+                      if (!consent && t.includes(k)) {
+                        const forId = lb.getAttribute('for');
+                        if (forId) {
+                          const cb = document.getElementById(forId);
+                          if (cb && cb.type === 'checkbox') consent = cb;
+                        } else {
+                          const cb2 = lb.querySelector('input[type="checkbox"]');
+                          if (cb2) consent = cb2;
+                        }
+                      }
+                    });
+                  });
+                  if (!consent) {
+                    consent = document.querySelector('input[type="checkbox"][required]') || document.querySelector('input[type="checkbox"]');
+                  }
+                  if (consent && visible(consent)) {
+                    res.consent = mark(consent, 'consent');
+                  }
+                  // submit button
+                  const subs = Array.from(document.querySelectorAll('button, input[type="submit"], .wpcf7-submit'))
+                    .filter(el => visible(el) && ((el.getAttribute('type')||'').toLowerCase()==='submit' || /(wyślij|wyslij|wyślij wiadomość|send message|send|submit)/i.test((el.innerText||el.value||'').toLowerCase())));
+                  if (subs.length) res.submit = mark(subs[0], 'submit');
+                  return res;
+                }
+                """
+            )
+            if not isinstance(selectors, dict):
+                selectors = {}
+            filled: Dict[str, Any] = {"filled": {}, "submitted": False}
+            # Fill fields
+            if canonical.get("name") and selectors.get("name"):
+                try:
+                    await page.fill(str(selectors["name"]), canonical["name"])
+                    filled["filled"]["name"] = True
+                except Exception:
+                    pass
+            if canonical.get("email") and selectors.get("email"):
+                try:
+                    await page.fill(str(selectors["email"]), canonical["email"])
+                    filled["filled"]["email"] = True
+                except Exception:
+                    pass
+            if canonical.get("subject") and selectors.get("subject"):
+                try:
+                    await page.fill(str(selectors["subject"]), canonical["subject"])
+                    filled["filled"]["subject"] = True
+                except Exception:
+                    pass
+            if canonical.get("phone") and selectors.get("phone"):
+                try:
+                    await page.fill(str(selectors["phone"]), canonical["phone"])
+                    filled["filled"]["phone"] = True
+                except Exception:
+                    pass
+            if canonical.get("message") and selectors.get("message"):
+                try:
+                    await page.fill(str(selectors["message"]), canonical["message"])
+                    filled["filled"]["message"] = True
+                except Exception:
+                    pass
+            # Consent checkbox if present
+            if selectors.get("consent"):
+                try:
+                    await page.check(str(selectors["consent"]))
+                    filled["filled"]["consent"] = True
+                except Exception:
+                    try:
+                        await page.click(str(selectors["consent"]))
+                        filled["filled"]["consent"] = True
+                    except Exception:
+                        pass
+            # Attempt submit
+            if selectors.get("submit"):
+                try:
+                    await page.click(str(selectors["submit"]))
+                    # Wait briefly for AJAX-based responses (CF7/Elementor)
+                    try:
+                        await page.wait_for_selector('.wpcf7-response-output, .elementor-message-success, .elementor-alert.elementor-alert-success', timeout=5000)
+                    except Exception:
+                        pass
+                    try:
+                        await page.wait_for_load_state("networkidle")
+                    except Exception:
+                        pass
+                    # Detect success message heuristically
+                    ok = await page.evaluate(
+                        """
+                        () => {
+                          const t = (document.body.innerText||'').toLowerCase();
+                          if (/(dziękujemy|dziekujemy|wiadomość została|wiadomosc zostala|wiadomość wysłana|wiadomosc wyslana|message sent|thank you|success)/i.test(t)) return true;
+                          if (document.querySelector('.wpcf7-mail-sent-ok, .wpcf7-response-output, .elementor-message-success, .elementor-alert.elementor-alert-success')) return true;
+                          return false;
+                        }
+                        """
+                    )
+                    filled["submitted"] = bool(ok)
+                except Exception:
+                    pass
+            filled["selectors"] = selectors
+            filled["values"] = canonical
+            return filled
+        except Exception as e:
+            if run_logger:
+                run_logger.log_kv("deterministic_form_fill_error", str(e))
+            return None
+            # TCP connectivity
+            def _tcp(port: int) -> bool:
+                try:
+                    with socket.create_connection((host, port), timeout=5):
+                        return True
+                except Exception:
+                    return False
+            out["tcp_443_open"] = _tcp(443)
+            out["tcp_80_open"] = _tcp(80)
+            # HTTPS handshake
+            https_info: Dict[str, Any] = {}
+            if out["tcp_443_open"]:
+                try:
+                    ctx = ssl.create_default_context()
+                    with socket.create_connection((host, 443), timeout=5) as sock:
+                        with ctx.wrap_socket(sock, server_hostname=host) as ssock:
+                            cert = ssock.getpeercert()
+                            https_info["handshake_ok"] = True
+                            try:
+                                https_info["cert_subject"] = cert.get("subject")
+                            except Exception:
+                                pass
+                except Exception as e:
+                    https_info["handshake_ok"] = False
+                    https_info["ssl_error"] = str(e)
+            out["https"] = https_info
+            # HTTP probe
+            http_url = f"http://{host}/"
+            try:
+                r = requests.get(http_url, timeout=6, allow_redirects=True)
+                out["http_probe"] = {"url": http_url, "status": getattr(r, "status_code", None)}
+            except Exception as e:
+                out["http_probe"] = {"url": http_url, "error": str(e)}
+            # HTTPS probe
+            if scheme == "https":
+                try:
+                    r2 = requests.get(url, timeout=6, allow_redirects=True)
+                    out["https_probe"] = {"status": getattr(r2, "status_code", None)}
+                except requests.exceptions.SSLError as e:
+                    out["https_probe"] = {"ssl_error": str(e)}
+                except Exception as e:
+                    out["https_probe"] = {"error": str(e)}
+        except Exception as e:
+            out["diagnostic_error"] = str(e)
+        return out
+
     async def _open_page_with_prechecks(
         self,
         agent,
@@ -895,12 +1214,44 @@ def _should_validate(instruction: Optional[str], data: Optional[Any]) -> bool:
     ):
         if url:
             page = await agent.browser.new_page()
-            await page.goto(url)
             try:
-                await page.wait_for_load_state("domcontentloaded")
-                await page.wait_for_load_state("networkidle")
-            except Exception:
-                pass
+                await page.goto(url)
+                try:
+                    await page.wait_for_load_state("domcontentloaded")
+                    await page.wait_for_load_state("networkidle")
+                except Exception:
+                    pass
+            except Exception as e:
+                # Diagnose URL issues and return early with structured error info
+                diag = self._diagnose_url_issue(url)
+                if run_logger:
+                    run_logger.log_kv("navigation_error", str(e))
+                    try:
+                        run_logger.log_code("json", json.dumps({"diagnostics": diag}, ensure_ascii=False, indent=2)[:2000])
+                    except Exception:
+                        pass
+                result["data"] = {
+                    "error": {
+                        "type": "navigation_error",
+                        "message": str(e),
+                        "diagnostics": diag,
+                    }
+                }
+                # Suggest retry with http if https handshake failed but HTTP reachable
+                try:
+                    host = urlparse(url).hostname or ""
+                    if isinstance(diag, dict):
+                        https = diag.get("https", {}) or {}
+                        http_probe = diag.get("http_probe", {}) or {}
+                        if (https.get("handshake_ok") is False) and http_probe.get("status") in (200, 301, 302, 303, 307, 308):
+                            http_url = f"http://{host}/"
+                            cmd = self._build_rerun_curl(instruction, http_url, {"include_dom_html": True}, top_level={"url": http_url})
+                            result["meta"]["hints"].append("HTTPS handshake failed but HTTP is reachable. Try HTTP.")
+                            if cmd:
+                                result["meta"]["suggested_commands"].append(cmd)
+                except Exception:
+                    pass
+                return page, config.screenshot_dir, stealth_mode, result
             try:
                 hv = await handle_human_verification(page, run_logger)
                 run_logger.log_kv("human_verify_clicked_on_nav", str(bool(hv)))

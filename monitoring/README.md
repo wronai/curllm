@@ -7,6 +7,10 @@ Prosty monitoring stron www oparty o curllm. Dla każdej domeny robi zrzut ekran
 - Harmonogram przez cron (domyślnie co 3 godziny).
 - Konfiguracja przez plik `.env`.
 - Lista stron w `url.csv` (jedna domena/URL na linię).
+  - Dozwolone: pełne URL (https://...) lub same domeny (np. `oneday.run`).
+  - Skrypt sam spróbuje: `https://<domena>`, `https://www.<domena>`, `http://<domena>`, `http://www.<domena>` i podąży za przekierowaniami.
+  - Możesz mieć wiersz nagłówka `Domain`/`Domena` — zostanie pominięty.
+  - Obsługa domen IDN (np. `urzędasy.pl`) — automatyczne punycode (jeśli dostępny `python3`).
 
 ## Wymagania
 
@@ -31,10 +35,11 @@ $EDITOR .env  # ustaw MAIL_TO i SMTP_* jeśli chcesz e-mail
 
 2) Uzupełnij listę stron w `url.csv` (po jednej na linię; komentarze dozwolone po #):
 ```text
-https://example.com
-https://ceneo.pl
-https://allegro.pl
-https://softreck.com
+Domain
+oneday.run
+prototypowanie.pl
+allegro.pl
+urzędasy.pl
 ```
 
 3) Uruchom jednorazowo (test):

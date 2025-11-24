@@ -43,6 +43,8 @@ def send_email(to_addr: str, subject: str, body: str, attachments: list[str] | N
         subtype = "octet-stream"
         if p.suffix.lower() in (".png", ".jpg", ".jpeg"):
             maintype = "image"; subtype = p.suffix.lower().lstrip(".")
+        elif p.suffix.lower() in (".html", ".htm"):
+            maintype = "text"; subtype = "html"
         msg.add_attachment(data, maintype=maintype, subtype=subtype, filename=p.name)
 
     if use_ssl:
