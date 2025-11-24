@@ -36,6 +36,50 @@ def parse_runtime_from_instruction(instruction: str | None) -> Tuple[str | None,
         if isinstance(obj, dict):
             if isinstance(obj.get("params"), dict):
                 runtime.update(obj["params"])  # type: ignore[arg-type]
+                try:
+                    presets = {
+                        "deep_scan": {
+                            "include_dom_html": True,
+                            "scroll_load": True,
+                            "dom_max_chars": 60000,
+                            "dom_max_cap": 60000,
+                            "stall_limit": 7,
+                            "planner_growth_per_step": 3000,
+                            "planner_max_cap": 30000,
+                            "action_timeout_ms": 20000,
+                            "wait_after_nav_ms": 2500,
+                            "wait_after_click_ms": 1500,
+                        },
+                        "fast_scan": {
+                            "include_dom_html": True,
+                            "scroll_load": False,
+                            "dom_max_chars": 20000,
+                            "dom_max_cap": 30000,
+                            "stall_limit": 3,
+                            "planner_growth_per_step": 1500,
+                            "planner_max_cap": 20000,
+                            "action_timeout_ms": 8000,
+                            "wait_after_nav_ms": 800,
+                            "wait_after_click_ms": 800,
+                        },
+                        "max_dom": {
+                            "include_dom_html": True,
+                            "scroll_load": True,
+                            "dom_max_chars": 60000,
+                            "dom_max_cap": 60000,
+                            "stall_limit": 9,
+                            "planner_growth_per_step": 4000,
+                            "planner_max_cap": 40000,
+                            "action_timeout_ms": 22000,
+                            "wait_after_nav_ms": 3000,
+                            "wait_after_click_ms": 1800,
+                        },
+                    }
+                    p = obj["params"].get("preset")
+                    if isinstance(p, str) and p in presets:
+                        runtime.update(presets[p])
+                except Exception:
+                    pass
             for key in ("instruction", "task", "data", "query"):
                 if isinstance(obj.get(key), str):
                     instruction = obj[key]  # type: ignore[index]

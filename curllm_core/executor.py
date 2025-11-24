@@ -282,6 +282,7 @@ class CurllmExecutor:
                     "stall_limit": int(os.getenv("CURLLM_STALL_LIMIT", "7")),
                     "planner_growth_per_step": int(os.getenv("CURLLM_PLANNER_GROWTH", "3000")),
                     "planner_max_cap": int(os.getenv("CURLLM_PLANNER_MAX", "30000")),
+                    "preset": "deep_scan",
                 }
                 cmd = self._build_rerun_curl(instruction, url or "", params)
                 run_logger.log_text("Suggested retry command:")
@@ -891,6 +892,7 @@ class CurllmExecutor:
                         "stall_limit": stall_limit,
                         "planner_growth_per_step": int(runtime.get("planner_growth_per_step", 2000)),
                         "planner_max_cap": int(runtime.get("planner_max_cap", 20000)),
+                        "preset": "deep_scan",
                     }
                     cmd = self._build_rerun_curl(instruction, url or "", params)
                     result["meta"]["hints"].append("Increased DOM depth due to no progress. You can also retry with these parameters.")
@@ -916,10 +918,24 @@ class CurllmExecutor:
                         "stall_limit": stall_limit + 2,
                         "planner_growth_per_step": int(runtime.get("planner_growth_per_step", 2000)) + 1000,
                         "planner_max_cap": int(runtime.get("planner_max_cap", 20000)) + 5000,
+                        "preset": "deep_scan",
                     }
                     cmd = self._build_rerun_curl(instruction, url or "", params)
                     result["meta"]["hints"].append("Stall limit reached. Consider increasing stall_limit and DOM cap and retry.")
                     result["meta"]["suggested_commands"].append(cmd)
+                    if page_context.get("status") == "human_verification":
+                        result["meta"]["hints"].append("Human verification detected. Consider retrying with human verification solver.")
+                        params = {
+                            "include_dom_html": True,
+                            "dom_max_chars": int(runtime.get("dom_max_cap", 60000) or 60000),
+                            "stall_limit": stall_limit + 2,
+                            "planner_growth_per_step": int(runtime.get("planner_growth_per_step", 2000)) + 1000,
+                            "planner_max_cap": int(runtime.get("planner_max_cap", 20000)) + 5000,
+                            "preset": "deep_scan",
+                            "human_verification": True,
+                        }
+                        cmd = self._build_rerun_curl(instruction, url or "", params)
+                        result["meta"]["suggested_commands"].append(cmd)
                 except Exception:
                     pass
                 return last_sig, no_progress, progressive_depth, True

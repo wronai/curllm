@@ -281,14 +281,7 @@ output:
 command:
 ```bash
 curllm --visual -H "Accept-Language: pl-PL,pl;q=0.9" "https://ceneo.pl" -d '{
-  "instruction":"Find all products under 50zł and extract names, prices and urls",
-  "params": {
-    "include_dom_html": true,
-    "no_click": true,
-    "scroll_load": true,
-    "action_timeout_ms": 120000,
-    "use_external_slider_solver": true
-  }
+  "instruction":"Find all products under 50zł and extract names, prices and urls"  
 }'
 ```
 output:

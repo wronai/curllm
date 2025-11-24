@@ -1,0 +1,20 @@
+FROM python:3.11-slim
+
+# Basic tools and fonts; Playwright runtime deps will be installed via `python -m playwright install-deps chromium`
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    wget \
+    ca-certificates \
+    git \
+    jq \
+    tesseract-ocr \
+    libtesseract-dev \
+    fonts-liberation \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+# Nothing copied; source will be bind-mounted by docker-compose
+
+# Keep container alive for interactive dev
+CMD ["bash", "-lc", "sleep infinity"]
