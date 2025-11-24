@@ -777,37 +777,39 @@ class CurllmExecutor:
         return str(filename)
     
     async def _extract_page_context(self, page) -> Dict:
-        """Extract page context for LLM"""
+        """Extract page context for LLM (null-safe)."""
         return await page.evaluate("""
             () => {
+                const safeText = (el) => { try { return (el && el.innerText) ? String(el.innerText) : ''; } catch(e){ return ''; } };
+                const bodyText = (() => { try { return (document.body && document.body.innerText) ? document.body.innerText : ''; } catch(e){ return ''; } })();
                 return {
                     title: document.title,
                     url: window.location.href,
-                    text: document.body.innerText.substring(0, 5000),
-                    forms: Array.from(document.forms).map(f => ({
-                        id: f.id,
-                        action: f.action,
-                        fields: Array.from(f.elements).map(e => ({
-                            name: e.name,
-                            type: e.type,
-                            value: e.value,
-                            visible: e.offsetParent !== null
+                    text: bodyText.substring(0, 5000),
+                    forms: Array.from(document.forms || []).map(f => ({
+                        id: (f && f.id) || undefined,
+                        action: (f && f.action) || undefined,
+                        fields: Array.from((f && f.elements) || []).map(e => ({
+                            name: (e && e.name) || undefined,
+                            type: (e && e.type) || undefined,
+                            value: (e && e.value) || '',
+                            visible: !!(e && e.offsetParent !== null)
                         }))
                     })),
-                    links: Array.from(document.links).slice(0, 50).map(l => ({
-                        href: l.href,
-                        text: l.innerText
+                    links: Array.from(document.links || []).slice(0, 50).map(l => ({
+                        href: (l && l.href) ? l.href : '',
+                        text: safeText(l)
                     })),
-                    buttons: Array.from(document.querySelectorAll('button')).map(b => ({
-                        text: b.innerText,
-                        onclick: b.onclick ? 'has handler' : null
+                    buttons: Array.from(document.querySelectorAll('button') || []).map(b => ({
+                        text: safeText(b),
+                        onclick: (b && b.onclick) ? 'has handler' : null
                     }))
                 };
             }
         """)
     
     async def _generate_action(self, instruction: str, page_context: Dict, step: int, run_logger: 'RunLogger' = None) -> Dict:
-        """Generate next action using LLM"""
+        """Generate next action using LLM (robust JSON parsing)."""
         context_str = json.dumps(page_context, indent=2)[:3000]
         prompt_text = (
             "You are a browser automation expert. Analyze the current page and determine the next action.\n\n"
@@ -838,10 +840,63 @@ class CurllmExecutor:
         if run_logger:
             run_logger.log_text("LLM Raw Response:")
             run_logger.log_code("json", text)
+
+        def _strip_fences(s: str) -> str:
+            s = s.strip()
+            if s.startswith("```"):
+                s = s.split("\n", 1)[1] if "\n" in s else s
+                if s.rstrip().endswith("```"):
+                    s = s.rsplit("```", 1)[0]
+            return s.strip()
+
+        raw = _strip_fences(text)
+        # Try direct JSON
         try:
-            return json.loads(text)
-        except json.JSONDecodeError:
-            return {"type": "wait"}
+            obj = json.loads(raw)
+            if isinstance(obj, dict):
+                return obj
+        except Exception:
+            pass
+        # Scan for any balanced JSON object in the text
+        try:
+            objs = []
+            start = -1
+            depth = 0
+            in_str = False
+            esc = False
+            for i, ch in enumerate(raw):
+                if in_str:
+                    if esc:
+                        esc = False
+                    elif ch == '\\':
+                        esc = True
+                    elif ch == '"':
+                        in_str = False
+                    continue
+                else:
+                    if ch == '"':
+                        in_str = True
+                        continue
+                    if ch == '{':
+                        if depth == 0:
+                            start = i
+                        depth += 1
+                        continue
+                    if ch == '}' and depth > 0:
+                        depth -= 1
+                        if depth == 0 and start != -1:
+                            objs.append(raw[start:i+1])
+                            start = -1
+            for cand in objs[::-1]:
+                try:
+                    obj = json.loads(cand)
+                    if isinstance(obj, dict):
+                        return obj
+                except Exception:
+                    continue
+        except Exception:
+            pass
+        return {"type": "wait"}
     
     async def _execute_action(self, page, action: Dict):
         """Execute browser action"""
@@ -852,10 +907,33 @@ class CurllmExecutor:
                 await page.wait_for_timeout(200 + int(random.random()*400))
             except Exception:
                 pass
-            await page.click(action["selector"], timeout=5000)
+            try:
+                loc = page.locator(str(action.get("selector")))
+                await loc.first.wait_for(state="visible", timeout=5000)
+                await loc.first.click(timeout=5000)
+            except Exception:
+                try:
+                    await page.evaluate("(s)=>{ const el=document.querySelector(s); if(el) el.click(); }", str(action.get("selector")))
+                except Exception:
+                    pass
         elif action_type == "fill":
-            await page.fill(action["selector"], action["value"])
-            await page.wait_for_timeout(150 + int(random.random()*350))
+            try:
+                sel = str(action.get("selector"))
+                val = str(action.get("value", ""))
+                loc = page.locator(sel)
+                await loc.first.wait_for(state="visible", timeout=5000)
+                await loc.first.fill(val)
+                # Fire input/blur to trigger client-side validation
+                try:
+                    await page.evaluate("(s) => { const el=document.querySelector(s); if(!el) return; try{ el.dispatchEvent(new Event('input', {bubbles:true})); }catch(e){} try{ el.blur(); }catch(e){} }", sel)
+                except Exception:
+                    pass
+            except Exception:
+                pass
+            try:
+                await page.wait_for_timeout(150 + int(random.random()*350))
+            except Exception:
+                pass
         elif action_type == "scroll":
             dy = 300 + int(random.random()*700)
             try:

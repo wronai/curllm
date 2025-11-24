@@ -46,7 +46,35 @@ async def execute_action(page, action: Dict, runtime: Dict[str, Any]):
             await page.locator(str(sel)).first.wait_for(state="visible", timeout=timeout)
         except Exception:
             pass
+        # If this looks like an email field, avoid filling invalid values like "Test"
+        try:
+            is_email = await page.evaluate(
+                "(s) => { const el=document.querySelector(s); if(!el) return false; if (el.matches('[data-curllm-target=\\"email\\"]')) return true; const t=(el.getAttribute('type')||'').toLowerCase(); const name=(el.getAttribute('name')||'').toLowerCase(); const pid=(el.id||'').toLowerCase(); const ph=(el.getAttribute('placeholder')||'').toLowerCase(); const aria=(el.getAttribute('aria-label')||'').toLowerCase(); return t==='email' || [name,pid,ph,aria].some(x=>x.includes('email')||x.includes('e-mail')||x.includes('mail')); }",
+                sel,
+            )
+        except Exception:
+            is_email = False
+        if is_email:
+            try:
+                canon = await page.evaluate("() => window.__curllm_canonical || null")
+            except Exception:
+                canon = None
+            try:
+                sval = str(val)
+                if (not isinstance(val, str)) or ("@" not in sval):
+                    if isinstance(canon, dict) and isinstance(canon.get("email"), str) and "@" in canon.get("email", ""):
+                        val = canon["email"]
+            except Exception:
+                pass
         await page.fill(str(sel), str(val))
+        # Fire input/blur to trigger client-side validation when present
+        try:
+            await page.evaluate(
+                "(s) => { const el=document.querySelector(s); if(!el) return; try{ el.dispatchEvent(new Event('input', {bubbles:true})); }catch(e){} try{ el.blur(); }catch(e){} }",
+                sel,
+            )
+        except Exception:
+            pass
         await page.wait_for_timeout(150 + int(random.random()*350))
     elif action_type == "scroll":
         dy = 300 + int(random.random()*700)

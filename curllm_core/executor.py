@@ -154,13 +154,13 @@ class CurllmExecutor:
                         data = bql_result.get("data") if isinstance(bql_result, dict) else None
                         if isinstance(data, dict) and "page" in data:
                             page_obj = data.get("page") or {}
-                            items = page_obj.get("items") or []
+                            items = page_obj.get("items") or page_obj.get("select") or []
                             if isinstance(items, list):
                                 articles = []
                                 for it in items:
                                     if isinstance(it, dict):
                                         title = it.get("title") or it.get("text")
-                                        url2 = it.get("url") or it.get("href")
+                                        url2 = it.get("url") or it.get("href") or it.get("attr")
                                         articles.append({"title": title or "", "url": url2 or ""})
                                 result_data = {"articles": articles}
                     except Exception:

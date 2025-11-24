@@ -6,43 +6,48 @@ async def extract_page_context(page, include_dom: bool = False, dom_max_chars: i
     base = await page.evaluate(
         """
         () => {
+            const safeText = (el) => { try { return (el && el.innerText) ? String(el.innerText) : ''; } catch(e){ return ''; } };
+            const safeAttr = (el, name) => { try { return (el && el.getAttribute) ? el.getAttribute(name) : null; } catch(e){ return null; } };
+            const bodyText = (() => { try { return (document.body && document.body.innerText) ? document.body.innerText : ''; } catch(e){ return ''; } })();
             return {
                 title: document.title,
                 url: window.location.href,
-                text: document.body.innerText.substring(0, 5000),
-                forms: Array.from(document.forms).map(f => ({
-                    id: f.id,
-                    action: f.action,
-                    fields: Array.from(f.elements).map(e => ({
-                        name: e.name,
-                        type: e.type,
-                        value: e.value,
-                        visible: e.offsetParent !== null
+                text: bodyText.substring(0, 5000),
+                forms: Array.from(document.forms || []).map(f => ({
+                    id: (f && f.id) || undefined,
+                    action: (f && f.action) || undefined,
+                    fields: Array.from((f && f.elements) || []).map(e => ({
+                        name: (e && e.name) || undefined,
+                        type: (e && e.type) || undefined,
+                        value: (e && e.value) || '',
+                        visible: !!(e && e.offsetParent !== null)
                     }))
                 })),
-                links: Array.from(document.links).slice(0, 50).map(l => ({
-                    href: l.href,
-                    text: l.innerText
+                links: Array.from(document.links || []).slice(0, 50).map(l => ({
+                    href: (l && l.href) ? l.href : '',
+                    text: safeText(l)
                 })),
-                buttons: Array.from(document.querySelectorAll('button')).map(b => ({
-                    text: b.innerText,
-                    onclick: b.onclick ? 'has handler' : null
+                buttons: Array.from(document.querySelectorAll('button') || []).map(b => ({
+                    text: safeText(b),
+                    onclick: (b && b.onclick) ? 'has handler' : null
                 })),
-                headings: Array.from(document.querySelectorAll('h1, h2, h3')).slice(0, 100).map(h => ({
-                    tag: h.tagName.toLowerCase(),
-                    text: (h.innerText||'').trim(),
-                    id: h.id || undefined,
-                    class: h.className || undefined
+                headings: Array.from(document.querySelectorAll('h1, h2, h3') || []).slice(0, 100).map(h => ({
+                    tag: (h && h.tagName ? h.tagName.toLowerCase() : undefined),
+                    text: safeText(h).trim(),
+                    id: (h && h.id) || undefined,
+                    class: (h && h.className) || undefined
                 })),
                 article_candidates: (() => {
-                    const anchors = Array.from(document.querySelectorAll('a[href]'));
-                    const pat = /(blog|post|wpis|article|artyk|news|aktualno)/i;
-                    return anchors.filter(a => {
-                        const href = a.getAttribute('href') || '';
-                        const t = (a.innerText||'').trim();
-                        if (!t) return false;
-                        return pat.test(href) || !!a.closest('article');
-                    }).slice(0, 100).map(a => ({ text: (a.innerText||'').trim(), href: a.href }));
+                    try {
+                        const anchors = Array.from(document.querySelectorAll('a[href]') || []);
+                        const pat = /(blog|post|wpis|article|artyk|news|aktualno)/i;
+                        return anchors.filter(a => {
+                            const href = safeAttr(a, 'href') || '';
+                            const t = safeText(a).trim();
+                            if (!t) return false;
+                            try { return pat.test(href) || !!a.closest('article'); } catch(e){ return pat.test(href); }
+                        }).slice(0, 100).map(a => ({ text: safeText(a).trim(), href: (a && a.href) ? a.href : '' }));
+                    } catch(e){ return []; }
                 })()
             };
         }
@@ -62,7 +67,8 @@ async def extract_page_context(page, include_dom: bool = False, dom_max_chars: i
                     for(const a of n.attributes){
                       if(["id","class","href","type","role","aria-label"].includes(a.name)) attrs[a.name]=a.value;
                     }
-                    let text=(n.innerText||"").trim();
+                    let text="";
+                    try{ text=(n.innerText||"").trim(); }catch(e){ text=""; }
                     if(text && text.length>200) text=undefined;
                     const obj={tag, attrs:Object.keys(attrs).length?attrs:undefined, text:text||undefined};
                     const children=[];
@@ -85,7 +91,7 @@ async def extract_page_context(page, include_dom: bool = False, dom_max_chars: i
                   for(const el of document.querySelectorAll(sel)){
                     out.push({
                       tag: el.tagName.toLowerCase(),
-                      text: (el.innerText||"").trim()||undefined,
+                      text: (()=>{ try{ return (el.innerText||"").trim()||undefined; }catch(e){ return undefined; } })(),
                       attrs: {
                         id: el.id||undefined,
                         class: el.className||undefined,

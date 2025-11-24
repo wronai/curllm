@@ -59,6 +59,11 @@ test:
 	@echo "Running tests..."
 	@PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/ -v
 
+test-e2e-diff:
+	@echo "Running E2E diff test..."
+	@chmod +x tests/e2e_diff.sh
+	@bash tests/e2e_diff.sh
+
 test-curlx-e2e:
 	@echo "Running curlx e2e (single-container)..."
 	@chmod +x curlx_pkg/tests/e2e/test_e2e.sh
