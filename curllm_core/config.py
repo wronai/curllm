@@ -29,6 +29,12 @@ class Config:
     validation_enabled: bool = os.getenv("CURLLM_VALIDATION", "true").lower() == "true"
     llm_timeout: int = int(os.getenv("CURLLM_LLM_TIMEOUT", "300"))
     hierarchical_planner_chars: int = int(os.getenv("CURLLM_HIERARCHICAL_PLANNER_CHARS", "25000"))
+    
+    # Vision-based form analysis
+    vision_form_analysis: bool = os.getenv("CURLLM_VISION_FORM_ANALYSIS", "auto").lower() in ["true", "1", "yes", "auto"]
+    vision_model: str = os.getenv("CURLLM_VISION_MODEL", "") or os.getenv("CURLLM_MODEL", "qwen2.5:7b")
+    vision_confidence_threshold: float = float(os.getenv("CURLLM_VISION_CONFIDENCE_THRESHOLD", "0.7"))
+    vision_detect_honeypots: bool = os.getenv("CURLLM_VISION_DETECT_HONEYPOTS", "true").lower() in ["true", "1", "yes"]
 
     def __post_init__(self):
         self.screenshot_dir.mkdir(parents=True, exist_ok=True)

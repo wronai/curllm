@@ -22,6 +22,7 @@ from .wordpress import WordPressAutomation
 from .proxy import resolve_proxy
 from .page_context import extract_page_context
 from .actions import execute_action
+from .result_evaluator import evaluate_run_success
 from .human_verify import handle_human_verification, looks_like_human_verify_text
 from .captcha_widget import handle_captcha_image as _handle_captcha_image_widget, handle_widget_captcha as _handle_widget_captcha
 from .page_utils import auto_scroll as _auto_scroll, accept_cookies as _accept_cookies, is_block_page as _is_block_page
@@ -246,13 +247,14 @@ class CurllmExecutor:
 
                     res = {
                         "success": True,
+                        "reason": "BQL query executed successfully",
                         "result": result_data,
                         "steps_taken": 1,
                         "screenshots": [],
                         "timestamp": datetime.now().isoformat(),
                         "run_log": str(run_logger.path),
                     }
-                    run_logger.log_text("Run finished successfully.")
+                    run_logger.log_text("✅ BQL execution finished successfully.")
                     return res
                 except Exception as e:
                     run_logger.log_text("BQL execution error:")
@@ -279,7 +281,8 @@ class CurllmExecutor:
                                 featured_image_path=wordpress_config.get("featured_image_path"),
                             )
                             out_res = {
-                                "success": True,
+                                "success": bool(post_url),
+                                "reason": "WordPress post published successfully" if post_url else "WordPress post publication failed",
                                 "result": {"post_url": post_url, "success": bool(post_url)},
                                 "steps_taken": 0,
                                 "screenshots": [],
@@ -304,7 +307,10 @@ class CurllmExecutor:
                                 await page.close()
                             except Exception:
                                 pass
-                            run_logger.log_text("WordPress automation finished.")
+                            if out_res["success"]:
+                                run_logger.log_text("✅ WordPress automation finished successfully.")
+                            else:
+                                run_logger.log_text("❌ WordPress automation failed.")
                             return out_res
                 except Exception as e:
                     run_logger.log_text(f"WordPress automation error: {e}")
@@ -373,8 +379,12 @@ class CurllmExecutor:
             except Exception:
                 diff_meta = None
 
+            # Intelligent success evaluation
+            success, reason, eval_metadata = evaluate_run_success(result, instruction, run_logger)
+            
             res = {
-                "success": True,
+                "success": success,
+                "reason": reason,
                 "result": result.get("data"),
                 "steps_taken": result.get("steps", 0),
                 "screenshots": result.get("screenshots", []),
@@ -382,13 +392,19 @@ class CurllmExecutor:
                 "run_log": str(run_logger.path),
                 "hints": (result.get("meta", {}) or {}).get("hints", []),
                 "suggested_commands": (result.get("meta", {}) or {}).get("suggested_commands", []),
+                "evaluation": eval_metadata
             }
             try:
                 if diff_meta:
                     res["diff"] = diff_meta
             except Exception:
                 pass
-            run_logger.log_text("Run finished successfully.")
+            
+            if success:
+                run_logger.log_text(f"✅ Run finished successfully: {reason}")
+            else:
+                run_logger.log_text(f"❌ Run finished with failure: {reason}")
+            
             return res
 
         except Exception as e:

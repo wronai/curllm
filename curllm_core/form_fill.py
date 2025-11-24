@@ -207,6 +207,15 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None) -> Op
         )
         if not isinstance(selectors, dict):
             selectors = {}
+        
+        # DEBUG: Log what we're about to fill
+        if run_logger:
+            run_logger.log_text("🔍 Form fill debug:")
+            run_logger.log_text(f"   Canonical values: {canonical}")
+            run_logger.log_text(f"   Found selectors: {list(selectors.keys())}")
+            for key, selector in selectors.items():
+                run_logger.log_text(f"   {key} → {selector}")
+        
         filled: Dict[str, Any] = {"filled": {}, "submitted": False}
         # Fill fields using robust filling
         if canonical.get("name") and selectors.get("name"):

@@ -16,6 +16,11 @@ Example for "Fill contact form":
 from typing import Dict, Any, Optional, List
 import json
 from .config import config
+from .vision_form_analysis import (
+    analyze_form_fields_vision,
+    build_vision_enhanced_field_list,
+    create_vision_decision_tree
+)
 
 
 def extract_strategic_context(page_context: Dict[str, Any]) -> Dict[str, Any]:
@@ -171,8 +176,8 @@ def extract_tactical_form_context(page_context: Dict[str, Any]) -> Dict[str, Any
         has_submit = False
         
         for field in form.get("fields", []):
-            field_name = field.get("name", "").lower()
-            field_type = field.get("type", "").lower()
+            field_name = (field.get("name") or "").lower()
+            field_type = (field.get("type") or "").lower()
             
             # Detect canonical fields
             if any(kw in field_name for kw in ["name", "imie", "nazwisko"]):
@@ -288,30 +293,169 @@ def generate_tactical_prompt(tactical_ctx: Dict[str, Any], instruction: str, str
             fields = [k for k, v in form["field_summary"].items() if v]
             forms_summary.append(f"Form '{form['id']}': fields={fields}")
         elif "fields" in form:
-            # LLM requested full field details
-            field_names = [f"{f.get('type', 'unknown')}:{f.get('name', 'unnamed')}" for f in form["fields"][:5]]
-            forms_summary.append(f"Form '{form['id']}': {len(form['fields'])} fields ({', '.join(field_names)})")
+            # LLM requested full field details - map to canonical names
+            canonical_fields = []
+            for f in form["fields"]:
+                field_name = (f.get("name") or "").lower()
+                field_type = (f.get("type") or "")
+                field_visible = f.get("visible", True)
+                
+                if not field_visible or field_type in ["hidden", "submit"]:
+                    continue  # Skip hidden and submit fields
+                
+                # Map to canonical names
+                canonical = None
+                if any(kw in field_name for kw in ["name", "imie", "nazwisko", "full"]):
+                    canonical = "name"
+                elif any(kw in field_name for kw in ["email", "mail"]):
+                    canonical = "email"
+                elif any(kw in field_name for kw in ["subject", "temat"]):
+                    canonical = "subject"
+                elif any(kw in field_name for kw in ["phone", "tel", "telefon"]):
+                    canonical = "phone"
+                elif any(kw in field_name for kw in ["message", "wiadomosc", "textarea", "tresc"]):
+                    canonical = "message"
+                
+                if canonical:
+                    required = f.get("required", False)
+                    canonical_fields.append(f"{canonical}{'*' if required else ''} ({field_type})")
+            
+            forms_summary.append(f"Form '{form['id']}': {', '.join(canonical_fields) if canonical_fields else 'no visible fields'}")
     
     prompt = f"""You are a browser automation expert. Previous decision: {strategic_decision}
 
 **User instruction:** {instruction}
 
-**Requested form details:**
+**Detected form fields (canonical names, * = required):**
 {chr(10).join(forms_summary) if forms_summary else "(You have the outline from Level 1)"}
+
+**CRITICAL RULE:** 
+- ONLY include fields that EXIST in the form above!
+- If the user instruction mentions a field that does NOT exist in the form (e.g., "subject"), DO NOT include it in args.
+- Map instruction values ONLY to available form fields.
 
 **Question:** What specific tool should be called?
 
 Available tools:
 - form.fill(args: {{name?, email?, subject?, phone?, message?}})
 
-Return JSON:
+**Example:** If form has only [name, email, message] but instruction says "subject=Test", IGNORE subject and fill only name, email, message.
+
+Return JSON with ONLY fields that actually exist in the form:
 {{
     "tool_name": "form.fill",
-    "args": {{"name": "...", "email": "..."}},
+    "args": {{"name": "...", "email": "...", "message": "..."}},
     "reason": "brief explanation"
 }}
 """
     return prompt
+
+
+async def hierarchical_plan_with_vision(
+    instruction: str,
+    page_context: Dict[str, Any],
+    screenshot_path: str,
+    llm,
+    run_logger
+) -> Optional[Dict[str, Any]]:
+    """
+    Execute hierarchical planning WITH vision analysis to detect honeypots and prioritize fields.
+    
+    This is an enhanced version that uses computer vision to:
+    1. Verify which fields are actually visible
+    2. Detect honeypot fields (hidden but present in DOM)
+    3. Prioritize fields based on visual layout
+    4. Map visual labels to field names
+    
+    Args:
+        instruction: User instruction
+        page_context: Full page context from DOM
+        screenshot_path: Path to screenshot for vision analysis
+        llm: LLM client (must support vision if available)
+        run_logger: Logger
+    
+    Returns:
+        Action dict with enhanced field selection, or None if not applicable
+    """
+    if run_logger:
+        run_logger.log_text("🔍 Vision-enhanced hierarchical planner starting...")
+    
+    # Check if this looks like a form task
+    if not should_use_hierarchical_planner(instruction, page_context):
+        return None
+    
+    forms = page_context.get("forms", [])
+    if not forms:
+        if run_logger:
+            run_logger.log_text("   No forms detected in page context")
+        return None
+    
+    # Step 1: Run vision analysis on screenshot
+    try:
+        vision_analysis = await analyze_form_fields_vision(
+            llm,
+            screenshot_path,
+            forms,
+            instruction,
+            run_logger
+        )
+    except Exception as e:
+        if run_logger:
+            run_logger.log_text(f"   ⚠️  Vision analysis failed: {e}, falling back to standard hierarchical planner")
+        # Fall back to standard hierarchical planner
+        return await hierarchical_plan(instruction, page_context, llm, run_logger)
+    
+    # Step 2: Build enhanced field list with honeypot detection
+    enhanced_fields = build_vision_enhanced_field_list(forms, vision_analysis)
+    
+    if run_logger:
+        safe_count = len([f for f in enhanced_fields if f["priority"] > 0])
+        honeypot_count = len([f for f in enhanced_fields if f["is_honeypot"]])
+        run_logger.log_text(f"   Enhanced field list: {safe_count} safe fields, {honeypot_count} honeypots avoided")
+    
+    # Step 3: Create decision tree
+    decision_tree = create_vision_decision_tree(enhanced_fields, instruction, run_logger)
+    
+    # Step 4: Extract values from instruction
+    from .form_fill import parse_form_pairs
+    parsed_values = parse_form_pairs(instruction)
+    
+    # Step 5: Map parsed values to safe fields only
+    safe_args = {}
+    field_selection = decision_tree.get("field_selection", {})
+    
+    for canonical_type, field_data in field_selection.items():
+        if canonical_type in parsed_values:
+            safe_args[canonical_type] = parsed_values[canonical_type]
+            if run_logger:
+                run_logger.log_text(f"   ✓ Mapping {canonical_type}: {field_data['name']} (priority: {field_data['priority']})")
+    
+    if not safe_args:
+        if run_logger:
+            run_logger.log_text("   ❌ No safe fields matched instruction values")
+        return None
+    
+    # Step 6: Return action with vision metadata
+    action = {
+        "type": "tool",
+        "tool_name": "form.fill",
+        "args": safe_args,
+        "reason": f"Vision-guided hierarchical planner: Detected {len(safe_args)} fields, avoided {decision_tree['honeypots_avoided']} honeypots",
+        "hierarchical": True,
+        "vision_enhanced": True,
+        "vision_metadata": {
+            "honeypots_avoided": decision_tree["honeypots_avoided"],
+            "safe_fields": decision_tree["safe_fields"],
+            "warnings": decision_tree.get("warnings", [])
+        }
+    }
+    
+    if run_logger:
+        run_logger.log_text(f"✓ Vision-enhanced action generated: {action['tool_name']}")
+        run_logger.log_text(f"   Args: {safe_args}")
+        run_logger.log_text(f"   Honeypots avoided: {decision_tree['honeypots_avoided']}")
+    
+    return action
 
 
 async def hierarchical_plan(
@@ -403,6 +547,20 @@ async def hierarchical_plan(
         else:
             # LLM requested specific details - send only what was asked
             tactical_ctx = extract_requested_details(page_context, need_details)
+            
+            if run_logger:
+                try:
+                    tactical_size = len(json.dumps(tactical_ctx, ensure_ascii=False))
+                    run_logger.log_text(f"📋 Level 2 (Tactical): {tactical_size:,} chars context")
+                    # Log what fields LLM sees
+                    for form in tactical_ctx.get("forms", []):
+                        field_count = len(form.get("fields", []))
+                        field_names = [(f.get("name") or "") for f in form.get("fields", [])[:10]]
+                        run_logger.log_text(f"   Form '{form.get('id', 'unknown')}': {field_count} fields")
+                        if field_names:
+                            run_logger.log_text(f"   Fields: {', '.join(field_names)}")
+                except Exception:
+                    pass
         
     except Exception as e:
         if run_logger:
@@ -413,7 +571,8 @@ async def hierarchical_plan(
     tactical_prompt = generate_tactical_prompt(tactical_ctx, instruction, strategic_decision.get("decision"))
     
     if run_logger:
-        run_logger.log_text(f"📋 Level 2 (Tactical): {len(tactical_prompt)} chars")
+        run_logger.log_text(f"📋 Level 2 (Tactical) prompt ({len(tactical_prompt)} chars):")
+        run_logger.log_text(f"```\n{tactical_prompt}\n```")
     
     try:
         tactical_response = await llm.ainvoke(tactical_prompt)
@@ -422,6 +581,7 @@ async def hierarchical_plan(
         
         if run_logger:
             run_logger.log_text(f"✓ Tactical decision: {tactical_action.get('tool_name')}")
+            run_logger.log_text(f"   Args: {tactical_action.get('args', {})}")
         
         # LEVEL 3: Direct execution (no LLM)
         return {

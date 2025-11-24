@@ -20,7 +20,8 @@ async def extract_page_context(page, include_dom: bool = False, dom_max_chars: i
                         name: (e && e.name) || undefined,
                         type: (e && e.type) || undefined,
                         value: (e && e.value) || '',
-                        visible: !!(e && e.offsetParent !== null)
+                        visible: !!(e && e.offsetParent !== null),
+                        required: !!(e && (e.required || e.getAttribute('aria-required') === 'true' || e.getAttribute('data-required') === 'true'))
                     }))
                 })),
                 links: Array.from(document.links || []).slice(0, 50).map(l => ({
