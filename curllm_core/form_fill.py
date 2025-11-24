@@ -176,31 +176,90 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None) -> Op
                     filled["filled"]["consent"] = True
                 except Exception:
                     pass
-        # Attempt submit
+        # Attempt submit with basic validation-aware remediation
         if selectors.get("submit"):
             try:
-                await page.click(str(selectors["submit"]))
-                # Wait briefly for AJAX-based responses (CF7/Elementor)
                 try:
-                    await page.wait_for_selector('.wpcf7-response-output, .elementor-message-success, .elementor-alert.elementor-alert-success', timeout=5000)
+                    await page.evaluate(
+                        """
+                        () => {
+                          const qs = '[data-curllm-target="name"], [data-curllm-target="email"], [data-curllm-target="subject"], [data-curllm-target="phone"], [data-curllm-target="message"]';
+                          document.querySelectorAll(qs).forEach(el => {
+                            try { el.dispatchEvent(new Event('input', {bubbles:true})); } catch(e){}
+                            try { el.blur(); } catch(e){}
+                          });
+                        }
+                        """
+                    )
                 except Exception:
                     pass
-                try:
-                    await page.wait_for_load_state("networkidle")
-                except Exception:
-                    pass
-                # Detect success message heuristically
-                ok = await page.evaluate(
-                    """
-                    () => {
-                      const t = (document.body.innerText||'').toLowerCase();
-                      if (/(dziękujemy|dziekujemy|wiadomość została|wiadomosc zostala|wiadomość wysłana|wiadomosc wyslana|message sent|thank you|success)/i.test(t)) return true;
-                      if (document.querySelector('.wpcf7-mail-sent-ok, .wpcf7-response-output, .elementor-message-success, .elementor-alert.elementor-alert-success')) return true;
-                      return false;
-                    }
-                    """
-                )
-                filled["submitted"] = bool(ok)
+                attempts = 0
+                diag_last: Dict[str, Any] | None = None
+                while attempts < 2:
+                    attempts += 1
+                    try:
+                        await page.click(str(selectors["submit"]))
+                    except Exception:
+                        pass
+                    try:
+                        await page.wait_for_selector('.wpcf7-response-output, .elementor-message-success, .elementor-alert.elementor-alert-success', timeout=5000)
+                    except Exception:
+                        pass
+                    try:
+                        await page.wait_for_load_state("networkidle")
+                    except Exception:
+                        pass
+                    ok = await page.evaluate(
+                        """
+                        () => {
+                          const t = (document.body.innerText||'').toLowerCase();
+                          if (/(dziękujemy|dziekujemy|wiadomość została|wiadomosc zostala|wiadomość wysłana|wiadomosc wyslana|message sent|thank you|success)/i.test(t)) return true;
+                          if (document.querySelector('.wpcf7-mail-sent-ok, .wpcf7-response-output, .elementor-message-success, .elementor-alert.elementor-alert-success')) return true;
+                          return false;
+                        }
+                        """
+                    )
+                    if bool(ok):
+                        filled["submitted"] = True
+                        break
+                    try:
+                        diag_last = await page.evaluate(
+                            """
+                            () => {
+                              const txt = (document.body.innerText||'').toLowerCase();
+                              const invalidEmail = /(nie jest prawidłowy adres e-mail|nieprawidłowy email|błędny email|invalid email)/i.test(txt)
+                                || !!document.querySelector('input[type="email"][aria-invalid="true"], .wpcf7-not-valid[name*="email"], .forminator-error-message');
+                              const consentRequired = (!!document.querySelector('input[type="checkbox"][required], input[type="checkbox"].wpcf7-not-valid'))
+                                && /(zgod|akcept|privacy|regulamin)/i.test(txt);
+                              const requiredMissing = /(wymagane|required|to pole jest wymagane)/i.test(txt)
+                                || !!document.querySelector('.wpcf7-not-valid, .forminator-error-message, .elementor-field-required');
+                              return {invalid_email: !!invalidEmail, consent_required: !!consentRequired, required_missing: !!requiredMissing};
+                            }
+                            """
+                        )
+                    except Exception:
+                        diag_last = None
+                    if isinstance(diag_last, dict):
+                        if diag_last.get("invalid_email") and selectors.get("email") and canonical.get("email"):
+                            try:
+                                await page.fill(str(selectors["email"]), canonical["email"])
+                            except Exception:
+                                pass
+                        if diag_last.get("consent_required") and selectors.get("consent"):
+                            try:
+                                await page.check(str(selectors["consent"]))
+                            except Exception:
+                                try:
+                                    await page.click(str(selectors["consent"]))
+                                except Exception:
+                                    pass
+                        # one more small wait before next attempt
+                        try:
+                            await page.wait_for_timeout(500)
+                        except Exception:
+                            pass
+                if not filled.get("submitted") and diag_last is not None:
+                    filled["errors"] = diag_last
             except Exception:
                 pass
         filled["selectors"] = selectors

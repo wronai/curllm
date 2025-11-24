@@ -167,6 +167,29 @@ PY
       if [ -n "$shot" ] && [ -f "$shot" ]; then
         attachments+=("$shot")
       fi
+      # Append diagnostics (DNS/IP/HTTPS/HTTP) using curllm_core if available
+      if command -v python3 >/dev/null 2>&1; then
+        diag_json=$(python3 - <<'PY'
+import json, sys
+from urllib.parse import urlparse
+try:
+    from curllm_core.diagnostics import diagnose_url_issue
+except Exception:
+    diagnose_url_issue = None
+url = sys.argv[1]
+out = {"url": url, "note": "python module curllm_core not available"}
+if diagnose_url_issue is not None:
+    try:
+        out = diagnose_url_issue(url)
+    except Exception as e:
+        out = {"url": url, "diagnostic_error": str(e)}
+print(json.dumps(out, ensure_ascii=False))
+PY
+"$use_url" 2>/dev/null | sed 's/^/  /')
+        if [ -n "$diag_json" ]; then
+          body_lines+=("  diagnostics: $diag_json")
+        fi
+      fi
     fi
   done < "$CSV_FILE"
 

@@ -42,102 +42,124 @@ async def generic_fastpath(instruction: str, page, run_logger=None) -> Optional[
         run_logger.log_code("json", json.dumps(result, indent=2))
     return result
 
+def _parse_limit_from_instruction(lower_instr: str, default: int = 30) -> int:
+    try:
+        m = re.search(r"first\s*(\d+)|pierwsze\s*(\d+)", lower_instr)
+        if m:
+            for g in m.groups():
+                if g:
+                    return max(1, min(200, int(g)))
+    except Exception:
+        pass
+    return default
+
+
+async def _extract_anchors_by_selectors(page, selectors: list[str], limit: int) -> list[Dict[str, str]]:
+    return await page.evaluate(
+        r"""
+            (sels, limit) => {
+                const out = [];
+                const seen = new Set();
+                const push = (a) => {
+                    if (!a) return;
+                    const text = (a.innerText||'').trim();
+                    const href = a.href;
+                    if (!text || !href) return;
+                    if (seen.has(href)) return; seen.add(href);
+                    out.push({text, href});
+                };
+                try { (sels||[]).forEach(s => document.querySelectorAll(s).forEach(push)); } catch(e){}
+                return out.slice(0, (limit||30));
+            }
+        """,
+        selectors,
+        limit,
+    )
+
+
+async def _extract_all_anchors(page) -> list[Dict[str, str]]:
+    return await page.evaluate(
+        """
+            () => Array.from(document.querySelectorAll('a')).map(a => ({
+                text: (a.innerText||'').trim(),
+                href: a.href
+            }))
+        """
+    )
+
+
+async def _extract_emails(page) -> list[str]:
+    text = await page.evaluate("() => document.body.innerText")
+    emails_text = list(set(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", text)))
+    emails_mailto = await page.evaluate(
+        """
+            () => Array.from(document.querySelectorAll('a[href^=\"mailto:\"]'))
+                .map(a => (a.getAttribute('href')||'')
+                    .replace(/^mailto:/,'')
+                    .split('?')[0]
+                    .trim())
+                .filter(Boolean)
+        """
+    )
+    return list(sorted(set(emails_text + emails_mailto)))[:100]
+
+
+async def _extract_phones(page) -> list[str]:
+    text = await page.evaluate("() => document.body.innerText")
+    phones_text = list(set(re.findall(r"(?:\\+\\d{1,3}[\\s-]?)?(?:\\(?\\d{2,4}\\)?[\\s-]?)?\\d[\\d\\s-]{6,}\\d", text)))
+    phones_tel = await page.evaluate(
+        """
+            () => Array.from(document.querySelectorAll('a[href^=\"tel:\"]'))
+                .map(a => (a.getAttribute('href')||'')
+                    .replace(/^tel:/,'')
+                    .split('?')[0]
+                    .trim())
+                .filter(Boolean)
+        """
+    )
+    def _norm(p: str) -> str:
+        return p.replace(" ", "").replace("-", "")
+    phones = list(sorted(set([_norm(p) for p in (phones_text + phones_tel) if p])))
+    return phones[:100]
+
+
+def _filter_only(lower_instr: str, direct: Dict[str, Any]) -> Dict[str, Any]:
+    if "only" not in lower_instr:
+        return direct
+    keep: Dict[str, Any] = {}
+    if ("email" in lower_instr or "mail" in lower_instr) and "emails" in direct:
+        keep["emails"] = direct["emails"]
+    if ("phone" in lower_instr or "tel" in lower_instr or "telefon" in lower_instr) and "phones" in direct:
+        keep["phones"] = direct["phones"]
+    if "links" in direct and not any(w in lower_instr for w in ["email", "mail", "phone", "tel", "telefon"]):
+        keep["links"] = direct["links"]
+    return keep or direct
+
+
 async def direct_fastpath(instruction: str, page, run_logger=None) -> Optional[Dict[str, Any]]:
     lower_instr = (instruction or "").lower()
     direct: Dict[str, Any] = {}
-    if "link" in lower_instr and not (
-        ("only" in lower_instr)
-        and ("email" in lower_instr or "mail" in lower_instr or "phone" in lower_instr or "tel" in lower_instr or "telefon" in lower_instr)
-    ):
-        # If instruction specifies CSS selectors (e.g., a.titlelink, a.storylink), honor them
-        sels = []
-        for sel in ["a.titlelink", "a.storylink"]:
-            if sel in (instruction or ""):
-                sels.append(sel)
+
+    if "link" in lower_instr and not ("only" in lower_instr and any(w in lower_instr for w in ["email","mail","phone","tel","telefon"])):
+        sels = [sel for sel in ["a.titlelink", "a.storylink"] if sel in (instruction or "")]
         if sels:
-            lim = 30
-            try:
-                m = re.search(r"first\s*(\d+)|pierwsze\s*(\d+)", lower_instr)
-                if m:
-                    for g in m.groups():
-                        if g:
-                            lim = max(1, min(200, int(g)))
-                            break
-            except Exception:
-                pass
-            anchors = await page.evaluate(
-                r"""
-                    (sels, limit) => {
-                        const out = [];
-                        const seen = new Set();
-                        const push = (a) => {
-                            if (!a) return;
-                            const text = (a.innerText||'').trim();
-                            const href = a.href;
-                            if (!text || !href) return;
-                            if (seen.has(href)) return; seen.add(href);
-                            out.push({text, href});
-                        };
-                        try { (sels||[]).forEach(s => document.querySelectorAll(s).forEach(push)); } catch(e){}
-                        return out.slice(0, (limit||30));
-                    }
-                """,
-                sels,
-                lim,
-            )
+            lim = _parse_limit_from_instruction(lower_instr, 30)
+            anchors = await _extract_anchors_by_selectors(page, sels, lim)
         else:
-            anchors = await page.evaluate(
-                """
-                    () => Array.from(document.querySelectorAll('a')).map(a => ({
-                        text: (a.innerText||'').trim(),
-                        href: a.href
-                    }))
-                """
-            )
+            anchors = await _extract_all_anchors(page)
         direct["links"] = anchors[:100]
+
     if "email" in lower_instr or "mail" in lower_instr:
-        text = await page.evaluate("() => document.body.innerText")
-        emails_text = list(set(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", text)))
-        emails_mailto = await page.evaluate(
-            """
-                () => Array.from(document.querySelectorAll('a[href^=\"mailto:\"]'))
-                    .map(a => (a.getAttribute('href')||'')
-                        .replace(/^mailto:/,'')
-                        .split('?')[0]
-                        .trim())
-                    .filter(Boolean)
-            """
-        )
-        emails = list(sorted(set(emails_text + emails_mailto)))
-        direct["emails"] = emails[:100]
-    if "phone" in lower_instr or "tel" in lower_instr or "telefon" in lower_instr:
-        text = await page.evaluate("() => document.body.innerText")
-        phones_text = list(set(re.findall(r"(?:\\+\\d{1,3}[\\s-]?)?(?:\\(?\\d{2,4}\\)?[\\s-]?)?\\d[\\d\\s-]{6,}\\d", text)))
-        phones_tel = await page.evaluate(
-            """
-                () => Array.from(document.querySelectorAll('a[href^=\"tel:\"]'))
-                    .map(a => (a.getAttribute('href')||'')
-                        .replace(/^tel:/,'')
-                        .split('?')[0]
-                        .trim())
-                    .filter(Boolean)
-            """
-        )
-        def _norm(p: str) -> str:
-            return p.replace(" ", "").replace("-", "")
-        phones = list(sorted(set([_norm(p) for p in (phones_text + phones_tel) if p])))
-        direct["phones"] = phones[:100]
+        direct["emails"] = await _extract_emails(page)
+
+    if any(w in lower_instr for w in ["phone","tel","telefon"]):
+        direct["phones"] = await _extract_phones(page)
+
     if not direct:
         return None
-    if "only" in lower_instr and (
-        "email" in lower_instr or "mail" in lower_instr or "phone" in lower_instr or "tel" in lower_instr or "telefon" in lower_instr
-    ):
-        filtered: Dict[str, Any] = {}
-        if ("email" in lower_instr or "mail" in lower_instr) and "emails" in direct:
-            filtered["emails"] = direct["emails"]
-        if ("phone" in lower_instr or "tel" in lower_instr or "telefon" in lower_instr) and "phones" in direct:
-            filtered["phones"] = direct["phones"]
-        direct = filtered
+
+    direct = _filter_only(lower_instr, direct)
+
     if run_logger:
         run_logger.log_text("Direct extraction fast-path used:")
         run_logger.log_code("json", json.dumps(direct, indent=2))

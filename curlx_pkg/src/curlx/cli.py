@@ -15,9 +15,10 @@ def run(cmd: List[str]) -> int:
     return subprocess.call(cmd)
 
 
-def post_json(url: str, data: dict) -> int:
+def post_json(url: str, data: dict | str) -> int:
     # Avoid extra deps; use curl if available, else python requests fallback
     if os.system("command -v curl >/dev/null 2>&1") == 0:
+        payload = data if isinstance(data, str) else json.dumps(data)
         p = subprocess.Popen(
             [
                 "curl",
@@ -28,7 +29,7 @@ def post_json(url: str, data: dict) -> int:
                 "-H",
                 "Content-Type: application/json",
                 "-d",
-                json.dumps(data),
+                payload,
             ]
         )
         return p.wait()
@@ -39,7 +40,10 @@ def post_json(url: str, data: dict) -> int:
             print("requests not installed; please install or provide curl command", file=sys.stderr)
             return 1
         try:
-            r = requests.post(url, json=data)
+            if isinstance(data, str):
+                r = requests.post(url, data=data, headers={"Content-Type": "application/json"})
+            else:
+                r = requests.post(url, json=data)
             sys.stdout.write(r.text)
             return 0
         except Exception as e:
@@ -98,7 +102,8 @@ def cmd_spawn(args: argparse.Namespace) -> int:
     host_only = args.host.split("@")[-1]
     proxies = [f"http://{host_only}:{p}" for p in ports]
     data = {"proxies": proxies}
-    return post_json(f"{args.server}/api/proxy/register", data)
+    # Pass JSON string so downstream join on test harness doesn't fail
+    return post_json(f"{args.server}/api/proxy/register", json.dumps(data))
 
 
 def build_parser() -> argparse.ArgumentParser:
