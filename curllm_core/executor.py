@@ -346,110 +346,20 @@ class CurllmExecutor:
     ) -> Dict:
         result: Dict[str, Any] = {"data": None, "steps": 0, "screenshots": [], "meta": {"hints": [], "suggested_commands": []}}
         lower_instr = (instruction or "").lower()
-        if url:
-            page = await agent.browser.new_page()
-            await page.goto(url)
-            try:
-                await page.wait_for_load_state("domcontentloaded")
-                await page.wait_for_load_state("networkidle")
-            except Exception:
-                pass
-            try:
-                hv = await handle_human_verification(page, run_logger)
-                run_logger.log_kv("human_verify_clicked_on_nav", str(bool(hv)))
-            except Exception as e:
-                run_logger.log_kv("human_verify_on_nav_error", str(e))
-            # Optional initial scroll to load content
-            if runtime.get("scroll_load"):
-                try:
-                    await _auto_scroll(page, steps=4, delay_ms=600)
-                except Exception:
-                    pass
-            # Attempt widget CAPTCHA solving right after navigation if enabled
-            if captcha_solver:
-                try:
-                    solved = await _handle_widget_captcha(page, current_url=url, solver=self.captcha_solver, run_logger=run_logger)
-                    run_logger.log_kv("widget_captcha_on_nav", str(bool(solved)))
-                except Exception as e:
-                    run_logger.log_kv("widget_captcha_on_nav_error", str(e))
-            # Attempt slider CAPTCHA
-            if bool(runtime.get("use_external_slider_solver")):
-                try:
-                    ext = await try_external_slider_solver(page, run_logger)
-                    if ext is not None:
-                        run_logger.log_kv("ext_slider_solver_on_nav", str(bool(ext)))
-                except Exception as e:
-                    run_logger.log_kv("ext_slider_solver_on_nav_error", str(e))
-            # Always attempt internal heuristic as best-effort too
-            try:
-                slid = await attempt_slider_challenge(page, run_logger)
-                if slid:
-                    run_logger.log_kv("slider_attempt_on_nav", "True")
-            except Exception as e:
-                run_logger.log_kv("slider_attempt_on_nav_error", str(e))
-        else:
-            page = await agent.browser.new_page()
-        try:
-            if await _is_block_page(page) and not stealth_mode:
-                if run_logger:
-                    run_logger.log_text("Block page detected; retrying with stealth mode...")
-                try:
-                    await page.close()
-                except Exception:
-                    pass
-                host = None
-                try:
-                    host = await page.evaluate("() => window.location.hostname")
-                except Exception:
-                    try:
-                        if url:
-                            host = urlparse(url).hostname
-                    except Exception:
-                        pass
-                new_ctx = await self._setup_browser(True, host, headers=None)
-                agent.browser = new_ctx
-                page = await agent.browser.new_page()
-                await page.goto(url)
-                try:
-                    await page.wait_for_load_state("domcontentloaded")
-                    await page.wait_for_load_state("networkidle")
-                except Exception:
-                    pass
-                stealth_mode = True
-        except Exception:
-            pass
-        domain_dir = config.screenshot_dir
-        try:
-            host = await page.evaluate("() => window.location.hostname")
-            if host:
-                domain_dir = config.screenshot_dir / host
-                domain_dir.mkdir(parents=True, exist_ok=True)
-        except Exception:
-            try:
-                if url:
-                    host = urlparse(url).hostname
-                    if host:
-                        domain_dir = config.screenshot_dir / host
-                        domain_dir.mkdir(parents=True, exist_ok=True)
-            except Exception:
-                pass
-        try:
-            if ("screenshot" in lower_instr) or ("zrzut" in lower_instr):
-                shot_path = await self._take_screenshot(page, 0, target_dir=domain_dir)
-                result["screenshots"].append(shot_path)
-                if run_logger:
-                    run_logger.log_text(f"Initial screenshot saved: {shot_path}")
-                result["data"] = {"screenshot_saved": shot_path}
-                if not ("extract" in lower_instr or "product" in lower_instr or "produkt" in lower_instr):
-                    await page.close()
-                    return result
-        except Exception:
-            pass
-        try:
-            await _accept_cookies(page)
-            run_logger.log_kv("accept_cookies", "attempted")
-        except Exception as e:
-            run_logger.log_kv("accept_cookies_error", str(e))
+        page, domain_dir, stealth_mode, early = await self._open_page_with_prechecks(
+            agent=agent,
+            url=url,
+            instruction=instruction,
+            stealth_mode=stealth_mode,
+            captcha_solver=captcha_solver,
+            runtime=runtime,
+            run_logger=run_logger,
+            result=result,
+            lower_instr=lower_instr,
+        )
+        if early is not None:
+            await page.close()
+            return early
         if bool(runtime.get("fastpath")):
             try:
                 res_generic = await generic_fastpath(instruction, page, run_logger)
@@ -470,40 +380,12 @@ class CurllmExecutor:
                     return result
             except Exception as e:
                 run_logger.log_kv("direct_fastpath_error", str(e))
-        # Multi-stage extraction strategy for products
         if "product" in lower_instr or "produkt" in lower_instr:
-            extraction_stages = [
-                {"scroll_steps": 2, "wait_ms": 500},
-                {"scroll_steps": 3, "wait_ms": 800},
-                {"scroll_steps": 5, "wait_ms": 1000},
-            ]
-
-            for stage_idx, stage in enumerate(extraction_stages):
-                if run_logger:
-                    run_logger.log_text(f"Product extraction stage {stage_idx + 1}/{len(extraction_stages)}")
-
-                # Scroll to load more content
-                for _ in range(stage["scroll_steps"]):
-                    try:
-                        await page.evaluate("window.scrollBy(0, window.innerHeight * 0.8);")
-                        await page.wait_for_timeout(stage["wait_ms"])
-                    except Exception:
-                        pass
-
-                # Try extraction
-                try:
-                    res_products = await product_heuristics(instruction, page, run_logger)
-                    if res_products and res_products.get("products"):
-                        if len(res_products["products"]) >= 3:
-                            result["data"] = res_products
-                            await page.close()
-                            return result
-                except Exception as e:
-                    if run_logger:
-                        run_logger.log_text(f"Stage {stage_idx + 1} extraction failed: {e}")
-
-            if run_logger:
-                run_logger.log_text("Multi-stage extraction incomplete, continuing with LLM planner")
+            ms = await self._multi_stage_product_extract(instruction, lower_instr, page, run_logger)
+            if ms is not None:
+                result["data"] = ms
+                await page.close()
+                return result
         last_sig = None
         no_progress = 0
         stall_limit = int(runtime.get("stall_limit", 5) or 5)
@@ -522,6 +404,15 @@ class CurllmExecutor:
                 last_visual_analysis = visual_analysis if isinstance(visual_analysis, dict) else {"raw": str(visual_analysis)}
                 if captcha_solver and visual_analysis.get("has_captcha"):
                     await _handle_captcha_image_widget(page, screenshot_path, self.captcha_solver, run_logger)
+                # If CAPTCHA detected but solver disabled, suggest enabling it
+                try:
+                    if (not captcha_solver) and bool(last_visual_analysis and last_visual_analysis.get("has_captcha")):
+                        params = {"include_dom_html": True}
+                        cmd = self._build_rerun_curl(instruction, url or "", params, top_level={"captcha_solver": True, "url": url or ""})
+                        result["meta"]["hints"].append("CAPTCHA detected. Retry with captcha_solver=true enabled.")
+                        result["meta"]["suggested_commands"].append(cmd)
+                except Exception:
+                    pass
             # Try handle human verification banners/buttons each step
             try:
                 await handle_human_verification(page, run_logger)
@@ -632,62 +523,20 @@ class CurllmExecutor:
             except Exception:
                 pass
             try:
-                sig = f"{page_context.get('url','')}|{page_context.get('title','')}|{len(page_context.get('interactive',[])):04d}|{len(page_context.get('dom_preview',''))}"
-
-                if last_sig is None:
-                    last_sig = sig
-                    no_progress = 0
-                elif sig == last_sig:
-                    no_progress += 1
-                    # If no progress, increase DOM analysis depth progressively
-                    if no_progress > 1:
-                        progressive_depth = min(progressive_depth + 1, 3)
-                        dom_cap = int(runtime.get("dom_max_cap", 60000) or 60000)
-                        runtime["dom_max_chars"] = min(int(runtime.get("dom_max_chars", 20000)) * progressive_depth, dom_cap)
-                        if run_logger:
-                            run_logger.log_text(f"No progress for {no_progress} steps. Increasing DOM depth to {runtime['dom_max_chars']} chars")
-                        try:
-                            params = {
-                                "include_dom_html": True,
-                                "dom_max_chars": runtime.get("dom_max_chars", 20000),
-                                "stall_limit": stall_limit,
-                                "planner_growth_per_step": int(runtime.get("planner_growth_per_step", 2000)),
-                                "planner_max_cap": int(runtime.get("planner_max_cap", 20000)),
-                            }
-                            cmd = self._build_rerun_curl(instruction, url or "", params)
-                            result["meta"]["hints"].append("Increased DOM depth due to no progress. You can also retry with these parameters.")
-                            result["meta"]["suggested_commands"].append(cmd)
-                        except Exception:
-                            pass
-                else:
-                    last_sig = sig
-                    no_progress = 0
-                    progressive_depth = 1
-
-                if no_progress >= stall_limit:
-                    # Before stopping, try once with maximum depth
-                    if progressive_depth < 3:
-                        progressive_depth = 3
-                        runtime["dom_max_chars"] = int(runtime.get("dom_max_cap", 60000) or 60000)
-                        no_progress = stall_limit - 1  # Give one more chance
-                    else:
-                        if run_logger:
-                            run_logger.log_text(f"No progress detected for {stall_limit} consecutive steps. Stopping early.")
-                        # Attach hints and a ready-to-run command
-                        try:
-                            params = {
-                                "include_dom_html": True,
-                                "dom_max_chars": int(runtime.get("dom_max_cap", 60000) or 60000),
-                                "stall_limit": stall_limit + 2,
-                                "planner_growth_per_step": int(runtime.get("planner_growth_per_step", 2000)) + 1000,
-                                "planner_max_cap": int(runtime.get("planner_max_cap", 20000)) + 5000,
-                            }
-                            cmd = self._build_rerun_curl(instruction, url or "", params)
-                            result["meta"]["hints"].append("Stall limit reached. Consider increasing stall_limit and DOM cap and retry.")
-                            result["meta"]["suggested_commands"].append(cmd)
-                        except Exception:
-                            pass
-                        break
+                last_sig, no_progress, progressive_depth, should_break = await self._progress_tick(
+                    page_context=page_context,
+                    last_sig=last_sig,
+                    no_progress=no_progress,
+                    progressive_depth=progressive_depth,
+                    runtime=runtime,
+                    run_logger=run_logger,
+                    result=result,
+                    instruction=instruction,
+                    url=url,
+                    stall_limit=stall_limit,
+                )
+                if should_break:
+                    break
             except Exception as e:
                 if run_logger:
                     run_logger.log_text(f"Progress check error: {e}")
@@ -836,7 +685,7 @@ class CurllmExecutor:
             return f"Extract the following fields from the page: {query}"
         return query
 
-    def _build_rerun_curl(self, instruction: str | None, url: str, params: Dict[str, Any]) -> str:
+    def _build_rerun_curl(self, instruction: str | None, url: str, params: Dict[str, Any], top_level: Dict[str, Any] | None = None) -> str:
         try:
             inner = {"instruction": instruction or "", "params": params}
             instr_json = json.dumps(inner, ensure_ascii=False)
@@ -848,8 +697,230 @@ class CurllmExecutor:
                 "captcha_solver": False,
                 "use_bql": False,
             }
+            if isinstance(top_level, dict):
+                try:
+                    payload.update({k: v for k, v in top_level.items() if k in ("visual_mode","stealth_mode","captcha_solver","use_bql","url")})
+                except Exception:
+                    pass
             payload_text = json.dumps(payload, ensure_ascii=False)
             api_url = f"http://localhost:{config.api_port}/api/execute"
             return f"curl -s -X POST '{api_url}' -H 'Content-Type: application/json' -d '{payload_text}'"
         except Exception:
             return ""
+
+    async def _open_page_with_prechecks(
+        self,
+        agent,
+        url: Optional[str],
+        instruction: str,
+        stealth_mode: bool,
+        captcha_solver: bool,
+        runtime: Dict[str, Any],
+        run_logger: RunLogger,
+        result: Dict[str, Any],
+        lower_instr: str,
+    ):
+        if url:
+            page = await agent.browser.new_page()
+            await page.goto(url)
+            try:
+                await page.wait_for_load_state("domcontentloaded")
+                await page.wait_for_load_state("networkidle")
+            except Exception:
+                pass
+            try:
+                hv = await handle_human_verification(page, run_logger)
+                run_logger.log_kv("human_verify_clicked_on_nav", str(bool(hv)))
+            except Exception as e:
+                run_logger.log_kv("human_verify_on_nav_error", str(e))
+            if runtime.get("scroll_load"):
+                try:
+                    await _auto_scroll(page, steps=4, delay_ms=600)
+                except Exception:
+                    pass
+            if captcha_solver:
+                try:
+                    solved = await _handle_widget_captcha(page, current_url=url, solver=self.captcha_solver, run_logger=run_logger)
+                    run_logger.log_kv("widget_captcha_on_nav", str(bool(solved)))
+                except Exception as e:
+                    run_logger.log_kv("widget_captcha_on_nav_error", str(e))
+            if bool(runtime.get("use_external_slider_solver")):
+                try:
+                    ext = await try_external_slider_solver(page, run_logger)
+                    if ext is not None:
+                        run_logger.log_kv("ext_slider_solver_on_nav", str(bool(ext)))
+                except Exception as e:
+                    run_logger.log_kv("ext_slider_solver_on_nav_error", str(e))
+            try:
+                slid = await attempt_slider_challenge(page, run_logger)
+                if slid:
+                    run_logger.log_kv("slider_attempt_on_nav", "True")
+            except Exception as e:
+                run_logger.log_kv("slider_attempt_on_nav_error", str(e))
+        else:
+            page = await agent.browser.new_page()
+        try:
+            if await _is_block_page(page) and not stealth_mode:
+                if run_logger:
+                    run_logger.log_text("Block page detected; retrying with stealth mode...")
+                try:
+                    # Suggest rerun with stealth mode
+                    params = {
+                        "include_dom_html": True,
+                        "scroll_load": True,
+                    }
+                    cmd = self._build_rerun_curl(instruction, url or "", params, top_level={"stealth_mode": True, "url": url or ""})
+                    result["meta"]["hints"].append("Block page detected. Retry with stealth_mode=true or use a proxy.")
+                    result["meta"]["suggested_commands"].append(cmd)
+                except Exception:
+                    pass
+                try:
+                    await page.close()
+                except Exception:
+                    pass
+                host = None
+                try:
+                    host = await page.evaluate("() => window.location.hostname")
+                except Exception:
+                    try:
+                        if url:
+                            host = urlparse(url).hostname
+                    except Exception:
+                        pass
+                new_ctx = await self._setup_browser(True, host, headers=None)
+                agent.browser = new_ctx
+                page = await agent.browser.new_page()
+                await page.goto(url)
+                try:
+                    await page.wait_for_load_state("domcontentloaded")
+                    await page.wait_for_load_state("networkidle")
+                except Exception:
+                    pass
+                stealth_mode = True
+        except Exception:
+            pass
+        domain_dir = config.screenshot_dir
+        try:
+            host = await page.evaluate("() => window.location.hostname")
+            if host:
+                domain_dir = config.screenshot_dir / host
+                domain_dir.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            try:
+                if url:
+                    host = urlparse(url).hostname
+                    if host:
+                        domain_dir = config.screenshot_dir / host
+                        domain_dir.mkdir(parents=True, exist_ok=True)
+            except Exception:
+                pass
+        try:
+            if ("screenshot" in lower_instr) or ("zrzut" in lower_instr):
+                shot_path = await self._take_screenshot(page, 0, target_dir=domain_dir)
+                result["screenshots"].append(shot_path)
+                if run_logger:
+                    run_logger.log_text(f"Initial screenshot saved: {shot_path}")
+                result["data"] = {"screenshot_saved": shot_path}
+                if not ("extract" in lower_instr or "product" in lower_instr or "produkt" in lower_instr):
+                    return page, domain_dir, stealth_mode, result
+        except Exception:
+            pass
+        try:
+            await _accept_cookies(page)
+            run_logger.log_kv("accept_cookies", "attempted")
+        except Exception as e:
+            run_logger.log_kv("accept_cookies_error", str(e))
+        return page, domain_dir, stealth_mode, None
+
+    async def _multi_stage_product_extract(self, instruction: str, lower_instr: str, page, run_logger: RunLogger | None):
+        extraction_stages = [
+            {"scroll_steps": 2, "wait_ms": 500},
+            {"scroll_steps": 3, "wait_ms": 800},
+            {"scroll_steps": 5, "wait_ms": 1000},
+        ]
+        for stage_idx, stage in enumerate(extraction_stages):
+            if run_logger:
+                run_logger.log_text(f"Product extraction stage {stage_idx + 1}/{len(extraction_stages)}")
+            for _ in range(stage["scroll_steps"]):
+                try:
+                    await page.evaluate("window.scrollBy(0, window.innerHeight * 0.8);")
+                    await page.wait_for_timeout(stage["wait_ms"])
+                except Exception:
+                    pass
+            try:
+                res_products = await product_heuristics(instruction, page, run_logger)
+                if res_products and res_products.get("products"):
+                    if len(res_products["products"]) >= 3:
+                        return res_products
+            except Exception as e:
+                if run_logger:
+                    run_logger.log_text(f"Stage {stage_idx + 1} extraction failed: {e}")
+        if run_logger:
+            run_logger.log_text("Multi-stage extraction incomplete, continuing with LLM planner")
+        return None
+
+    async def _progress_tick(
+        self,
+        page_context: Dict[str, Any],
+        last_sig: Optional[str],
+        no_progress: int,
+        progressive_depth: int,
+        runtime: Dict[str, Any],
+        run_logger: RunLogger | None,
+        result: Dict[str, Any],
+        instruction: str,
+        url: Optional[str],
+        stall_limit: int,
+    ) -> tuple[Optional[str], int, int, bool]:
+        sig = f"{page_context.get('url','')}|{page_context.get('title','')}|{len(page_context.get('interactive',[])):04d}|{len(page_context.get('dom_preview',''))}"
+        if last_sig is None:
+            last_sig = sig
+            no_progress = 0
+        elif sig == last_sig:
+            no_progress += 1
+            if no_progress > 1:
+                progressive_depth = min(progressive_depth + 1, 3)
+                dom_cap = int(runtime.get("dom_max_cap", 60000) or 60000)
+                runtime["dom_max_chars"] = min(int(runtime.get("dom_max_chars", 20000)) * progressive_depth, dom_cap)
+                if run_logger:
+                    run_logger.log_text(f"No progress for {no_progress} steps. Increasing DOM depth to {runtime['dom_max_chars']} chars")
+                try:
+                    params = {
+                        "include_dom_html": True,
+                        "dom_max_chars": runtime.get("dom_max_chars", 20000),
+                        "stall_limit": stall_limit,
+                        "planner_growth_per_step": int(runtime.get("planner_growth_per_step", 2000)),
+                        "planner_max_cap": int(runtime.get("planner_max_cap", 20000)),
+                    }
+                    cmd = self._build_rerun_curl(instruction, url or "", params)
+                    result["meta"]["hints"].append("Increased DOM depth due to no progress. You can also retry with these parameters.")
+                    result["meta"]["suggested_commands"].append(cmd)
+                except Exception:
+                    pass
+        else:
+            last_sig = sig
+            no_progress = 0
+            progressive_depth = 1
+        if no_progress >= stall_limit:
+            if progressive_depth < 3:
+                progressive_depth = 3
+                runtime["dom_max_chars"] = int(runtime.get("dom_max_cap", 60000) or 60000)
+                no_progress = stall_limit - 1
+            else:
+                if run_logger:
+                    run_logger.log_text(f"No progress detected for {stall_limit} consecutive steps. Stopping early.")
+                try:
+                    params = {
+                        "include_dom_html": True,
+                        "dom_max_chars": int(runtime.get("dom_max_cap", 60000) or 60000),
+                        "stall_limit": stall_limit + 2,
+                        "planner_growth_per_step": int(runtime.get("planner_growth_per_step", 2000)) + 1000,
+                        "planner_max_cap": int(runtime.get("planner_max_cap", 20000)) + 5000,
+                    }
+                    cmd = self._build_rerun_curl(instruction, url or "", params)
+                    result["meta"]["hints"].append("Stall limit reached. Consider increasing stall_limit and DOM cap and retry.")
+                    result["meta"]["suggested_commands"].append(cmd)
+                except Exception:
+                    pass
+                return last_sig, no_progress, progressive_depth, True
+        return last_sig, no_progress, progressive_depth, False
