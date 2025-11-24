@@ -484,7 +484,11 @@ def _should_validate(instruction: Optional[str], data: Optional[Any]) -> bool:
                     data_det = {"articles": det_items}
                     try:
                         if config.validation_enabled and _should_validate(instruction, data_det):
-                            v = await validate_with_llm(self.llm, instruction, data_det, run_logger)
+                            try:
+                                dom_html = await page.content()
+                            except Exception:
+                                dom_html = None
+                            v = await validate_with_llm(self.llm, instruction, data_det, run_logger, dom_html=dom_html)
                             if v is not None:
                                 data_det = v
                     except Exception:

@@ -481,8 +481,9 @@ json_select_rows() {
         . as $root
         | ($root.result? // $root) as $b
         | (
-            (try ($b.page.links) catch null)
-            // $b.products? // $b.articles? // $b.items? // $b.links? // $b.data? // $b.emails? // $b.phones?
+            $b.articles?
+            // (try ($b.page.links) catch null)
+            // $b.products? // $b.items? // $b.links? // $b.data? // $b.emails? // $b.phones?
             // (try ($root.page.links) catch null)
             // first_array($b)
             // first_array($root)

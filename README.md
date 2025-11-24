@@ -141,6 +141,72 @@ curllm --bql -d 'query {
 }'
 ```
 
+## 💡 Usage Recipes (quick)
+
+- Extract all links
+
+  ```bash
+  curllm "https://example.com" -d "extract all links"
+  ```
+
+- Screenshot
+
+  ```bash
+  curllm "https://example.com" -d "screenshot"
+  ```
+
+- Export CSV/HTML/XLS
+
+  ```bash
+  curllm "https://example.com" -d "extract all links" --csv -o links.csv
+  curllm "https://example.com" -d "extract all links" --html -o links.html
+  curllm "https://example.com" -d "extract all links" --xls -o links.xls
+  ```
+
+- Public proxy rotation (Ceneo under 150 zł)
+
+  ```bash
+  export CURLLM_PUBLIC_PROXY_LIST="https://raw.githubusercontent.com/clarketm/proxy-list/master/proxy-list-raw.txt"
+  curllm "https://ceneo.pl" -d "Find all products under 150zł and extract names, prices and urls" \
+    --stealth --proxy rotate:public --csv -o products.csv
+  ```
+
+- Registry rotation (po rejestracji przez curlx)
+
+  ```bash
+  # przykład rejestracji proxy:
+  curlx register --host 203.0.113.10 --ports 3128,3129 --server http://localhost:8000
+  curllm "https://ceneo.pl" -d "Find all products under 150zł and extract names, prices and urls" \
+    --stealth --proxy rotate:registry --html -o products.html
+  ```
+
+- Sesja (persistent cookies)
+
+  ```bash
+  curllm --session my-site "https://example.com" -d "screenshot"
+  ```
+
+- WordPress: utwórz post
+
+  ```bash
+  curllm --session wp-s1 -d '{"wordpress_config":{"url":"https://example.wordpress.com","action":"create_post","title":"Hello","content":"Post body","status":"draft"}}'
+  ```
+
+- BQL: Hacker News links
+
+  ```bash
+  curllm --bql -d 'query { page(url: "https://news.ycombinator.com") { title links: select(css: "a.storylink, a.titlelink") { text url: attr(name: "href") } }}'
+  ```
+
+- Monitoring (cron + e-mail)
+
+  ```bash
+  # zobacz monitoring/README.md
+  make -C monitoring setup
+  make -C monitoring run
+  make -C monitoring install-3h
+  ```
+
 ## 🎯 Examples
 
 For a comprehensive, curated set of examples and ready-to-run scripts, see:

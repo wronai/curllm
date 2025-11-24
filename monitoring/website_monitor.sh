@@ -40,6 +40,11 @@ if [ -f "$ENV_FILE" ]; then
   done < "$ENV_FILE"
 fi
 
+# Recompute effective CSV_FILE after env load (empty CSV_FILE in .env should fallback to default)
+if [ -z "${CSV_FILE:-}" ]; then
+  CSV_FILE="$CSV_FILE_DEFAULT"
+fi
+
 MAIL_TO_DEFAULT="${MAIL_TO:-}"
 CURLLM_BIN="${CURLLM_BIN:-curllm}"
 JQ_BIN="${JQ_BIN:-jq}"

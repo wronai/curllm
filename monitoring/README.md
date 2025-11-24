@@ -2,6 +2,8 @@
 
 Prosty monitoring stron www oparty o curllm. Dla każdej domeny robi zrzut ekranu, wykrywa typowe problemy heurystycznie (np. error/timeout/captcha w tytule) i w razie wykrycia wysyła jeden zbiorczy e‑mail z załączonymi screenshotami.
 
+[Pełne przykłady użycia znajdziesz w EXAMPLES.md](./EXAMPLES.md)
+
 - Harmonogram przez cron (domyślnie co 3 godziny).
 - Konfiguracja przez plik `.env`.
 - Lista stron w `url.csv` (jedna domena/URL na linię).
@@ -16,6 +18,7 @@ Prosty monitoring stron www oparty o curllm. Dla każdej domeny robi zrzut ekran
 Linki:
 - curllm: ./../README.md
 - Proxies (opcjonalnie): ./../docs/REMOTE_PROXY_TUTORIAL.md
+- Monitoring examples: ./EXAMPLES.md
 
 ## Szybki start
 

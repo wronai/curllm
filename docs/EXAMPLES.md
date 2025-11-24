@@ -8,6 +8,74 @@ This document contains curated, end-to-end examples for common automation tasks 
 - Scripts will be created as `examples/curllm-*.sh`
 - Ensure services are running: `curllm --start-services && curllm --status`
 
+## Top 10 quick examples
+
+1. Extract all links
+
+   ```bash
+   curllm "https://example.com" -d "extract all links"
+   ```
+
+2. Extract emails and phones
+
+   ```bash
+   curllm "https://example.com/contact" -d "extract all emails and phone numbers"
+   ```
+
+3. Take a screenshot
+
+   ```bash
+   curllm "https://example.com" -d "screenshot"
+   ```
+
+4. Products under 150 zł (public proxy rotation)
+
+   ```bash
+   export CURLLM_PUBLIC_PROXY_LIST="https://raw.githubusercontent.com/clarketm/proxy-list/master/proxy-list-raw.txt"
+   curllm "https://ceneo.pl" -d "Find all products under 150zł and extract names, prices and urls" \
+     --stealth --proxy rotate:public --csv -o products.csv
+   ```
+
+5. Products with registry rotation (after registering proxies)
+
+   ```bash
+   # register proxies via curlx or API, then:
+   curllm "https://ceneo.pl" -d "Find all products under 150zł and extract names, prices and urls" \
+     --stealth --proxy rotate:registry --html -o products.html
+   ```
+
+6. BQL: Hacker News links (CSS selectors)
+
+   ```bash
+   curllm --bql -d 'query { page(url: "https://news.ycombinator.com") { title links: select(css: "a.storylink, a.titlelink") { text url: attr(name: "href") } }}'
+   ```
+
+7. Visual fill contact form (stealth)
+
+   ```bash
+   curllm --visual --stealth "https://www.prototypowanie.pl/kontakt/" \
+     -d "Fill contact form: name=John Doe, email=john@example.com, message=Hello"
+   ```
+
+8. Use a session (persist cookies between runs)
+
+   ```bash
+   curllm --session my-site "https://example.com" -d "screenshot"
+   # later: same session reused automatically
+   ```
+
+9. Export results to XLS (Excel-compatible)
+
+   ```bash
+   curllm "https://example.com" -d "extract all links" --xls -o links.xls
+   ```
+
+10. WordPress: create a post using session
+
+    ```bash
+    curllm --session wp-s1 -d '{"wordpress_config":{"url":"https://example.wordpress.com","action":"create_post","title":"Hello","content":"Post body","status":"draft"}}'
+    ```
+
 ## Table of Contents
 - Extract links from a page
 - BQL: Hacker News links
