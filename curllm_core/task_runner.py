@@ -1,5 +1,10 @@
 from typing import Any, Dict, Optional
 import json
+import os
+import logging
+
+logger = logging.getLogger(__name__)
+LOG_PREVIEW_CHARS = int(os.getenv("CURLLM_LOG_PREVIEW_CHARS", "1500") or 1500)
 
 from .config import config
 from .extraction import (
@@ -358,6 +363,17 @@ async def run_task(
         await page.close()
         return early
 
+    # Expose canonical pairs (name/email/subject/phone/message) from instruction to the page for fill fallbacks
+    try:
+        canonical_pairs = executor._parse_form_pairs(instruction)
+        if isinstance(canonical_pairs, dict):
+            try:
+                await page.evaluate("(data) => { window.__curllm_canonical = data; }", canonical_pairs)  # type: ignore[arg-type]
+            except Exception:
+                pass
+    except Exception:
+        pass
+
     # Early exits
     early_res = await _try_early_form_fill(executor, instruction, page, domain_dir, run_logger, result, lower_instr)
     if early_res is not None:
@@ -423,7 +439,7 @@ async def run_task(
         if run_logger:
             try:
                 run_logger.log_text("Page context snapshot (truncated):")
-                run_logger.log_code("json", json.dumps(page_context, indent=2)[:1500])
+                run_logger.log_code("json", json.dumps(page_context, indent=2)[:LOG_PREVIEW_CHARS])
             except Exception:
                 pass
 
@@ -442,7 +458,7 @@ async def run_task(
             break
 
         if await executor._detect_honeypot(page):
-            executor.logger.warning("Honeypot detected, skipping field")
+            logger.warning("Honeypot detected, skipping field")
 
     if result.get("data") is None:
         await _finalize_fallback(executor, instruction, url, page, run_logger, result)
