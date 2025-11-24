@@ -49,7 +49,19 @@ async def execute_action(page, action: Dict, runtime: Dict[str, Any]):
         # If this looks like an email field, avoid filling invalid values like "Test"
         try:
             is_email = await page.evaluate(
-                "(s) => { const el=document.querySelector(s); if(!el) return false; if (el.matches('[data-curllm-target=\\"email\\"]')) return true; const t=(el.getAttribute('type')||'').toLowerCase(); const name=(el.getAttribute('name')||'').toLowerCase(); const pid=(el.id||'').toLowerCase(); const ph=(el.getAttribute('placeholder')||'').toLowerCase(); const aria=(el.getAttribute('aria-label')||'').toLowerCase(); return t==='email' || [name,pid,ph,aria].some(x=>x.includes('email')||x.includes('e-mail')||x.includes('mail')); }",
+                """
+                (s) => {
+                  const el = document.querySelector(s);
+                  if (!el) return false;
+                  if (el.matches('[data-curllm-target="email"]')) return true;
+                  const t = (el.getAttribute('type')||'').toLowerCase();
+                  const name = (el.getAttribute('name')||'').toLowerCase();
+                  const pid = (el.id||'').toLowerCase();
+                  const ph = (el.getAttribute('placeholder')||'').toLowerCase();
+                  const aria = (el.getAttribute('aria-label')||'').toLowerCase();
+                  return t === 'email' || [name,pid,ph,aria].some(x => x.includes('email') || x.includes('e-mail') || x.includes('mail'));
+                }
+                """,
                 sel,
             )
         except Exception:

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -31,3 +32,14 @@ class RunLogger:
 
     def log_code(self, lang: str, code: str):
         self._write(f"```{lang}\n{code}\n```\n\n")
+
+    def log_image(self, image_path: str, alt: str = ""):
+        try:
+            img = Path(image_path)
+            # Compute path relative to the logs directory so Markdown renders correctly
+            rel = os.path.relpath(img.resolve(), start=self.dir.resolve())
+            safe_alt = alt or img.name
+            self._write(f"![{safe_alt}]({rel})\n\n")
+        except Exception:
+            # Fallback to plain text if relative resolution fails
+            self.log_text(f"Screenshot: {image_path}")
