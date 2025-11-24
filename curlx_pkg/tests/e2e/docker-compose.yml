@@ -1,0 +1,30 @@
+version: '3.9'
+
+networks:
+  e2e:
+    driver: bridge
+
+services:
+  api:
+    build:
+      context: ../../..
+      dockerfile: curlx_pkg/tests/e2e/Dockerfile
+    ports:
+      - "18080:8000"
+    environment:
+      - CURLLM_HEADLESS=true
+      - CURLLM_API_PORT=8000
+      - CURLLM_WORKSPACE=/app/workspace
+    networks:
+      - e2e
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  remote-proxy:
+    image: python:3.11-slim
+    command: ["sh", "-lc", "pip install --no-cache-dir proxy.py && (python -m proxy --hostname 0.0.0.0 --port 3128 & python -m proxy --hostname 0.0.0.0 --port 3129 & wait)"]
+    networks:
+      - e2e

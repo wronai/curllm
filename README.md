@@ -992,6 +992,83 @@ Zmienne środowiskowe:
 - SSH_BIN — polecenie SSH (domyślnie: ssh)
 - PY_BIN_REMOTE — Python na hoście zdalnym (domyślnie: python3)
 
+### Proxy health-check i pruning
+
+Sprawdź działanie proxy i usuń niedziałające wpisy z rejestru:
+
+```bash
+# Sprawdzenie (bez usuwania)
+curl -s -X POST "$CURLLM_API_HOST/api/proxy/health" -H 'Content-Type: application/json' \
+  -d '{"url":"http://example.com","timeout":4,"limit":20,"prune":false}' | jq .
+
+# Auto-pruning (usuwanie martwych)
+curl -s -X POST "$CURLLM_API_HOST/api/proxy/health" -H 'Content-Type: application/json' \
+  -d '{"url":"http://example.com","timeout":4,"prune":true}' | jq .
+```
+
+### WordPress + Sesje (PL)
+
+Utrwalaj logowanie do WordPress przy pomocy `session_id` i twórz posty:
+
+```bash
+curl -s -X POST "$CURLLM_API_HOST/api/execute" -H 'Content-Type: application/json' -d '{
+  "wordpress_config": {
+    "url": "https://example.wordpress.com",
+    "username": "admin",
+    "password": "secret123",
+    "action": "create_post",
+    "title": "Nowy artykuł",
+    "content": "# Tytuł\n\nTreść...",
+    "status": "publish"
+  },
+  "session_id": "wp-s1"
+}'
+```
+
+Kolejne posty w tej samej sesji (bez ponownego logowania):
+
+```bash
+curllm --session wp-s1 -d '{"wordpress_config":{"url":"https://example.wordpress.com","action":"create_post","title":"Kolejny","content":"Treść","status":"draft"}}'
+```
+
+### WordPress + Sessions (EN)
+
+Persist WordPress login with `session_id` and create posts:
+
+```bash
+curl -s -X POST "$CURLLM_API_HOST/api/execute" -H 'Content-Type: application/json' -d '{
+  "wordpress_config": {
+    "url": "https://example.wordpress.com",
+    "username": "admin",
+    "password": "secret123",
+    "action": "create_post",
+    "title": "New Post",
+    "content": "# Title\n\nContent...",
+    "status": "publish"
+  },
+  "session_id": "wp-s1"
+}'
+```
+
+Next posts in the same session:
+
+```bash
+curllm --session wp-s1 -d '{"wordpress_config":{"url":"https://example.wordpress.com","action":"create_post","title":"Next","content":"Text","status":"draft"}}'
+```
+
+### Publikacja curlx (PyPI)
+
+W katalogu `curlx_pkg/` znajdują się cele Makefile i workflow CI do wydania curlx:
+
+```bash
+cd curlx_pkg
+make release           # build sdist/wheel do dist/
+make publish-test      # publikacja do TestPyPI (wymaga TWINE_PASSWORD token)
+make publish           # publikacja do PyPI
+```
+
+Repo zawiera także workflow `.github/workflows/publish-curlx.yml` uruchamiany tagiem `curlx-v*`.
+
 ## 🗺️ Roadmap
 
 - [ ] CLI `--proxy` flag with rotation presets (public/list/file)

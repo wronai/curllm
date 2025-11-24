@@ -480,7 +480,9 @@ json_select_rows() {
       def pick:
         . as $root
         | ($root.result? // $root) as $b
-        | ($b.products? // $b.articles? // $b.items? // $b.links? // $b.data? // $b.emails? // $b.phones? // first_array($b)) // first_array($root);
+        | ((($b.page? | .links?) // null)
+           // $b.products? // $b.articles? // $b.items? // $b.links? // $b.data? // $b.emails? // $b.phones? // first_array($b))
+          // (($root.page? | .links?) // first_array($root)));
       def to_objects($arr):
         if ($arr|type=="array" and ($arr|length>0) and (($arr[0]|type)!="object"))
         then [ $arr[] | {value:.} ] else $arr end;

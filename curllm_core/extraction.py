@@ -11,6 +11,7 @@ async def generic_fastpath(instruction: str, page, run_logger=None) -> Optional[
     specific_keywords = [
         "link","email","mail","phone","tel","telefon",
         "product","produkt","form","screenshot","captcha","bql",
+        "title","titles","article","articles","articl","artcile","artyku","wpis","blog","news","headline","headlines",
     ]
     if not (generic_triggers and not any(k in lower_instr for k in specific_keywords)):
         return None
@@ -48,14 +49,51 @@ async def direct_fastpath(instruction: str, page, run_logger=None) -> Optional[D
         ("only" in lower_instr)
         and ("email" in lower_instr or "mail" in lower_instr or "phone" in lower_instr or "tel" in lower_instr or "telefon" in lower_instr)
     ):
-        anchors = await page.evaluate(
-            """
-                () => Array.from(document.querySelectorAll('a')).map(a => ({
-                    text: (a.innerText||'').trim(),
-                    href: a.href
-                }))
-            """
-        )
+        # If instruction specifies CSS selectors (e.g., a.titlelink, a.storylink), honor them
+        sels = []
+        for sel in ["a.titlelink", "a.storylink"]:
+            if sel in (instruction or ""):
+                sels.append(sel)
+        if sels:
+            lim = 30
+            try:
+                m = re.search(r"first\s*(\d+)|pierwsze\s*(\d+)", lower_instr)
+                if m:
+                    for g in m.groups():
+                        if g:
+                            lim = max(1, min(200, int(g)))
+                            break
+            except Exception:
+                pass
+            anchors = await page.evaluate(
+                r"""
+                    (sels, limit) => {
+                        const out = [];
+                        const seen = new Set();
+                        const push = (a) => {
+                            if (!a) return;
+                            const text = (a.innerText||'').trim();
+                            const href = a.href;
+                            if (!text || !href) return;
+                            if (seen.has(href)) return; seen.add(href);
+                            out.push({text, href});
+                        };
+                        try { (sels||[]).forEach(s => document.querySelectorAll(s).forEach(push)); } catch(e){}
+                        return out.slice(0, (limit||30));
+                    }
+                """,
+                sels,
+                lim,
+            )
+        else:
+            anchors = await page.evaluate(
+                """
+                    () => Array.from(document.querySelectorAll('a')).map(a => ({
+                        text: (a.innerText||'').trim(),
+                        href: a.href
+                    }))
+                """
+            )
         direct["links"] = anchors[:100]
     if "email" in lower_instr or "mail" in lower_instr:
         text = await page.evaluate("() => document.body.innerText")
@@ -104,6 +142,72 @@ async def direct_fastpath(instruction: str, page, run_logger=None) -> Optional[D
         run_logger.log_text("Direct extraction fast-path used:")
         run_logger.log_code("json", json.dumps(direct, indent=2))
     return direct
+
+async def extract_links_by_selectors(instruction: str, page, run_logger=None) -> Optional[Dict[str, Any]]:
+    """Deterministically extract links using CSS selectors mentioned in instruction.
+    Returns a JSON object shaped as {"page": {"title": str, "links": [{"text": str, "url": str}]}}.
+    Only runs when instruction mentions specific selectors, e.g., 'a.titlelink' or 'a.storylink'.
+    """
+    instr = instruction or ""
+    selectors = []
+    for sel in ["a.titlelink", "a.storylink"]:
+        if sel in instr:
+            selectors.append(sel)
+    if not selectors:
+        return None
+    m = re.search(r"first\s*(\d+)|pierwsze\s*(\d+)", instr.lower())
+    limit = 30
+    if m:
+        for g in m.groups():
+            if g:
+                try:
+                    limit = max(1, min(200, int(g)))
+                except Exception:
+                    pass
+                break
+    ctx = await _page_context_min(page)
+    items = await page.evaluate(
+        r"""
+        (sels, limit) => {
+          const out = [];
+          const seen = new Set();
+          const push = (a) => {
+            if (!a) return;
+            const text = (a.innerText||'').trim();
+            const url = a.href;
+            if (!text || !url) return;
+            if (seen.has(url)) return; seen.add(url);
+            out.push({text, url});
+          };
+          try {
+            (sels||[]).forEach(s => {
+              document.querySelectorAll(s).forEach(push);
+            });
+          } catch (e) {}
+          // Fallback for Hacker News current/legacy structure
+          if (out.length === 0) {
+            try {
+              ['span.titleline a','a.titlelink','a.storylink'].forEach(s => {
+                document.querySelectorAll(s).forEach(push);
+              });
+            } catch (e) {}
+          }
+          return out.slice(0, limit||30);
+        }
+        """,
+        selectors,
+        limit,
+    )
+    if isinstance(items, list) and items:
+        data = {"page": {"title": ctx.get("title"), "links": items}}
+        if run_logger:
+            try:
+                run_logger.log_text(f"Selector-based links extracted: {len(items)} using {selectors}")
+                run_logger.log_code("json", json.dumps(data, ensure_ascii=False, indent=2)[:2000])
+            except Exception:
+                pass
+        return data
+    return None
 
 async def product_heuristics(instruction: str, page, run_logger=None) -> Optional[Dict[str, Any]]:
     lower_instr = (instruction or "").lower()
@@ -222,9 +326,10 @@ async def validate_with_llm(llm, instruction: str, data: Any, run_logger=None) -
             "You are a strict validator of extracted web data. "
             "Given the user's instruction and the extracted JSON data, return a corrected JSON that strictly follows the instruction. "
             "If the instruction requests product listings under a price threshold (e.g., under 150zł), include only items that are real products with a numeric price <= the threshold. "
-            "Exclude legal/policy documents, categories, banners, and placeholders like 'Regulamin', 'Polityka', 'Cookie', 'FAQ'. "
-            "Preserve fields: name (string), price (number), url (absolute URL). "
-            "Prefer a top-level object with key 'products' when the instruction concerns products; otherwise sanitize existing keys. "
+            "If the instruction requests article or page titles (optionally with links), include only real post/news/article entries and exclude navigation items (e.g., new, past, comments, login, hide), metadata (points, hours ago, comments counters), and category/breadcrumb links. "
+            "For products, preserve fields: name (string), price (number), url (absolute URL). "
+            "For titles/articles, prefer a top-level object 'articles': [{title: string, url?: string}] or, if the extracted shape is page.links, keep only entries that look like news/article items and ensure fields are text/url. If the instruction requests 'only titles', omit url fields and return just titles. "
+            "Prefer a top-level object with key 'products' when the instruction concerns products; otherwise sanitize existing keys with minimal change. "
             "Output ONLY valid JSON, no comments, no extra text.\n\n"
             f"Instruction:\n{instruction}\n\n"
             f"Extracted JSON:\n{json.dumps(data, ensure_ascii=False)}\n\n"
@@ -319,7 +424,9 @@ async def extract_articles_eval(page) -> Optional[list[Dict[str, Any]]]:
           const selAnchors = [
             'article h1 a','article h2 a','article h3 a',
             'main h1 a','main h2 a','main h3 a',
-            'section h1 a','section h2 a','section h3 a'
+            'section h1 a','section h2 a','section h3 a',
+            // Link aggregator (Hacker News current/legacy)
+            'span.titleline a','a.titlelink','a.storylink'
           ];
           selAnchors.forEach(s => {
             document.querySelectorAll(s).forEach(a => push(a.innerText, a.href));

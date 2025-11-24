@@ -50,6 +50,16 @@ def _dict_to_playwright_proxy(d: Dict[str, Any]) -> Dict[str, str]:
     return out
 
 
+def _norm_proxy_line(line: str) -> Optional[str]:
+    s = (line or "").strip()
+    if not s or s.startswith("#"):
+        return None
+    if not (s.startswith("http://") or s.startswith("https://")):
+        if "://" not in s:
+            s = "http://" + s
+    return s
+
+
 def _load_public_list() -> List[str]:
     # Priority: env var -> file in workspace -> none
     env = os.getenv("CURLLM_PUBLIC_PROXY_LIST", "").strip()
@@ -60,23 +70,56 @@ def _load_public_list() -> List[str]:
             try:
                 p = Path(env.replace("file://", ""))
                 if p.exists():
-                    items = [l.strip() for l in p.read_text(encoding="utf-8").splitlines() if l.strip()]
+                    items = [x for x in (_norm_proxy_line(l) for l in p.read_text(encoding="utf-8").splitlines()) if x]
             except Exception:
                 items = []
         elif env.startswith("http://") or env.startswith("https://"):
             try:
                 with urlopen(env, timeout=10) as resp:
                     txt = resp.read().decode("utf-8", errors="ignore")
-                    items = [l.strip() for l in txt.splitlines() if l.strip()]
+                    items = [x for x in (_norm_proxy_line(l) for l in txt.splitlines()) if x]
             except Exception:
                 items = []
         else:
-            items = [x.strip() for x in env.split(",") if x.strip()]
+            items = [x for x in (_norm_proxy_line(t) for t in env.split(",")) if x]
     if not items and PUBLIC_FILE.exists():
         try:
-            items = [l.strip() for l in PUBLIC_FILE.read_text(encoding="utf-8").splitlines() if l.strip()]
+            items = [x for x in (_norm_proxy_line(l) for l in PUBLIC_FILE.read_text(encoding="utf-8").splitlines()) if x]
         except Exception:
             items = []
+    # Built-in default sources (best-effort) if still empty
+    if not items:
+        default_sources = [
+            # Public proxy text lists (HTTP). These may change; best-effort only.
+            "https://raw.githubusercontent.com/clarketm/proxy-list/master/proxy-list-raw.txt",
+            "https://www.proxy-list.download/api/v1/get?type=http",
+            "https://www.proxyscan.io/download?type=http",
+        ]
+        for src in default_sources:
+            try:
+                with urlopen(src, timeout=8) as resp:
+                    txt = resp.read().decode("utf-8", errors="ignore")
+                    cand = [x for x in (_norm_proxy_line(l) for l in txt.splitlines()) if x]
+                    if cand:
+                        items.extend(cand)
+                        break
+            except Exception:
+                continue
+    # Fallback: if still empty, try using registry list as a public source
+    if not items:
+        try:
+            if REGISTRY_JSON.exists():
+                obj = json.loads(REGISTRY_JSON.read_text(encoding="utf-8"))
+                arr = obj.get("proxies") if isinstance(obj, dict) else None
+                if isinstance(arr, list):
+                    items = [x for x in (_norm_proxy_line(str(v)) for v in arr) if x]
+        except Exception:
+            items = items or []
+        if not items and REGISTRY_TXT.exists():
+            try:
+                items = [x for x in (_norm_proxy_line(l) for l in REGISTRY_TXT.read_text(encoding="utf-8").splitlines()) if x]
+            except Exception:
+                items = []
     return items
 
 

@@ -22,6 +22,25 @@ This document contains curated, end-to-end examples for common automation tasks 
 
 ---
 
+## LLM: Hacker News links
+
+Command:
+
+```bash
+curllm "https://news.ycombinator.com" -d "Extract the page title and the first 30 news links. Use anchors matching CSS selectors 'a.titlelink' or 'a.storylink'. Return JSON shaped exactly as: {\"page\": {\"title\": string, \"links\": [{\"text\": string, \"url\": string}] } }" -v
+```
+
+Script:
+
+- `examples/curllm-llm-hn-links.sh`
+
+Notes:
+
+- You can add `--html -o hn.html` to export links to an HTML table.
+- For consistency with BQL example, the shape is `{page: {title, links: [{text, url}]}}`.
+
+---
+
 ## Extract links from a page
 
 Command:

@@ -136,6 +136,85 @@ def proxy_list():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
+@app.route('/api/proxy/health', methods=['POST'])
+def proxy_health():
+    """Check proxy health and optionally prune dead entries from registry.
+    Body JSON:
+      - url: test URL (default: http://example.com)
+      - timeout: seconds (default: 4)
+      - limit: max proxies to test (0 or missing = all)
+      - prune: bool (default: false) -> if true, remove dead from registry
+    """
+    try:
+        data = request.get_json() or {}
+        test_url = data.get('url') or 'http://example.com'
+        timeout = float(data.get('timeout') or 4)
+        limit = int(data.get('limit') or 0)
+        prune = bool(data.get('prune') or False)
+
+        # Load registry proxies
+        reg: List[str] = []
+        try:
+            if REGISTRY_JSON.exists():
+                obj = json.loads(REGISTRY_JSON.read_text(encoding='utf-8'))
+                arr = obj.get('proxies') if isinstance(obj, dict) else None
+                if isinstance(arr, list):
+                    reg.extend([str(x).strip() for x in arr if str(x).strip()])
+        except Exception:
+            pass
+        try:
+            if REGISTRY_TXT.exists():
+                reg.extend([l.strip() for l in REGISTRY_TXT.read_text(encoding='utf-8').splitlines() if l.strip()])
+        except Exception:
+            pass
+        # unique
+        reg = list(dict.fromkeys(reg))
+
+        to_test = reg[:limit] if (limit and limit > 0) else reg
+        import requests
+        alive: List[str] = []
+        statuses = []
+        for px in to_test:
+            ok = False
+            err = None
+            try:
+                proxies = {"http": px, "https": px}
+                r = requests.get(test_url, proxies=proxies, timeout=timeout, allow_redirects=True)
+                ok = (200 <= r.status_code < 400)
+            except Exception as e:
+                err = str(e)
+            statuses.append({"proxy": px, "ok": ok, "error": err})
+            if ok:
+                alive.append(px)
+
+        pruned = 0
+        if prune:
+            # Keep original order but filter to alive
+            if alive:
+                try:
+                    REGISTRY_JSON.parent.mkdir(parents=True, exist_ok=True)
+                except Exception:
+                    pass
+                try:
+                    REGISTRY_JSON.write_text(json.dumps({"proxies": alive}, indent=2), encoding='utf-8')
+                except Exception:
+                    pass
+                try:
+                    REGISTRY_TXT.write_text("\n".join(alive) + "\n", encoding='utf-8')
+                except Exception:
+                    pass
+            pruned = len(reg) - len(alive)
+
+        return jsonify({
+            "tested": len(to_test),
+            "alive": len(alive),
+            "dead": len(to_test) - len(alive),
+            "pruned": pruned,
+            "statuses": statuses,
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
 @app.route('/api/models', methods=['GET'])
 def list_models():
     try:

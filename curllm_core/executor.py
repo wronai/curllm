@@ -39,7 +39,7 @@ from .actions import execute_action
 from .human_verify import handle_human_verification, looks_like_human_verify_text
 from .captcha_widget import handle_captcha_image as _handle_captcha_image_widget, handle_widget_captcha as _handle_widget_captcha
 from .page_utils import auto_scroll as _auto_scroll, accept_cookies as _accept_cookies, is_block_page as _is_block_page
-from .extraction import generic_fastpath, direct_fastpath, product_heuristics, fallback_extract, extract_articles_eval, validate_with_llm
+from .extraction import generic_fastpath, direct_fastpath, product_heuristics, fallback_extract, extract_articles_eval, validate_with_llm, extract_links_by_selectors
 from .captcha_slider import attempt_slider_challenge
 from .slider_plugin import try_external_slider_solver
 from .bql import BQLExecutor
@@ -53,6 +53,31 @@ class CurllmExecutor:
         self.vision_analyzer = VisionAnalyzer()
         self.captcha_solver = CaptchaSolver()
         self.stealth_config = StealthConfig()
+
+def _should_validate(instruction: Optional[str], data: Optional[Any]) -> bool:
+    try:
+        low = (instruction or "").lower()
+        # product-related
+        if any(k in low for k in ["product", "produkt", "price", "zł", "pln"]):
+            return True
+        # article/title-related
+        if any(k in low for k in ["title", "titles", "article", "artyku", "wpis", "blog", "news", "headline", "articl"]):
+            return True
+        if isinstance(data, dict):
+            if "products" in data:
+                return True
+            if "articles" in data:
+                return True
+            try:
+                pg = data.get("page")
+                if isinstance(pg, dict) and isinstance(pg.get("links"), list):
+                    # Looks like page.links extraction
+                    return True
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return False
 
     def _setup_llm(self) -> Any:
         backend = os.getenv("CURLLM_LLM_BACKEND", "simple").lower()
@@ -177,7 +202,7 @@ class CurllmExecutor:
 
                     # Validation pass (LLM) if enabled
                     try:
-                        if config.validation_enabled and result_data is not None:
+                        if config.validation_enabled and result_data is not None and _should_validate(instruction, result_data):
                             v = await validate_with_llm(self.llm, instruction, result_data, run_logger)
                             if v is not None:
                                 result_data = v
@@ -312,7 +337,7 @@ class CurllmExecutor:
             # Validation pass (LLM) before finalizing
             try:
                 final_data = result.get("data")
-                if config.validation_enabled and final_data is not None:
+                if config.validation_enabled and final_data is not None and _should_validate(instruction, final_data):
                     v = await validate_with_llm(self.llm, instruction, final_data, run_logger)
                     if v is not None:
                         result["data"] = v
@@ -446,6 +471,33 @@ class CurllmExecutor:
         if early is not None:
             await page.close()
             return early
+        # Early deep article-title extraction when the instruction asks for titles/articles/blog/news
+        try:
+            if any(k in lower_instr for k in ["title", "titles", "article", "artyku", "wpis", "blog", "news", "headline", "articl"]):
+                det_items = await extract_articles_eval(page)
+                if det_items:
+                    data_det = {"articles": det_items}
+                    try:
+                        if config.validation_enabled and _should_validate(instruction, data_det):
+                            v = await validate_with_llm(self.llm, instruction, data_det, run_logger)
+                            if v is not None:
+                                data_det = v
+                    except Exception:
+                        pass
+                    result["data"] = data_det
+                    await page.close()
+                    return result
+        except Exception:
+            pass
+        # Honor explicit CSS selectors in instruction (e.g., a.titlelink, a.storylink)
+        try:
+            sel_data = await extract_links_by_selectors(instruction, page, run_logger)
+            if sel_data is not None:
+                result["data"] = sel_data
+                await page.close()
+                return result
+        except Exception:
+            pass
         if bool(runtime.get("fastpath")):
             try:
                 res_generic = await generic_fastpath(instruction, page, run_logger)
@@ -472,7 +524,7 @@ class CurllmExecutor:
                 data_ms = ms
                 # Validation pass (LLM) if enabled
                 try:
-                    if config.validation_enabled and data_ms is not None:
+                    if config.validation_enabled and data_ms is not None and _should_validate(instruction, data_ms):
                         v = await validate_with_llm(self.llm, instruction, data_ms, run_logger)
                         if v is not None:
                             data_ms = v
@@ -656,7 +708,7 @@ class CurllmExecutor:
                     if det_items:
                         data_det = {"articles": det_items}
                         try:
-                            if config.validation_enabled:
+                            if config.validation_enabled and _should_validate(instruction, data_det):
                                 v = await validate_with_llm(self.llm, instruction, data_det, run_logger)
                                 if v is not None:
                                     data_det = v
