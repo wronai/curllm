@@ -3,12 +3,16 @@ import json
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
+from urllib.parse import urlparse
+from urllib.request import urlopen
 
 ProxyConfig = Union[str, Dict[str, Any], None]
 
 STATE_DIR = Path(os.getenv("CURLLM_WORKSPACE", "./workspace")) / "proxy"
 STATE_FILE = STATE_DIR / "rotation_state.json"
 PUBLIC_FILE = STATE_DIR / "public_proxies.txt"
+REGISTRY_JSON = STATE_DIR / "registry.json"
+REGISTRY_TXT = STATE_DIR / "registry.txt"
 
 
 class ProxyStateManager:
@@ -59,6 +63,13 @@ def _load_public_list() -> List[str]:
                     items = [l.strip() for l in p.read_text(encoding="utf-8").splitlines() if l.strip()]
             except Exception:
                 items = []
+        elif env.startswith("http://") or env.startswith("https://"):
+            try:
+                with urlopen(env, timeout=10) as resp:
+                    txt = resp.read().decode("utf-8", errors="ignore")
+                    items = [l.strip() for l in txt.splitlines() if l.strip()]
+            except Exception:
+                items = []
         else:
             items = [x.strip() for x in env.split(",") if x.strip()]
     if not items and PUBLIC_FILE.exists():
@@ -104,6 +115,28 @@ def resolve_proxy(proxy_config: ProxyConfig, rotation_key: Optional[str] = None)
                 key = proxy_config.get("key") or rotation_key or "global"
                 mgr = ProxyStateManager()
                 idx = mgr.next_index(f"public::{key}", len(lst))
+                return {"server": lst[idx]}
+            # Registry rotation (shared list stored by API)
+            if isinstance(proxy_config.get("rotate"), str) and proxy_config.get("rotate") in ("registry", "reg"):
+                lst: List[str] = []
+                try:
+                    if REGISTRY_JSON.exists():
+                        obj = json.loads(REGISTRY_JSON.read_text(encoding="utf-8"))
+                        arr = obj.get("proxies") if isinstance(obj, dict) else None
+                        if isinstance(arr, list):
+                            lst = [str(x).strip() for x in arr if str(x).strip()]
+                except Exception:
+                    lst = []
+                if not lst and REGISTRY_TXT.exists():
+                    try:
+                        lst = [l.strip() for l in REGISTRY_TXT.read_text(encoding="utf-8").splitlines() if l.strip()]
+                    except Exception:
+                        lst = []
+                if not lst:
+                    return None
+                key = proxy_config.get("key") or rotation_key or "global"
+                mgr = ProxyStateManager()
+                idx = mgr.next_index(f"registry::{key}", len(lst))
                 return {"server": lst[idx]}
             # Provided list rotation
             raw_list = proxy_config.get("list") or []

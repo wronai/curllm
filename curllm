@@ -58,6 +58,8 @@ VISUAL_MODE=false
 STEALTH_MODE=false
 CAPTCHA_SOLVER=false
 USE_BQL=false
+PROXY_ARG=""
+SESSION_ID=""
 
 # Help function
 show_help() {
@@ -79,6 +81,11 @@ AUTOMATION OPTIONS:
     --captcha              Enable CAPTCHA solving
     --bql                  Use BQL (Browser Query Language) mode
     --model MODEL          LLM model to use (default: qwen2.5:7b)
+    --proxy VALUE         Proxy config:
+                          - rotate:public | rotate:registry
+                          - file:/path/to/list.txt | /path/to/list.txt
+                          - http://user:pass@host:port[,http://host2:port]
+    --session ID          Persist cookies under this session id
     --html                 Export response data (auto-detected table) to HTML file
     --xml                  Export response data (auto-detected table) to XML file
     --csv                  Export response data (auto-detected table) to CSV file
@@ -549,6 +556,10 @@ while [[ $# -gt 0 ]]; do
             USE_BQL=true; shift;;
         --model)
             CURLLM_MODEL="$2"; shift 2;;
+        --proxy)
+            PROXY_ARG="$2"; shift 2;;
+        --session)
+            SESSION_ID="$2"; shift 2;;
         --start-services)
             start_services; exit 0;;
         --stop-services)
@@ -596,6 +607,31 @@ main() {
     else
         HEADERS_JSON=$(printf '%s\n' "${HEADERS[@]}" | jq -R . | jq -s .)
     fi
+    # Build proxy JSON
+    PROXY_JSON="null"
+    if [ -n "$PROXY_ARG" ]; then
+        if [[ "$PROXY_ARG" == rotate:public ]]; then
+            PROXY_JSON='{"rotate":"public"}'
+        elif [[ "$PROXY_ARG" == rotate:registry ]]; then
+            PROXY_JSON='{"rotate":"registry"}'
+        elif [[ "$PROXY_ARG" == file:* ]]; then
+            PTH="${PROXY_ARG#file:}"
+            ESC_PTH=$(printf '%s' "$PTH" | jq -Rs '.')
+            PROXY_JSON=$(printf '{"rotate":true,"file":%s}' "$ESC_PTH")
+        elif [ -f "$PROXY_ARG" ]; then
+            ABS=$(readlink -f "$PROXY_ARG")
+            ESC_ABS=$(printf '%s' "$ABS" | jq -Rs '.')
+            PROXY_JSON=$(printf '{"rotate":true,"file":%s}' "$ESC_ABS")
+        elif [[ "$PROXY_ARG" == *","* ]]; then
+            # Comma-separated list -> JSON array
+            LIST_JSON=$(printf '%s' "$PROXY_ARG" | awk -F, '{for(i=1;i<=NF;i++){print $i}}' | jq -Rs 'split("\n") | map(select(length>0))')
+            PROXY_JSON=$(printf '{"rotate":true,"list":%s}' "$LIST_JSON")
+        else
+            # Single proxy string -> JSON string
+            PROXY_JSON=$(printf '%s' "$PROXY_ARG" | jq -Rs '.')
+        fi
+    fi
+
     PAYLOAD=$(cat <<EOF
 {
     "method": "$METHOD",
@@ -606,7 +642,9 @@ main() {
     "captcha_solver": $CAPTCHA_SOLVER,
     "use_bql": $USE_BQL,
     "model": "$CURLLM_MODEL",
-    "headers": $HEADERS_JSON
+    "headers": $HEADERS_JSON,
+    "proxy": $PROXY_JSON,
+    "session_id": $(printf '%s' "$SESSION_ID" | jq -Rs '.')
 }
 EOF
     )

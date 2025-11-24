@@ -1,0 +1,100 @@
+#!/bin/bash
+# curlx - Lightweight proxy manager for curllm
+# - Spawn simple HTTP proxies on remote host via SSH using proxy.py
+# - Register proxies in curllm registry (/api/proxy/register)
+# - List registered proxies
+
+set -euo pipefail
+
+API_HOST="${CURLLM_API_HOST:-http://localhost:8000}"
+SSH_BIN="${SSH_BIN:-ssh}"
+PY_BIN_REMOTE="${PY_BIN_REMOTE:-python3}"
+
+usage() {
+  cat <<EOF
+curlx - Proxy helper for curllm
+
+Usage:
+  curlx register --host <IP|HOST> --ports <CSV> [--server <API_HOST>]
+  curlx list [--server <API_HOST>]
+  curlx spawn --host <USER@HOST> --ports <CSV> [--python <py>] [--ssh <ssh>] [--server <API_HOST>]
+
+Examples:
+  # Register existing proxies with curllm registry
+  curlx register --host 203.0.113.10 --ports 3128,3129 --server http://localhost:8000
+
+  # Spawn proxies remotely via SSH (requires passwordless or key auth)
+  curlx spawn --host ubuntu@203.0.113.10 --ports 3128,3129 --server http://localhost:8000
+
+  # List all registered proxies
+  curlx list --server http://localhost:8000
+
+Environment:
+  CURLLM_API_HOST   Default API host if --server is not passed (default: http://localhost:8000)
+  SSH_BIN           SSH command (default: ssh)
+  PY_BIN_REMOTE     Python interpreter on remote (default: python3)
+EOF
+}
+
+cmd=${1:-}
+shift || true
+case "$cmd" in
+  register)
+    HOST=""; PORTS=""; SERVER="$API_HOST"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --host) HOST="$2"; shift 2;;
+        --ports) PORTS="$2"; shift 2;;
+        --server) SERVER="$2"; shift 2;;
+        -h|--help) usage; exit 0;;
+        *) echo "Unknown arg: $1"; usage; exit 1;;
+      esac
+    done
+    if [ -z "$HOST" ] || [ -z "$PORTS" ]; then echo "--host and --ports required"; exit 1; fi
+    # Build proxies array
+    PROXIES_JSON=$(printf '%s' "$PORTS" | awk -F, -v h="$HOST" '{for(i=1;i<=NF;i++){gsub(/^\s+|\s+$/,"",$i); if($i!="") print "http://" h ":" $i}}' | jq -Rs 'split("\n") | map(select(length>0)) | {proxies: .}')
+    curl -s -X POST "$SERVER/api/proxy/register" -H 'Content-Type: application/json' -d "$PROXIES_JSON"
+    ;;
+  list)
+    SERVER="$API_HOST"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --server) SERVER="$2"; shift 2;;
+        -h|--help) usage; exit 0;;
+        *) echo "Unknown arg: $1"; usage; exit 1;;
+      esac
+    done
+    curl -s "$SERVER/api/proxy/list"
+    ;;
+  spawn)
+    RHOST=""; PORTS=""; SERVER="$API_HOST"; PY="$PY_BIN_REMOTE"; SSHC="$SSH_BIN"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --host) RHOST="$2"; shift 2;;
+        --ports) PORTS="$2"; shift 2;;
+        --python) PY="$2"; shift 2;;
+        --ssh) SSHC="$2"; shift 2;;
+        --server) SERVER="$2"; shift 2;;
+        -h|--help) usage; exit 0;;
+        *) echo "Unknown arg: $1"; usage; exit 1;;
+      esac
+    done
+    if [ -z "$RHOST" ] || [ -z "$PORTS" ]; then echo "--host and --ports required"; exit 1; fi
+    echo "[*] Installing proxy.py and spawning proxies on $RHOST: $PORTS" 1>&2
+    # Install proxy.py if missing
+    $SSHC "$RHOST" "$PY -m pip install --user -q proxy.py || true"
+    # Start each proxy in background and ensure listening
+    IFS=',' read -r -a arr <<< "$PORTS"
+    for p in "${arr[@]}"; do
+      port=$(echo "$p" | tr -d ' ')
+      [ -z "$port" ] && continue
+      echo "[*] Starting proxy on port $port" 1>&2
+      $SSHC "$RHOST" "nohup $PY -m proxy --hostname 0.0.0.0 --port $port >/tmp/proxy_${port}.log 2>&1 & echo \$! > /tmp/proxy_${port}.pid"
+    done
+    echo "[*] Registering proxies in curllm registry" 1>&2
+    HOST_ONLY=$(printf '%s' "$RHOST" | awk -F@ '{print $NF}')
+    PROXIES_JSON=$(printf '%s' "$PORTS" | awk -F, -v h="$HOST_ONLY" '{for(i=1;i<=NF;i++){gsub(/^\s+|\s+$/,"",$i); if($i!="") print "http://" h ":" $i}}' | jq -Rs 'split("\n") | map(select(length>0)) | {proxies: .}')
+    curl -s -X POST "$SERVER/api/proxy/register" -H 'Content-Type: application/json' -d "$PROXIES_JSON"
+    ;;
+  -h|--help|*) usage; exit 0;;
+esac

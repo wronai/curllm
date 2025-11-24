@@ -793,6 +793,69 @@ Bypasses common bot detection:
 curllm --stealth "https://pypi.org/project/curllm/" -d "Extract data"
 ```
 
+### Proxy rotation and sessions
+
+- curllm can use proxies per request and rotate them automatically.
+- You can pass proxy config via the API `proxy` field, and persist logins via `session_id` (cookies saved under ./workspace/sessions/<session_id>.json).
+
+Examples (API):
+
+```bash
+# 1) Rotate through a provided list (round-robin per host)
+curl -s -X POST "$CURLLM_API_HOST/api/execute" -H 'Content-Type: application/json' -d '{
+  "url": "https://example.com",
+  "data": "extract all links",
+  "proxy": {"rotate": true, "list": ["http://p1:8080","http://p2:8080","http://p3:8080"]},
+  "session_id": "mysession"
+}'
+
+# 2) Rotate using a file of proxies (one per line)
+curl -s -X POST "$CURLLM_API_HOST/api/execute" -H 'Content-Type: application/json' -d '{
+  "url": "https://example.com",
+  "data": "extract all links",
+  "proxy": {"rotate": true, "file": "./workspace/proxy/public_proxies.txt"}
+}'
+
+# 3) Use public proxy list via URL or env (CURLLM_PUBLIC_PROXY_LIST)
+export CURLLM_PUBLIC_PROXY_LIST="https://myhost/proxies.txt"  # or file:///abs/path/list.txt or comma list
+curl -s -X POST "$CURLLM_API_HOST/api/execute" -H 'Content-Type: application/json' -d '{
+  "url": "https://example.com",
+  "data": "extract all links",
+  "proxy": {"rotate": "public"}
+}'
+
+# 4) Single static proxy (string or dict)
+curl -s -X POST "$CURLLM_API_HOST/api/execute" -H 'Content-Type: application/json' -d '{
+  "url": "https://example.com",
+  "data": "extract all links",
+  "proxy": "http://user:pass@proxy.example.com:8080"
+}'
+```
+
+Notes:
+
+- Rotation is stored per-target host (round-robin). State is saved in `./workspace/proxy/rotation_state.json`.
+- With `session_id`, cookies persist across requests. Use the same `session_id` to keep you logged in.
+
+WordPress automation in one session (no proxy):
+
+```bash
+curl -s -X POST "$CURLLM_API_HOST/api/execute" -H 'Content-Type: application/json' -d '{
+  "wordpress_config": {
+    "url": "https://example.wordpress.com",
+    "username": "admin",
+    "password": "secret123",
+    "action": "create_post",
+    "title": "Nowy artykuł",
+    "content": "# Tytuł\n\nTreść...",
+    "status": "publish",
+    "categories": ["Technologia"],
+    "tags": ["AI","Automation"]
+  },
+  "session_id": "wp-mysession"
+}'
+```
+
 ### BQL (Browser Query Language)
 
 GraphQL-like syntax for structured extraction:
@@ -836,9 +899,14 @@ Content-Type: application/json
   "visual_mode": true,
   "stealth_mode": false,
   "captcha_solver": false,
-  "use_bql": false
+  "use_bql": false,
+  "proxy": "http://user:pass@proxy:8080" | {"server":"...","username":"...","password":"..."} | {"rotate":true, "list":["http://..."], "file":"path"} | {"rotate":"public"},
+  "session_id": "my-session-id",
+  "wordpress_config": {"url":"https://...","username":"...","password":"...","action":"create_post", "title":"...", "content":"...", "status":"draft|publish", "categories":["..."], "tags":["..."]}
 }
 ```
+
+CLI flag `--proxy` (planned): pass the same JSON (or shorthand like `rotate:public`). Until then, use the API `proxy` field as above or set `CURLLM_PUBLIC_PROXY_LIST`.
 
 ### Python Client
 
@@ -891,6 +959,8 @@ export SCREENSHOT_QUALITY=100
 
 ## 🗺️ Roadmap
 
+- [ ] CLI `--proxy` flag with rotation presets (public/list/file)
+- [ ] `curlx` companion: remote proxy provisioning + registry API for curllm
 - [ ] Multi-agent orchestration
 - [ ] Fine-tuning interface for domain-specific tasks  
 - [ ] WebSocket support for real-time automation

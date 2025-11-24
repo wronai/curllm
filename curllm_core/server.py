@@ -2,6 +2,10 @@
 import asyncio
 import logging
 from flask import Flask, request, jsonify
+import json
+from pathlib import Path
+from typing import List
+from .proxy import REGISTRY_JSON, REGISTRY_TXT
 from flask_cors import CORS
 
 from .config import config
@@ -66,8 +70,71 @@ def execute():
             except Exception:
                 pass
 
-    result = _run_in_new_loop()
-    return jsonify(result)
+    return _run_in_new_loop()
+
+
+@app.route('/api/proxy/register', methods=['POST'])
+def proxy_register():
+    try:
+        data = request.get_json() or {}
+        proxies: List[str] = []
+        if isinstance(data.get('proxies'), list):
+            proxies.extend([str(x).strip() for x in data['proxies'] if str(x).strip()])
+        if isinstance(data.get('proxy'), str):
+            p = data.get('proxy').strip()
+            if p:
+                proxies.append(p)
+        if not proxies:
+            return jsonify({"ok": False, "error": "No proxies provided"}), 400
+        # Load existing registry
+        REGISTRY_JSON.parent.mkdir(parents=True, exist_ok=True)
+        current: List[str] = []
+        try:
+            if REGISTRY_JSON.exists():
+                obj = json.loads(REGISTRY_JSON.read_text(encoding='utf-8'))
+                arr = obj.get('proxies') if isinstance(obj, dict) else None
+                if isinstance(arr, list):
+                    current = [str(x).strip() for x in arr if str(x).strip()]
+        except Exception:
+            current = []
+        merged = list(dict.fromkeys(current + proxies))
+        # Write JSON and TXT
+        try:
+            REGISTRY_JSON.write_text(json.dumps({"proxies": merged}, indent=2), encoding='utf-8')
+        except Exception:
+            pass
+        try:
+            REGISTRY_TXT.write_text("\n".join(merged) + "\n", encoding='utf-8')
+        except Exception:
+            pass
+        return jsonify({"ok": True, "count": len(merged)})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route('/api/proxy/list', methods=['GET'])
+def proxy_list():
+    try:
+        out: List[str] = []
+        try:
+            if REGISTRY_JSON.exists():
+                obj = json.loads(REGISTRY_JSON.read_text(encoding='utf-8'))
+                arr = obj.get('proxies') if isinstance(obj, dict) else None
+                if isinstance(arr, list):
+                    out.extend([str(x).strip() for x in arr if str(x).strip()])
+        except Exception:
+            pass
+        try:
+            if REGISTRY_TXT.exists():
+                out.extend([l.strip() for l in REGISTRY_TXT.read_text(encoding='utf-8').splitlines() if l.strip()])
+        except Exception:
+            pass
+        # unique
+        out = list(dict.fromkeys(out))
+        return jsonify({"proxies": out, "count": len(out)})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
 
 @app.route('/api/models', methods=['GET'])
 def list_models():
