@@ -141,6 +141,11 @@ def _should_validate(instruction: Optional[str], data: Optional[Any]) -> bool:
             if looks_extractive and not bool(runtime.get("include_dom_html")):
                 runtime["include_dom_html"] = True
                 run_logger.log_kv("Auto include_dom_html", "True")
+            # Remove simplified fastpaths for content-extraction tasks
+            if any(k in low for k in ["product", "produkt", "price", "zł", "pln", "title", "titles", "article", "articles", "news", "headline", "wpis", "artyku"]):
+                if runtime.get("fastpath"):
+                    run_logger.log_kv("runtime.fastpath_forced", "False")
+                runtime["fastpath"] = False
         except Exception:
             pass
 
@@ -525,7 +530,12 @@ def _should_validate(instruction: Optional[str], data: Optional[Any]) -> bool:
                 # Validation pass (LLM) if enabled
                 try:
                     if config.validation_enabled and data_ms is not None and _should_validate(instruction, data_ms):
-                        v = await validate_with_llm(self.llm, instruction, data_ms, run_logger)
+                        # Provide DOM HTML to avoid hallucinations
+                        try:
+                            dom_html = await page.content()
+                        except Exception:
+                            dom_html = None
+                        v = await validate_with_llm(self.llm, instruction, data_ms, run_logger, dom_html=dom_html)
                         if v is not None:
                             data_ms = v
                 except Exception:
@@ -709,7 +719,11 @@ def _should_validate(instruction: Optional[str], data: Optional[Any]) -> bool:
                         data_det = {"articles": det_items}
                         try:
                             if config.validation_enabled and _should_validate(instruction, data_det):
-                                v = await validate_with_llm(self.llm, instruction, data_det, run_logger)
+                                try:
+                                    dom_html = await page.content()
+                                except Exception:
+                                    dom_html = None
+                                v = await validate_with_llm(self.llm, instruction, data_det, run_logger, dom_html=dom_html)
                                 if v is not None:
                                     data_det = v
                         except Exception:

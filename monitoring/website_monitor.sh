@@ -9,7 +9,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-CSV_FILE="$REPO_DIR/monitoring/url.csv"
+CSV_FILE_DEFAULT="$REPO_DIR/monitoring/url.csv"
+CSV_FILE="${CSV_FILE:-$CSV_FILE_DEFAULT}"
 ENV_FILE="$REPO_DIR/monitoring/.env"
 PY_SEND="$REPO_DIR/monitoring/send_email.py"
 TAG="# curllm-website-monitor"
@@ -21,13 +22,28 @@ if [ ! -f "$ENV_FILE" ] && [ -f "$REPO_DIR/monitoring/.env.example" ]; then
   cp "$REPO_DIR/monitoring/.env.example" "$ENV_FILE"
 fi
 if [ -f "$ENV_FILE" ]; then
-  # shellcheck disable=SC1090
-  . "$ENV_FILE"
+  # Safe loader: do not source directly to avoid interpreting pipes/spaces
+  while IFS= read -r __line; do
+    # strip comments
+    case "$__line" in
+      ''|\#*) continue;;
+    esac
+    # keep everything after first '=' as value (can contain spaces/pipes)
+    __key="${__line%%=*}"
+    __val="${__line#*=}"
+    # trim whitespace around key
+    __key="${__key%%[[:space:]]*}"
+    __key="${__key##[[:space:]]}"
+    [ -z "$__key" ] && continue
+    # export as single argument to avoid word-splitting
+    declare -x "${__key}=${__val}"
+  done < "$ENV_FILE"
 fi
 
 MAIL_TO_DEFAULT="${MAIL_TO:-}"
 CURLLM_BIN="${CURLLM_BIN:-curllm}"
 JQ_BIN="${JQ_BIN:-jq}"
+CURLLM_ARGS="${CURLLM_ARGS:-}"
 
 # Keywords indicating issues in title/content
 ISSUE_PATTERNS=${ISSUE_PATTERNS:-"error|not found|forbidden|access denied|bad gateway|service unavailable|502|503|504|timeout|captcha|verification"}
@@ -53,8 +69,10 @@ run_check() {
     if [ -z "$url" ]; then continue; fi
     echo "["$(date -Is)"] Checking $url" | tee -a "$LOG_FILE"
     # Ask for screenshot, rely on fast-paths in curllm
+    # Build extra args array safely
+    IFS=' ' read -r -a _EXTRA <<< "$CURLLM_ARGS"
     set +e
-    out=$($CURLLM_BIN "$url" -d "screenshot" 2>/dev/null)
+    out=$($CURLLM_BIN "${_EXTRA[@]}" "$url" -d "screenshot" 2>/dev/null)
     rc=$?
     set -e
     if [ $rc -ne 0 ] || [ -z "$out" ]; then
@@ -83,11 +101,16 @@ run_check() {
     local subject="curllm monitor: issues detected ($ts)"
     local body
     body=$(printf '%s\n' "Detected issues:" "" "${body_lines[@]}")
-    # Send email
-    if command -v python3 >/dev/null 2>&1; then
-      python3 "$PY_SEND" --to "$mail_to" --subject "$subject" --body "$body" ${attachments[@]/#/--attach }
+    if [ -n "$mail_to" ]; then
+      # Send email
+      if command -v python3 >/dev/null 2>&1; then
+        python3 "$PY_SEND" --to "$mail_to" --subject "$subject" --body "$body" ${attachments[@]/#/--attach }
+      else
+        echo "Python not available to send email. Report:" >&2
+        printf '%s\n' "$subject" "$body" >&2
+      fi
     else
-      echo "Python not available to send email. Report:" >&2
+      echo "MAIL_TO not set; printing report instead:" >&2
       printf '%s\n' "$subject" "$body" >&2
     fi
   else
@@ -101,15 +124,17 @@ install_cron() {
     echo "MAIL_TO is required (set in $ENV_FILE or pass --mail)" >&2
     exit 2
   fi
+  local cron_expr
+  cron_expr="${CRON_EXPR:-0 */3 * * *}"
   local cmd="$REPO_DIR/monitoring/website_monitor.sh run --mail '$mail_to'"
   # Filter existing crontab
   local tmp
   tmp=$(mktemp)
   crontab -l 2>/dev/null | grep -v "$TAG" > "$tmp" || true
-  echo "0 */3 * * * $cmd $TAG" >> "$tmp"
+  echo "$cron_expr $cmd $TAG" >> "$tmp"
   crontab "$tmp"
   rm -f "$tmp"
-  echo "Installed cron job: every 3 hours"
+  echo "Installed cron job: $cron_expr"
 }
 
 remove_cron() {
