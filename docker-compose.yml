@@ -114,6 +114,20 @@ services:
       timeout: 10s
       retries: 3
 
+  # Devbox for testing installation and examples (venv inside container)
+  devbox:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: curllm_devbox
+    restart: unless-stopped
+    working_dir: /workspace
+    volumes:
+      - ./:/workspace
+    shm_size: 2gb
+    tty: true
+    stdin_open: true
+
 volumes:
   ollama_data:
   redis_data:

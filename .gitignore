@@ -6,6 +6,7 @@ dsl.sqlite.*.bak
 data/
 generated/
 screenshots/
+docs/marketing/
 # Logs
 logs
 *.log

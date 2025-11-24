@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Auto-load env from examples/.env or project .env if present
+# Auto-load env from examples/.env and then project .env (project overrides)
 ENV_DIR="$(cd "$(dirname "$0")" && pwd)"
-for CAND in "$ENV_DIR/.env" "$ENV_DIR/../.env"; do
-  if [ -f "$CAND" ]; then set -a; . "$CAND"; set +a; break; fi
-done
+if [ -f "$ENV_DIR/.env" ]; then set -a; . "$ENV_DIR/.env"; set +a; fi
+if [ -f "$ENV_DIR/../.env" ]; then set -a; . "$ENV_DIR/../.env"; set +a; fi
 
 API_HOST="${CURLLM_API_HOST:-http://localhost:8000}"
 URL="${WP_LOGIN_URL:-https://www.prototypowanie.pl/wp-login.php}"

@@ -307,6 +307,99 @@ output:
 ```
 
 
+### Examples .env and autoload
+
+- The examples directory includes `.env.examples` and `.env` (generate or update with `examples/setup_env.sh`).
+- Shell scripts in `examples/curl_*.sh` now auto-load `examples/.env` (or project `.env`) at runtime.
+- Node.js and PHP examples read `examples/.env` automatically.
+- If your API picks a non-default port (e.g., 8002), ensure `CURLLM_API_HOST` is set in `.env` (handled by `curllm --start-services`).
+
+Quick setup:
+
+```bash
+chmod +x examples/setup_env.sh
+examples/setup_env.sh
+
+# Optional: export CAPTCHA 2captcha key for widget solving in core curllm
+export CAPTCHA_API_KEY=YOUR_2CAPTCHA_KEY
+
+# Run any example
+examples/curl_product_search.sh
+```
+
+If you saw `{ "detail": "Not Found" }`, you likely hit the wrong port. Fix by either:
+
+```bash
+# 1) Let scripts auto-load the updated host from .env (recommended)
+curllm --start-services  # updates .env with the actual port
+examples/curl_product_search.sh
+
+# 2) Or export the API host manually
+export CURLLM_API_HOST=http://localhost:8002
+examples/curl_product_search.sh
+```
+
+### Node.js / PHP API examples
+
+- Node.js: `examples/node_api_example.js`
+
+```bash
+node examples/node_api_example.js
+# reads examples/.env, posts to ${CURLLM_API_HOST}/api/execute
+```
+
+- PHP: `examples/php_api_example.php`
+
+```bash
+php examples/php_api_example.php
+# reads examples/.env, posts to ${CURLLM_API_HOST}/api/execute
+```
+
+### CAPTCHA solver
+
+- Core curllm can optionally solve widget CAPTCHAs (sitekey-token via 2captcha). Set env and use `--captcha`:
+
+```bash
+export CAPTCHA_API_KEY=YOUR_2CAPTCHA_KEY
+curllm --visual --captcha "https://example.com" -d "fill form"
+```
+
+### Docker devbox (venv) for testing installation and examples
+
+A lightweight container to test install and examples without touching host.
+
+```bash
+# Build and start devbox + Ollama + API (optional)
+docker compose up -d devbox ollama curllm-api
+
+# Enter the devbox
+docker compose exec devbox bash
+
+# Inside devbox: create a venv and install deps
+python3 -m venv venv
+source venv/bin/activate
+python -m pip install -U pip setuptools wheel
+python -m pip install -r requirements.txt
+python -m pip install playwright && python -m playwright install chromium
+# (optional, Linux) system deps for browsers
+python -m playwright install-deps chromium || true
+
+# Prepare examples env and point to services via docker network
+examples/setup_env.sh
+export CURLLM_API_HOST=http://curllm-api:8000
+export CURLLM_OLLAMA_HOST=http://ollama:11434
+
+# Run examples
+bash examples/curl_product_search.sh
+python examples/bql_product_search.py
+```
+
+Notes:
+
+- For Accept-Language, set `ACCEPT_LANGUAGE` in examples/.env; shell scripts send it as a header automatically.
+- The Playwright+BQL Python examples do not auto-load `.env`; load it via `source examples/.env` before `python ...` if needed.
+
+
 ### Validated examples (tested)
 
 - Extract links (basic)

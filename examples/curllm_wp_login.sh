@@ -5,6 +5,11 @@ set -euo pipefail
 # Usage:
 #   WP_LOGIN_URL=https://site/wp-login.php WP_USER=admin WP_PASS=secret examples/curllm_wp_login.sh
 
+# Auto-load env from examples/.env and then project .env (project overrides)
+ENV_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [ -f "$ENV_DIR/.env" ]; then set -a; . "$ENV_DIR/.env"; set +a; fi
+if [ -f "$ENV_DIR/../.env" ]; then set -a; . "$ENV_DIR/../.env"; set +a; fi
+
 URL="${WP_LOGIN_URL:-https://www.prototypowanie.pl/wp-login.php}"
 USER_NAME="${WP_USER:-admin}"
 USER_PASS="${WP_PASS:-test123}"
@@ -25,4 +30,6 @@ VISUAL_FLAG=${VISUAL_FLAG:-}
 STEALTH_FLAG=${STEALTH_FLAG:---stealth}
 CAPTCHA_FLAG=${CAPTCHA_FLAG:---captcha}
 
-curllm ${VISUAL_FLAG} ${STEALTH_FLAG} ${CAPTCHA_FLAG} "${URL}" -d "${PAYLOAD}"
+curllm ${VISUAL_FLAG} ${STEALTH_FLAG} ${CAPTCHA_FLAG} \
+  ${ACCEPT_LANGUAGE:+-H "Accept-Language: ${ACCEPT_LANGUAGE}"} \
+  "${URL}" -d "${PAYLOAD}"

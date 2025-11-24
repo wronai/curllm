@@ -1,5 +1,7 @@
 # curllm Examples
 
+Docs: [Home](../README.md) | [Installation](Installation.md) | [Environment](Environment.md) | [API](API.md) | [Playwright+BQL](Playwright_BQL.md) | [Examples](EXAMPLES.md) | [Docker](Docker.md) | [Devbox](Devbox.md) | [Troubleshooting](Troubleshooting.md) | [Instrukcja](../INSTRUKCJA.md)
+
 This document contains curated, end-to-end examples for common automation tasks with curllm. You can also generate runnable shell scripts for these examples into the `examples/` directory.
 
 - Generate scripts: `make examples` (or `bash tools/generate_examples.sh`)
