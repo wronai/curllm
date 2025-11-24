@@ -1,6 +1,8 @@
 # Troubleshooting
 
-Docs: [Home](../README.md) | [Installation](Installation.md) | [Environment](Environment.md) | [API](API.md) | [Playwright+BQL](Playwright_BQL.md) | [Examples](EXAMPLES.md) | [Docker](Docker.md) | [Devbox](Devbox.md) | [Troubleshooting](Troubleshooting.md) | [Instrukcja](../INSTRUKCJA.md)
+**[📚 Documentation Index](INDEX.md)** | **[⬅️ Back to Main README](../README.md)**
+
+---
 
 ## Common issues
 
@@ -69,3 +71,7 @@ bash examples/curl_product_search.sh
 set -a; source examples/.env; set +a
 python examples/bql_product_search.py
 ```
+
+---
+
+**[📚 Documentation Index](INDEX.md)** | **[⬆️ Back to Top](#troubleshooting)** | **[Related: Hierarchical Planner →](HIERARCHICAL_PLANNER.md) | [Form Filling →](FORM_FILLING.md)**

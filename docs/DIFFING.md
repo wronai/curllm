@@ -1,5 +1,9 @@
 # Result storage and diffing (new | changed | delta)
 
+**[📚 Documentation Index](INDEX.md)** | **[⬅️ Back to Main README](../README.md)**
+
+---
+
 This document describes how to persist extraction results between runs and how to return only the differences (e.g. only new items) in subsequent runs.
 
 ## Quick start (CLI)
@@ -58,3 +62,7 @@ All of these can be overridden per-run via `params` in the `-d` JSON payload.
 - Diffing is performed on the primary array in the result (e.g. `links`, `articles`, or `products`).
 - When `diff_mode` is not `none`, a `diff` summary with counts is included at the top level of the API response.
 - When `include_prev_results=true`, the planner receives a `previous_results` object in the page context: `{ key, items, fields }`.
+
+---
+
+**[📚 Documentation Index](INDEX.md)** | **[⬆️ Back to Top](#result-storage-and-diffing-new--changed--delta)** | **[Related: Examples →](EXAMPLES.md)**

@@ -28,4 +28,5 @@ def setup_llm():
         num_predict=config.num_predict,
         temperature=config.temperature,
         top_p=config.top_p,
+        timeout=config.llm_timeout,
     )

@@ -12,7 +12,7 @@ async def extract_page_context(page, include_dom: bool = False, dom_max_chars: i
             return {
                 title: document.title,
                 url: window.location.href,
-                text: bodyText.substring(0, 5000),
+                text: ((bodyText||'').substring(0, 5000).trim() || undefined),
                 forms: Array.from(document.forms || []).map(f => ({
                     id: (f && f.id) || undefined,
                     action: (f && f.action) || undefined,
@@ -25,18 +25,21 @@ async def extract_page_context(page, include_dom: bool = False, dom_max_chars: i
                 })),
                 links: Array.from(document.links || []).slice(0, 50).map(l => ({
                     href: (l && l.href) ? l.href : '',
-                    text: safeText(l)
+                    text: (safeText(l).trim() || undefined)
                 })),
                 buttons: Array.from(document.querySelectorAll('button') || []).map(b => ({
-                    text: safeText(b),
-                    onclick: (b && b.onclick) ? 'has handler' : null
+                    text: (safeText(b).trim() || undefined),
+                    onclick: (b && b.onclick) ? 'has handler' : undefined
                 })),
-                headings: Array.from(document.querySelectorAll('h1, h2, h3') || []).slice(0, 100).map(h => ({
-                    tag: (h && h.tagName ? h.tagName.toLowerCase() : undefined),
-                    text: safeText(h).trim(),
-                    id: (h && h.id) || undefined,
-                    class: (h && h.className) || undefined
-                })),
+                headings: Array.from(document.querySelectorAll('h1, h2, h3') || [])
+                    .filter(h => !!safeText(h).trim())
+                    .slice(0, 100)
+                    .map(h => ({
+                        tag: (h && h.tagName ? h.tagName.toLowerCase() : undefined),
+                        text: safeText(h).trim(),
+                        id: (h && h.id) || undefined,
+                        class: (h && h.className) || undefined
+                    })),
                 article_candidates: (() => {
                     try {
                         const anchors = Array.from(document.querySelectorAll('a[href]') || []);
@@ -108,7 +111,10 @@ async def extract_page_context(page, include_dom: bool = False, dom_max_chars: i
             )
         except Exception:
             interactive = []
-        base["interactive"] = (interactive or [])[:40]
+        if interactive:
+            _ilist = (interactive or [])[:40]
+            if _ilist:
+                base["interactive"] = _ilist
         try:
             dom_preview = json.dumps(dom_tree)[:max(0, int(dom_max_chars))]
         except Exception:
@@ -165,7 +171,13 @@ async def extract_page_context(page, include_dom: bool = False, dom_max_chars: i
                     except Exception:
                         furl = None
                     if fdom or finter:
-                        iframes.append({"url": furl, "dom": fdom, "interactive": (finter or [])[:20]})
+                        entry = {"dom": fdom}
+                        _fint = (finter or [])[:20]
+                        if _fint:
+                            entry["interactive"] = _fint
+                        if furl:
+                            entry["url"] = furl
+                        iframes.append(entry)
             except Exception:
                 pass
             if iframes:

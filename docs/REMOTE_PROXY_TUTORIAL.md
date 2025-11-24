@@ -1,8 +1,10 @@
 # Remote Proxy Tutorial (PL/EN)
 
-This guide shows how to run HTTP proxy servers on an external host and use them locally in curllm.
+**[📚 Documentation Index](INDEX.md)** | **[⬅️ Back to Main README](../README.md)**
 
 ---
+
+This guide shows how to run HTTP proxy servers on an external host and use them locally in curllm.
 
 ## PL: Zewnętrzny host proxy + lokalne użycie w curllm
 
@@ -158,3 +160,7 @@ curl -s -X POST "http://localhost:8000/api/proxy/register" \
 ### Troubleshooting
 - Ensure remote ports are reachable, firewall open, and `proxy.py` keeps running.
 - Prefer registry + pruning or your curated public list for stability.
+
+---
+
+**[📚 Documentation Index](INDEX.md)** | **[⬆️ Back to Top](#remote-proxy-tutorial-plen)** | **[Related: Docker →](Docker.md)**

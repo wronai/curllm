@@ -2,9 +2,10 @@ from typing import Any, Dict, Optional
 import json
 import os
 import logging
+import time
 
 logger = logging.getLogger(__name__)
-LOG_PREVIEW_CHARS = int(os.getenv("CURLLM_LOG_PREVIEW_CHARS", "1500") or 1500)
+LOG_PREVIEW_CHARS = int(os.getenv("CURLLM_LOG_PREVIEW_CHARS", "35000") or 35000)
 
 from .config import config
 from .extraction import (
@@ -126,16 +127,33 @@ async def _try_product_extraction(executor, instruction: str, page, run_logger, 
 async def _step_visual(executor, page, step: int, domain_dir, captcha_solver: bool, run_logger, result: Dict[str, Any]) -> tuple[Optional[str], Optional[Dict[str, Any]]]:
     last_screenshot_path: Optional[str] = None
     last_visual_analysis: Optional[Dict[str, Any]] = None
+    _t0 = time.time()
     screenshot_path = await executor._take_screenshot(page, step, target_dir=domain_dir)
+    _ms = int((time.time() - _t0) * 1000)
+    try:
+        run_logger.log_kv("fn:_take_screenshot_ms", str(_ms))
+    except Exception:
+        pass
     result["screenshots"].append(screenshot_path)
     if run_logger:
         try:
             run_logger.log_image(screenshot_path, alt=f"Step {step+1} screenshot")
         except Exception:
             run_logger.log_text(f"Screenshot saved: {screenshot_path}")
+    _t1 = time.time()
     visual_analysis = await executor.vision_analyzer.analyze(screenshot_path)
+    _ms2 = int((time.time() - _t1) * 1000)
+    try:
+        run_logger.log_kv("fn:vision.analyze_ms", str(_ms2))
+    except Exception:
+        pass
     last_screenshot_path = screenshot_path
     last_visual_analysis = visual_analysis if isinstance(visual_analysis, dict) else {"raw": str(visual_analysis)}
+    try:
+        if isinstance(last_visual_analysis, dict):
+            run_logger.log_kv("vision.has_captcha", str(bool(last_visual_analysis.get("has_captcha"))))
+    except Exception:
+        pass
     if captcha_solver and isinstance(last_visual_analysis, dict) and last_visual_analysis.get("has_captcha"):
         await executor._handle_human_verification(page, run_logger)
     return last_screenshot_path, last_visual_analysis
@@ -178,23 +196,43 @@ async def _remediate_if_empty(page, runtime: Dict[str, Any], run_logger, page_co
     if inter_len == 0 and dom_len == 0 and bool(runtime.get("include_dom_html")):
         run_logger.log_text("DOM snapshot empty; running remediation: human_verify -> accept_cookies -> small scroll -> re-extract")
         try:
+            _t_hv2 = time.time()
             hv2 = await handle_human_verification(page, run_logger)
+            try:
+                run_logger.log_kv("fn:human.verify(remediate)_ms", str(int((time.time() - _t_hv2) * 1000)))
+            except Exception:
+                pass
             run_logger.log_kv("human_verify_remediation", str(bool(hv2)))
         except Exception as e:
             run_logger.log_kv("human_verify_remediation_error", str(e))
         try:
+            _t_acc = time.time()
             await _accept_cookies(page)
+            try:
+                run_logger.log_kv("fn:accept_cookies_ms", str(int((time.time() - _t_acc) * 1000)))
+            except Exception:
+                pass
         except Exception:
             pass
         try:
+            _t_scr = time.time()
             await _auto_scroll(page, steps=1, delay_ms=300)
+            try:
+                run_logger.log_kv("fn:auto_scroll_ms", str(int((time.time() - _t_scr) * 1000)))
+            except Exception:
+                pass
         except Exception:
             pass
+        _t_pc2 = time.time()
         page_context = await executor._extract_page_context(
             page,
             include_dom=True,
             dom_max_chars=int(runtime.get("dom_max_chars", 20000) or 20000),
         )
+        try:
+            run_logger.log_kv("fn:_extract_page_context(remediate)_ms", str(int((time.time() - _t_pc2) * 1000)))
+        except Exception:
+            pass
         inter_len2 = len(page_context.get("interactive", []) or [])
         dom_len2 = len(page_context.get("dom_preview", "") or "")
         ifr_len2 = len(page_context.get("iframes", []) or [])
@@ -216,9 +254,10 @@ async def _remediate_if_empty(page, runtime: Dict[str, Any], run_logger, page_co
     return page_context
 
 
-def _progress_and_maybe_break(executor, page_context: Dict[str, Any], last_sig: Optional[str], no_progress: int, progressive_depth: int, runtime: Dict[str, Any], run_logger, result: Dict[str, Any], instruction: str, url: Optional[str], stall_limit: int):
+async def _progress_and_maybe_break(executor, page_context: Dict[str, Any], last_sig: Optional[str], no_progress: int, progressive_depth: int, runtime: Dict[str, Any], run_logger, result: Dict[str, Any], instruction: str, url: Optional[str], stall_limit: int):
     try:
-        return executor._progress_tick(
+        _t_prog = time.time()
+        ret = executor._progress_tick(
             page_context=page_context,
             last_sig=last_sig,
             no_progress=no_progress,
@@ -230,6 +269,13 @@ def _progress_and_maybe_break(executor, page_context: Dict[str, Any], last_sig: 
             url=url,
             stall_limit=stall_limit,
         )
+        try:
+            _ms = int((time.time() - _t_prog) * 1000)
+            _ls, _np, _pd, _br = ret
+            run_logger.log_code("json", json.dumps({"fn":"_progress_tick","ms":_ms,"no_progress":_np,"progressive_depth":_pd,"should_break":_br}))
+        except Exception:
+            pass
+        return ret
     except Exception as e:
         if run_logger:
             run_logger.log_text(f"Progress check error: {e}")
@@ -239,6 +285,7 @@ def _progress_and_maybe_break(executor, page_context: Dict[str, Any], last_sig: 
 async def _execute_tool(executor, page, instruction: str, tool_name: str, args: Dict[str, Any], runtime: Dict[str, Any], run_logger):
     try:
         tn = str(tool_name or "").strip().lower()
+        _t_tool = time.time()
         if run_logger:
             try:
                 run_logger.log_text(f"Tool call: {tn}")
@@ -254,6 +301,10 @@ async def _execute_tool(executor, page, instruction: str, tool_name: str, args: 
                     run_logger.log_kv("emails_count", str(len(emails or [])))
                 except Exception:
                     pass
+            try:
+                run_logger.log_kv(f"fn:tool.extract.emails_ms", str(int((time.time() - _t_tool) * 1000)))
+            except Exception:
+                pass
             return {"emails": emails}
         if tn == "extract.links":
             sel = None
@@ -288,6 +339,10 @@ async def _execute_tool(executor, page, instruction: str, tool_name: str, args: 
                     run_logger.log_code("json", json.dumps({"sample": sample}))
                 except Exception:
                     pass
+            try:
+                run_logger.log_kv(f"fn:tool.extract.links_ms", str(int((time.time() - _t_tool) * 1000)))
+            except Exception:
+                pass
             return {"links": links}
         if tn == "extract.phones":
             phones = await _tool_extract_phones(page)
@@ -296,6 +351,10 @@ async def _execute_tool(executor, page, instruction: str, tool_name: str, args: 
                     run_logger.log_kv("phones_count", str(len(phones or [])))
                 except Exception:
                     pass
+            try:
+                run_logger.log_kv(f"fn:tool.extract.phones_ms", str(int((time.time() - _t_tool) * 1000)))
+            except Exception:
+                pass
             return {"phones": phones}
         # Articles
         if tn == "articles.extract":
@@ -305,6 +364,10 @@ async def _execute_tool(executor, page, instruction: str, tool_name: str, args: 
                     run_logger.log_kv("articles_count", str(len(items or [])))
                 except Exception:
                     pass
+            try:
+                run_logger.log_kv(f"fn:tool.articles.extract_ms", str(int((time.time() - _t_tool) * 1000)))
+            except Exception:
+                pass
             return {"articles": items or []}
         # Products (heuristics)
         if tn == "products.heuristics":
@@ -324,6 +387,10 @@ async def _execute_tool(executor, page, instruction: str, tool_name: str, args: 
                     run_logger.log_kv("products_count", str(cnt))
                 except Exception:
                     pass
+            try:
+                run_logger.log_kv(f"fn:tool.products.heuristics_ms", str(int((time.time() - _t_tool) * 1000)))
+            except Exception:
+                pass
             return data or {"products": []}
         # DOM snapshot
         if tn == "dom.snapshot":
@@ -337,6 +404,10 @@ async def _execute_tool(executor, page, instruction: str, tool_name: str, args: 
                     run_logger.log_code("json", json.dumps({"dom_preview_len": dom_len, "interactive_count": inter_len}))
                 except Exception:
                     pass
+            try:
+                run_logger.log_kv(f"fn:tool.dom.snapshot_ms", str(int((time.time() - _t_tool) * 1000)))
+            except Exception:
+                pass
             return {"page_context": pc}
         # Cookies accept
         if tn == "cookies.accept":
@@ -344,10 +415,18 @@ async def _execute_tool(executor, page, instruction: str, tool_name: str, args: 
                 await _accept_cookies(page)
                 if run_logger:
                     run_logger.log_kv("cookies.accept", "true")
+                try:
+                    run_logger.log_kv(f"fn:tool.cookies.accept_ms", str(int((time.time() - _t_tool) * 1000)))
+                except Exception:
+                    pass
                 return {"accepted": True}
             except Exception as e:
                 if run_logger:
                     run_logger.log_kv("cookies.accept", "false")
+                try:
+                    run_logger.log_kv(f"fn:tool.cookies.accept_ms", str(int((time.time() - _t_tool) * 1000)))
+                except Exception:
+                    pass
                 return {"accepted": False, "error": str(e)}
         # Human verify
         if tn == "human.verify":
@@ -359,13 +438,39 @@ async def _execute_tool(executor, page, instruction: str, tool_name: str, args: 
                 ok = False
             if run_logger:
                 run_logger.log_kv("human.verify", str(ok))
+            try:
+                run_logger.log_kv(f"fn:tool.human.verify_ms", str(int((time.time() - _t_tool) * 1000)))
+            except Exception:
+                pass
             return {"ok": ok}
         # Form fill
         if tn == "form.fill":
             try:
+                # Merge values: instruction has priority over tool args
+                merged_args = {}
                 if isinstance(args, dict) and args:
+                    merged_args.update(args)
+                # Parse instruction and overwrite with instruction values
+                try:
+                    from curllm_core.form_fill import parse_form_pairs
+                    raw_pairs = parse_form_pairs(instruction)
+                    for k, v in raw_pairs.items():
+                        lk = k.lower()
+                        if any(x in lk for x in ["email", "e-mail", "mail"]):
+                            merged_args["email"] = v
+                        elif any(x in lk for x in ["name", "imi", "nazw", "full name", "fullname", "first name", "last name"]):
+                            merged_args["name"] = v
+                        elif any(x in lk for x in ["message", "wiadomo", "treść", "tresc", "content", "komentarz"]):
+                            merged_args["message"] = v
+                        elif any(x in lk for x in ["subject", "temat"]):
+                            merged_args["subject"] = v
+                        elif any(x in lk for x in ["phone", "telefon", "tel"]):
+                            merged_args["phone"] = v
+                except Exception:
+                    pass
+                if merged_args:
                     try:
-                        await page.evaluate("(data) => { window.__curllm_canonical = Object.assign({}, window.__curllm_canonical||{}, data); }", args)
+                        await page.evaluate("(data) => { window.__curllm_canonical = Object.assign({}, window.__curllm_canonical||{}, data); }", merged_args)
                     except Exception:
                         pass
                 det = await executor._deterministic_form_fill(instruction, page, run_logger)
@@ -377,21 +482,76 @@ async def _execute_tool(executor, page, instruction: str, tool_name: str, args: 
                         }))
                     except Exception:
                         pass
+                try:
+                    run_logger.log_kv(f"fn:tool.form.fill_ms", str(int((time.time() - _t_tool) * 1000)))
+                except Exception:
+                    pass
                 return {"form_fill": det}
             except Exception as e:
+                try:
+                    run_logger.log_kv(f"fn:tool.form.fill_ms", str(int((time.time() - _t_tool) * 1000)))
+                except Exception:
+                    pass
                 return {"form_fill": {"submitted": False, "error": str(e)}}
     except Exception as e:
         return {"error": str(e)}
 
 
 async def _planner_cycle(executor, instruction: str, page_context: Dict[str, Any], step: int, run_logger, runtime: Dict[str, Any], page, tool_history: list[Dict[str, Any]]):
-    action = await executor._generate_action(
-        instruction=instruction,
-        page_context=page_context,
-        step=step,
-        run_logger=run_logger,
-        runtime=runtime,
-    )
+    _t_gen = time.time()
+    
+    # Try hierarchical planner first (only for form-filling tasks)
+    hierarchical_enabled = runtime.get("hierarchical_planner", True)
+    if run_logger:
+        run_logger.log_text(f"🔍 Checking hierarchical planner: enabled={hierarchical_enabled}, step={step}")
+    
+    if hierarchical_enabled and step == 1:  # Only on first step
+        try:
+            from .hierarchical_planner import hierarchical_plan
+            if run_logger:
+                run_logger.log_text("⚙️  Attempting hierarchical planner...")
+            action = await hierarchical_plan(instruction, page_context, executor.llm, run_logger)
+            if action is not None:
+                # Hierarchical planner succeeded, use its action
+                try:
+                    run_logger.log_kv("fn:hierarchical_plan_ms", str(int((time.time() - _t_gen) * 1000)))
+                except Exception:
+                    pass
+                if run_logger:
+                    run_logger.log_text("✓ Hierarchical planner generated action")
+            else:
+                # Fall back to standard planner
+                if run_logger:
+                    run_logger.log_text("❌ Hierarchical planner returned None, falling back to standard planner")
+                action = await executor._generate_action(
+                    instruction=instruction,
+                    page_context=page_context,
+                    step=step,
+                    run_logger=run_logger,
+                    runtime=runtime,
+                )
+        except Exception as e:
+            if run_logger:
+                run_logger.log_text(f"Hierarchical planner failed: {e}, falling back to standard")
+            action = await executor._generate_action(
+                instruction=instruction,
+                page_context=page_context,
+                step=step,
+                run_logger=run_logger,
+                runtime=runtime,
+            )
+    else:
+        action = await executor._generate_action(
+            instruction=instruction,
+            page_context=page_context,
+            step=step,
+            run_logger=run_logger,
+            runtime=runtime,
+        )
+    try:
+        run_logger.log_kv("fn:generate_action_ms", str(int((time.time() - _t_gen) * 1000)))
+    except Exception:
+        pass
     if run_logger:
         run_logger.log_text("Planned action:")
         run_logger.log_code("json", json.dumps(action))
@@ -441,7 +601,12 @@ async def _planner_cycle(executor, instruction: str, page_context: Dict[str, Any
         if run_logger:
             run_logger.log_text("Skipping click due to no_click=true")
     else:
+        _t_exec = time.time()
         await executor._execute_action(page, action, runtime)
+        try:
+            run_logger.log_kv("fn:_execute_action_ms", str(int((time.time() - _t_exec) * 1000)))
+        except Exception:
+            pass
     if run_logger:
         run_logger.log_text(f"Executed action: {action.get('type')}")
         try:
@@ -511,12 +676,14 @@ async def _finalize_fallback(executor, instruction: str, url: Optional[str], pag
     try:
         lower_instr2 = (instruction or "").lower()
         if any(k in lower_instr2 for k in ["form", "formularz", "fill", "wypełnij", "wypelnij", "submit"]):
-            result["data"] = {
-                "error": {
-                    "type": "form_fill_failed",
-                    "message": "Could not locate or fill form fields within the allowed steps.",
-                }
-            }
+            try:
+                det2 = await executor._deterministic_form_fill(instruction, page, run_logger)
+            except Exception:
+                det2 = None
+            if isinstance(det2, dict) and det2.get("submitted") is True:
+                result["data"] = {"form_fill": det2}
+                return
+            result["data"] = {"error": {"type": "form_fill_failed", "message": "Could not locate or fill form fields within the allowed steps."}, **({"form_fill": det2} if det2 else {})}
             try:
                 params = {"include_dom_html": True, "preset": "deep_scan", "action_timeout_ms": 20000}
                 cmd = executor._build_rerun_curl(instruction, url or "", params, top_level={"visual_mode": True, "stealth_mode": True, "url": url or ""})
@@ -624,11 +791,30 @@ async def run_task(
 
         # Try handle human verification banners/buttons each step
         try:
+            _t_hv = time.time()
             await handle_human_verification(page, run_logger)
+            try:
+                run_logger.log_kv("fn:human.verify_ms", str(int((time.time() - _t_hv) * 1000)))
+            except Exception:
+                pass
+        except Exception:
+            pass
+        try:
+            _t_acc_each = time.time()
+            await _accept_cookies(page)
+            try:
+                run_logger.log_kv("fn:accept_cookies(per_step)_ms", str(int((time.time() - _t_acc_each) * 1000)))
+            except Exception:
+                pass
         except Exception:
             pass
 
+        _t_pc = time.time()
         page_context = await _step_page_context(executor, page, runtime, last_screenshot_path, last_visual_analysis)
+        try:
+            run_logger.log_kv("fn:_extract_page_context_ms", str(int((time.time() - _t_pc) * 1000)))
+        except Exception:
+            pass
         if prev_ctx:
             try:
                 page_context["previous_results"] = prev_ctx
@@ -641,7 +827,7 @@ async def run_task(
         page_context = await _remediate_if_empty(page, runtime, run_logger, page_context)
 
         # progress
-        last_sig, no_progress, progressive_depth, should_break = _progress_and_maybe_break(
+        last_sig, no_progress, progressive_depth, should_break = await _progress_and_maybe_break(
             executor,
             page_context,
             last_sig,
@@ -663,12 +849,26 @@ async def run_task(
                 dom_chars = int(runtime.get("dom_max_chars", 20000) or 20000)
                 dom_cap = int(runtime.get("dom_max_cap", 60000) or 60000)
                 incl = bool(runtime.get("include_dom_html", False))
+                def _prune_nulls(obj):
+                    if isinstance(obj, dict):
+                        pruned = {k: _prune_nulls(v) for k, v in obj.items()}
+                        return {k: v for k, v in pruned.items() if v is not None and not (isinstance(v, (list, dict)) and len(v) == 0)}
+                    if isinstance(obj, list):
+                        pruned_list = [_prune_nulls(x) for x in obj]
+                        pruned_list = [x for x in pruned_list if x is not None and not (isinstance(x, (list, dict)) and len(x) == 0)]
+                        return pruned_list
+                    return obj
+                pc_json = json.dumps(_prune_nulls(page_context), indent=2)
+                original_len = len(pc_json)
+                logged_len = min(original_len, preview_len)
+                truncated_by = max(0, original_len - logged_len)
                 run_logger.log_text(
-                    f"Page context snapshot (preview {preview_len} chars via CURLLM_LOG_PREVIEW_CHARS; "
+                    f"Page context snapshot (preview {preview_len} via CURLLM_LOG_PREVIEW_CHARS; "
+                    f"original={original_len} chars; logged={logged_len}; truncated_by={truncated_by}; "
                     f"dom_max_chars={dom_chars} via CURLLM_DOM_MAX_CHARS; dom_max_cap={dom_cap} via CURLLM_DOM_MAX_CAP; "
                     f"include_dom_html={incl} via CURLLM_INCLUDE_DOM_HTML)"
                 )
-                run_logger.log_code("json", json.dumps(page_context, indent=2)[:preview_len])
+                run_logger.log_code("json", pc_json[:preview_len])
             except Exception:
                 pass
 

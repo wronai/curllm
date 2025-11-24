@@ -1,6 +1,8 @@
 # Devbox (Docker)
 
-Docs: [Home](../README.md) | [Installation](Installation.md) | [Environment](Environment.md) | [API](API.md) | [Playwright+BQL](Playwright_BQL.md) | [Examples](EXAMPLES.md) | [Docker](Docker.md) | [Devbox](Devbox.md) | [Troubleshooting](Troubleshooting.md) | [Instrukcja](../INSTRUKCJA.md)
+**[📚 Documentation Index](INDEX.md)** | **[⬅️ Back to Main README](../README.md)**
+
+---
 
 A small container for testing installation and examples with an isolated virtualenv.
 
@@ -38,3 +40,7 @@ Notes:
 
 - Use `ACCEPT_LANGUAGE` in `examples/.env` to control language; shell examples add this header automatically.
 - For CAPTCHA solving in core, set `CAPTCHA_API_KEY` and use `--captcha`.
+
+---
+
+**[📚 Documentation Index](INDEX.md)** | **[⬆️ Back to Top](#devbox-docker)** | **[Related: Docker →](Docker.md) | [Installation →](Installation.md)**

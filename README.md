@@ -1,7 +1,9 @@
 ![curllm.png](docs/curllm.png)
 # curllm - Browser Automation with Local LLM
 
-Docs: [Home](README.md) | [Installation](docs/Installation.md) | [Environment](docs/Environment.md) | [API](docs/API.md) | [Playwright+BQL](docs/Playwright_BQL.md) | [Examples](docs/EXAMPLES.md) | [Docker](docs/Docker.md) | [Devbox](docs/Devbox.md) | [Troubleshooting](docs/Troubleshooting.md) | [Instrukcja](INSTRUKCJA.md)
+**[📚 Full Documentation](docs/INDEX.md)** | **[🚀 Quick Start](#-quick-start)** | **[📖 Examples](docs/EXAMPLES.md)** | **[⚙️ Installation](docs/Installation.md)**
+
+---
 
 <div align="center">
   <h3>🤖 Intelligent Browser Automation using 8GB GPU-Compatible Local LLMs</h3>
@@ -14,10 +16,11 @@ Docs: [Home](README.md) | [Installation](docs/Installation.md) | [Environment](d
 ## ✨ Features
 
 - **🧠 Local LLM Integration**: Run on 8GB GPUs with models like Qwen 2.5, Mistral, or Llama
+- **🎯 Hierarchical Planner**: 87% token reduction with intelligent 3-level decision tree ([docs](docs/HIERARCHICAL_PLANNER.md))
+- **📝 Smart Form Filling**: Automated form completion with error detection and remediation ([docs](docs/FORM_FILLING.md))
 - **👁️ Visual Analysis**: Computer vision for CAPTCHA detection and page understanding  
 - **🥷 Stealth Mode**: Advanced anti-bot detection bypass techniques
 - **🔍 BQL Support**: Browser Query Language for structured data extraction
-- **🎯 Smart Navigation**: AI-driven page interaction and form filling
 - **🔒 Privacy-First**: Everything runs locally - no data leaves your machine
 - **⚡ GPU Optimized**: Quantized models for efficient inference on consumer GPUs
 
@@ -34,18 +37,33 @@ Docs: [Home](README.md) | [Installation](docs/Installation.md) | [Environment](d
 - Docker (optional, for Browserless features)
 - CUDA toolkit (for GPU acceleration)
 
+## 📚 Documentation
+
+**[→ Complete Documentation Index](docs/INDEX.md)**
+
+### Quick Links
+- **[Installation Guide](docs/Installation.md)** - Detailed installation instructions
+- **[Examples & Tutorials](docs/EXAMPLES.md)** - Practical use cases
+- **[Hierarchical Planner](docs/HIERARCHICAL_PLANNER.md)** - NEW! 87% token reduction
+- **[Form Filling](docs/FORM_FILLING.md)** - NEW! Automated form completion
+- **[API Reference](docs/API.md)** - REST API endpoints
+- **[Environment Config](docs/Environment.md)** - Configuration guide
+- **[Troubleshooting](docs/Troubleshooting.md)** - Common issues
+
 ## 🚀 Quick Start
 
 ```shell
 make install
 ```
 
-## 📚 More Documentation & Example Scripts
+### Generate Example Scripts
 
-- Full examples with commands and context: docs/EXAMPLES.md
-- Generate runnable scripts: make examples
-  - Scripts are created in examples/ as executable files (curllm-*.sh)
-  - Run with: ./examples/curllm-extract-links.sh
+Generate runnable example scripts:
+```shell
+make examples
+# Scripts created in examples/ as curllm-*.sh
+# Run with: ./examples/curllm-extract-links.sh
+```
 
 ```shell
 Installing curllm dependencies...

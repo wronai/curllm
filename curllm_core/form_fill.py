@@ -22,23 +22,69 @@ def parse_form_pairs(instruction: str | None) -> Dict[str, str]:
     return pairs
 
 
+async def _robust_fill_field(page, selector: str, value: str) -> bool:
+    """Robust field filling with multiple fallbacks and event triggering."""
+    try:
+        # Attempt 1: page.fill (native Playwright)
+        try:
+            await page.fill(selector, value, timeout=3000)
+            # Trigger events on the field
+            await page.evaluate(
+                """(sel) => {
+                  const el = document.querySelector(sel);
+                  if (el) {
+                    el.dispatchEvent(new Event('input', {bubbles:true}));
+                    el.dispatchEvent(new Event('change', {bubbles:true}));
+                    el.blur();
+                  }
+                }""", selector
+            )
+            return True
+        except Exception:
+            pass
+        # Attempt 2: page.type (slower but more reliable for some fields)
+        try:
+            await page.evaluate(f"(sel) => {{ const el = document.querySelector(sel); if (el) el.value = ''; }}", selector)
+            await page.type(selector, value, delay=20, timeout=3000)
+            await page.evaluate(
+                """(sel) => {
+                  const el = document.querySelector(sel);
+                  if (el) {
+                    el.dispatchEvent(new Event('input', {bubbles:true}));
+                    el.dispatchEvent(new Event('change', {bubbles:true}));
+                    el.blur();
+                  }
+                }""", selector
+            )
+            return True
+        except Exception:
+            pass
+        # Attempt 3: Direct DOM setValue via evaluate
+        try:
+            await page.evaluate(
+                """(args) => {
+                  const el = document.querySelector(args.sel);
+                  if (el) {
+                    el.value = args.val;
+                    el.dispatchEvent(new Event('input', {bubbles:true}));
+                    el.dispatchEvent(new Event('change', {bubbles:true}));
+                    el.blur();
+                  }
+                }""", {"sel": selector, "val": value}
+            )
+            return True
+        except Exception:
+            pass
+        return False
+    except Exception:
+        return False
+
+
 async def deterministic_form_fill(instruction: str, page, run_logger=None) -> Optional[Dict[str, Any]]:
     try:
-        raw_pairs = parse_form_pairs(instruction)
+        # Priority: instruction > window.__curllm_canonical
+        # First, get values from window.__curllm_canonical (from tool args)
         canonical: Dict[str, str] = {}
-        for k, v in raw_pairs.items():
-            lk = k.lower()
-            if any(x in lk for x in ["email", "e-mail", "mail"]):
-                canonical["email"] = v
-            elif any(x in lk for x in ["name", "imi", "nazw", "full name", "fullname", "first name", "last name"]):
-                if "name" not in canonical:
-                    canonical["name"] = v
-            elif any(x in lk for x in ["message", "wiadomo", "treść", "tresc", "content", "komentarz"]):
-                canonical["message"] = v
-            elif any(x in lk for x in ["subject", "temat"]):
-                canonical["subject"] = v
-            elif any(x in lk for x in ["phone", "telefon", "tel"]):
-                canonical["phone"] = v
         try:
             cc = await page.evaluate("() => (window.__curllm_canonical||null)")
             if isinstance(cc, dict):
@@ -48,6 +94,21 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None) -> Op
                         canonical[k] = v.strip()
         except Exception:
             pass
+        
+        # Then parse instruction and OVERWRITE canonical (instruction has priority)
+        raw_pairs = parse_form_pairs(instruction)
+        for k, v in raw_pairs.items():
+            lk = k.lower()
+            if any(x in lk for x in ["email", "e-mail", "mail"]):
+                canonical["email"] = v
+            elif any(x in lk for x in ["name", "imi", "nazw", "full name", "fullname", "first name", "last name"]):
+                canonical["name"] = v
+            elif any(x in lk for x in ["message", "wiadomo", "treść", "tresc", "content", "komentarz"]):
+                canonical["message"] = v
+            elif any(x in lk for x in ["subject", "temat"]):
+                canonical["subject"] = v
+            elif any(x in lk for x in ["phone", "telefon", "tel"]):
+                canonical["phone"] = v
 
         # Mark target fields in DOM and obtain stable selectors
         selectors = await page.evaluate(
@@ -90,6 +151,10 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None) -> Op
                   by('input[type="email"]', 9);
                   by('input[type="text"]', 5);
                 }
+                // For email field, prioritize input[type="email"] even if keywords matched
+                if (prefer === 'email') {
+                  by('input[type="email"]', 14);
+                }
                 C.sort((a,b)=>b.score-a.score);
                 return C.length ? C[0].el : null;
               };
@@ -97,7 +162,7 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None) -> Op
               const mark = (el, key) => { if (!el) return null; el.setAttribute('data-curllm-target', key); return `[data-curllm-target="${key}"]`; };
               const nameEl = findField(['name','fullname','full name','imi','imię','nazw'], 'input');
               if (nameEl) res.name = mark(nameEl, 'name');
-              const emailEl = findField(['email','e-mail','mail'], 'input');
+              const emailEl = findField(['email','e-mail','mail','adres'], 'email');
               if (emailEl) res.email = mark(emailEl, 'email');
               const msgEl = findField(['message','wiadomo','treść','tresc','content','komentarz'], 'textarea');
               if (msgEl) res.message = mark(msgEl, 'message');
@@ -143,37 +208,22 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None) -> Op
         if not isinstance(selectors, dict):
             selectors = {}
         filled: Dict[str, Any] = {"filled": {}, "submitted": False}
-        # Fill fields
+        # Fill fields using robust filling
         if canonical.get("name") and selectors.get("name"):
-            try:
-                await page.fill(str(selectors["name"]), canonical["name"])
+            if await _robust_fill_field(page, str(selectors["name"]), canonical["name"]):
                 filled["filled"]["name"] = True
-            except Exception:
-                pass
         if canonical.get("email") and selectors.get("email"):
-            try:
-                await page.fill(str(selectors["email"]), canonical["email"])
+            if await _robust_fill_field(page, str(selectors["email"]), canonical["email"]):
                 filled["filled"]["email"] = True
-            except Exception:
-                pass
         if canonical.get("subject") and selectors.get("subject"):
-            try:
-                await page.fill(str(selectors["subject"]), canonical["subject"])
+            if await _robust_fill_field(page, str(selectors["subject"]), canonical["subject"]):
                 filled["filled"]["subject"] = True
-            except Exception:
-                pass
         if canonical.get("phone") and selectors.get("phone"):
-            try:
-                await page.fill(str(selectors["phone"]), canonical["phone"])
+            if await _robust_fill_field(page, str(selectors["phone"]), canonical["phone"]):
                 filled["filled"]["phone"] = True
-            except Exception:
-                pass
         if canonical.get("message") and selectors.get("message"):
-            try:
-                await page.fill(str(selectors["message"]), canonical["message"])
+            if await _robust_fill_field(page, str(selectors["message"]), canonical["message"]):
                 filled["filled"]["message"] = True
-            except Exception:
-                pass
         # Consent checkbox if present
         if selectors.get("consent"):
             try:
@@ -236,8 +286,19 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None) -> Op
                             """
                             () => {
                               const txt = (document.body.innerText||'').toLowerCase();
-                              const invalidEmail = /(nie jest prawidłowy adres e-mail|nieprawidłowy email|błędny email|invalid email)/i.test(txt)
-                                || !!document.querySelector('input[type="email"][aria-invalid="true"], .wpcf7-not-valid[name*="email"], .forminator-error-message');
+                              // Check for invalid email directly on email field
+                              const emailField = document.querySelector('[data-curllm-target="email"]');
+                              let invalidEmail = false;
+                              if (emailField) {
+                                invalidEmail = emailField.getAttribute('aria-invalid') === 'true'
+                                  || emailField.classList.contains('wpcf7-not-valid')
+                                  || emailField.classList.contains('forminator-error')
+                                  || (emailField.nextElementSibling && emailField.nextElementSibling.classList.contains('forminator-error-message'))
+                                  || (emailField.parentElement && emailField.parentElement.querySelector('.forminator-error-message'));
+                              }
+                              if (!invalidEmail) {
+                                invalidEmail = /(nie jest prawidłowy adres e-mail|nieprawidłowy email|błędny email|invalid email)/i.test(txt);
+                              }
                               const consentRequired = (!!document.querySelector('input[type="checkbox"][required], input[type="checkbox"].wpcf7-not-valid'))
                                 && /(zgod|akcept|privacy|regulamin)/i.test(txt);
                               const requiredMissing = /(wymagane|required|to pole jest wymagane)/i.test(txt)
@@ -263,25 +324,13 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None) -> Op
                             except Exception:
                                 dom = ""
                             fallback_email = f"{local}@{dom}" if dom else (canonical.get("email") or "user@example.com")
-                            try:
-                                await page.fill(str(selectors["email"]), fallback_email)
+                            if run_logger:
+                                run_logger.log_text(f"Attempting email fallback: {fallback_email}")
+                            if await _robust_fill_field(page, str(selectors["email"]), fallback_email):
                                 canonical["email"] = fallback_email
-                            except Exception:
-                                pass
-                            try:
-                                await page.evaluate(
-                                    """
-                                    () => {
-                                      const qs = '[data-curllm-target="email"]';
-                                      document.querySelectorAll(qs).forEach(el => {
-                                        try { el.dispatchEvent(new Event('input', {bubbles:true})); } catch(e){}
-                                        try { el.blur(); } catch(e){}
-                                      });
-                                    }
-                                    """
-                                )
-                            except Exception:
-                                pass
+                                filled["filled"]["email"] = True
+                                if run_logger:
+                                    run_logger.log_text(f"Email fallback successful: {fallback_email}")
                         if diag_last.get("consent_required") and selectors.get("consent"):
                             try:
                                 await page.check(str(selectors["consent"]))

@@ -1,6 +1,8 @@
 # API
 
-Docs: [Home](../README.md) | [Installation](Installation.md) | [Environment](Environment.md) | [API](API.md) | [Playwright+BQL](Playwright_BQL.md) | [Examples](EXAMPLES.md) | [Docker](Docker.md) | [Devbox](Devbox.md) | [Troubleshooting](Troubleshooting.md) | [Instrukcja](../INSTRUKCJA.md)
+**[📚 Documentation Index](INDEX.md)** | **[⬅️ Back to Main README](../README.md)**
+
+---
 
 ## REST Endpoints
 

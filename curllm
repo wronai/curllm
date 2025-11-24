@@ -98,8 +98,9 @@ AUTOMATION OPTIONS:
 SERVICE OPTIONS:
     --start-services       Start required services (Ollama, API server)
     --stop-services        Stop all services
-    --status              Check service status
-    --install             Install dependencies
+    --status               Check service status
+    --status-services      Check service status (alias of --status)
+    --install              Install dependencies
     
 EXAMPLES:
     # Simple web extraction
@@ -412,6 +413,16 @@ stop_services() {
 
 # Function to check status
 check_status() {
+    # Check if all services are running first
+    local all_ok=true
+    if ! check_services > /dev/null 2>&1; then
+        all_ok=false
+    fi
+    
+    if [ "$all_ok" = true ]; then
+        echo -e "${GREEN}Services started successfully!${NC}"
+    fi
+    
     echo -e "${BLUE}=== curllm Service Status ===${NC}"
     check_services
     
@@ -464,6 +475,71 @@ install_dependencies() {
     echo "Run 'curllm --start-services' to begin"
 }
 
+print_kv() {
+    printf '%s: %s\n' "$1" "$2"
+}
+print_verbose_env() {
+    echo -e "${BLUE}Environment (.env) in use:${NC}"
+    print_kv "CURLLM_API_HOST" "${CURLLM_API_HOST}"
+    print_kv "CURLLM_API_PORT" "${CURLLM_API_PORT}"
+    print_kv "CURLLM_OLLAMA_HOST" "${CURLLM_OLLAMA_HOST}"
+    print_kv "CURLLM_OLLAMA_PORT" "${CURLLM_OLLAMA_PORT}"
+    print_kv "CURLLM_MODEL" "${CURLLM_MODEL}"
+    print_kv "CURLLM_BROWSERLESS" "${CURLLM_BROWSERLESS}"
+    print_kv "BROWSERLESS_URL" "${BROWSERLESS_URL}"
+    print_kv "CURLLM_DEBUG" "${CURLLM_DEBUG}"
+    print_kv "CURLLM_HEADLESS" "${CURLLM_HEADLESS}"
+    print_kv "CURLLM_NUM_CTX" "${CURLLM_NUM_CTX}"
+    print_kv "CURLLM_NUM_PREDICT" "${CURLLM_NUM_PREDICT}"
+    print_kv "CURLLM_TEMPERATURE" "${CURLLM_TEMPERATURE}"
+    print_kv "CURLLM_TOP_P" "${CURLLM_TOP_P}"
+    print_kv "CURLLM_LOCALE" "${CURLLM_LOCALE}"
+    print_kv "CURLLM_TIMEZONE" "${CURLLM_TIMEZONE}"
+    print_kv "CURLLM_VALIDATION" "${CURLLM_VALIDATION}"
+    print_kv "CURLLM_PROXY" "${CURLLM_PROXY}"
+    print_kv "HTTPS_PROXY" "${HTTPS_PROXY}"
+    print_kv "HTTP_PROXY" "${HTTP_PROXY}"
+    print_kv "CAPTCHA_API_KEY" "${CAPTCHA_API_KEY}"
+    echo -e "${BLUE}Runtime (.env)${NC}"
+    print_kv "CURLLM_INCLUDE_DOM_HTML" "${CURLLM_INCLUDE_DOM_HTML}"
+    print_kv "CURLLM_DOM_MAX_CHARS" "${CURLLM_DOM_MAX_CHARS}"
+    print_kv "CURLLM_DOM_MAX_CAP" "${CURLLM_DOM_MAX_CAP}"
+    print_kv "CURLLM_SMART_CLICK" "${CURLLM_SMART_CLICK}"
+    print_kv "CURLLM_ACTION_TIMEOUT_MS" "${CURLLM_ACTION_TIMEOUT_MS}"
+    print_kv "CURLLM_WAIT_AFTER_CLICK_MS" "${CURLLM_WAIT_AFTER_CLICK_MS}"
+    print_kv "CURLLM_WAIT_AFTER_NAV_MS" "${CURLLM_WAIT_AFTER_NAV_MS}"
+    print_kv "CURLLM_NO_CLICK" "${CURLLM_NO_CLICK}"
+    print_kv "CURLLM_SCROLL_LOAD" "${CURLLM_SCROLL_LOAD}"
+    print_kv "CURLLM_FASTPATH" "${CURLLM_FASTPATH}"
+    print_kv "CURLLM_REFINE_INSTRUCTION" "${CURLLM_REFINE_INSTRUCTION}"
+    print_kv "CURLLM_USE_EXTERNAL_SLIDER_SOLVER" "${CURLLM_USE_EXTERNAL_SLIDER_SOLVER}"
+    print_kv "CURLLM_STALL_LIMIT" "${CURLLM_STALL_LIMIT}"
+    print_kv "CURLLM_PLANNER_BASE_CHARS" "${CURLLM_PLANNER_BASE_CHARS}"
+    print_kv "CURLLM_PLANNER_GROWTH_PER_STEP" "${CURLLM_PLANNER_GROWTH_PER_STEP}"
+    print_kv "CURLLM_PLANNER_MAX_CAP" "${CURLLM_PLANNER_MAX_CAP}"
+    print_kv "CURLLM_STORE_RESULTS" "${CURLLM_STORE_RESULTS}"
+    print_kv "CURLLM_RESULT_KEY" "${CURLLM_RESULT_KEY}"
+    print_kv "CURLLM_DIFF_MODE" "${CURLLM_DIFF_MODE}"
+    print_kv "CURLLM_DIFF_FIELDS" "${CURLLM_DIFF_FIELDS}"
+    print_kv "CURLLM_KEEP_HISTORY" "${CURLLM_KEEP_HISTORY}"
+    print_kv "CURLLM_INCLUDE_PREV_RESULTS" "${CURLLM_INCLUDE_PREV_RESULTS}"
+    print_kv "CURLLM_RUNTIME_PRESET" "${CURLLM_RUNTIME_PRESET}"
+    print_kv "CURLLM_AUTO_RESTART_OLD_MODEL" "${CURLLM_AUTO_RESTART_OLD_MODEL}"
+    echo -e "${BLUE}Logging (.env)${NC}"
+    print_kv "CURLLM_LOG_PREVIEW_CHARS" "${CURLLM_LOG_PREVIEW_CHARS}"
+    print_kv "CURLLM_LOG_PROMPT_CHARS" "${CURLLM_LOG_PROMPT_CHARS}"
+    echo -e "${BLUE}Workspace (.env)${NC}"
+    print_kv "CURLLM_WORKSPACE" "${CURLLM_WORKSPACE}"
+    print_kv "CURLLM_STORAGE_DIR" "${CURLLM_STORAGE_DIR}"
+    print_kv "CURLLM_SCREENSHOT_DIR" "${CURLLM_SCREENSHOT_DIR}"
+    echo -e "${BLUE}Flags (this run)${NC}"
+    print_kv "VISUAL_MODE" "${VISUAL_MODE}"
+    print_kv "STEALTH_MODE" "${STEALTH_MODE}"
+    print_kv "CAPTCHA_SOLVER" "${CAPTCHA_SOLVER}"
+    print_kv "USE_BQL" "${USE_BQL}"
+    print_kv "PROXY_ARG" "${PROXY_ARG}"
+    print_kv "SESSION_ID" "${SESSION_ID}"
+}
 #############################################
 # Export helpers (require jq)
 #############################################
@@ -603,6 +679,8 @@ while [[ $# -gt 0 ]]; do
             stop_services; exit 0;;
         --status)
             check_status; exit 0;;
+        --status-services)
+            check_status; exit 0;;
         --install)
             install_dependencies; exit 0;;
         --html)
@@ -688,7 +766,7 @@ EOF
     
     # Show verbose output if requested (to stderr)
     if [ "$VERBOSE" = true ]; then
-        { echo -e "${BLUE}Request:${NC}"; echo "$PAYLOAD" | jq .; } 1>&2
+        { print_verbose_env; echo -e "${BLUE}Request:${NC}"; echo "$PAYLOAD" | jq .; } 1>&2
     fi
     
     # Make API request
@@ -706,6 +784,13 @@ EOF
     # Always output pure JSON on stdout; verbose info goes to stderr
     if [ "$VERBOSE" = true ]; then
         { echo -e "${BLUE}Response:${NC}"; echo "$RESPONSE" | jq .; } 1>&2
+        # Attempt to print used configuration from run log header
+        RUN_LOG=$(printf '%s' "$RESPONSE" | jq -r '.run_log // empty')
+        if [ -n "$RUN_LOG" ] && [ -f "$RUN_LOG" ]; then
+            { echo -e "${BLUE}Run header (used config):${NC}";
+              awk '/^## curllm run:/{flag=1;next}/^## /{flag=0}flag' "$RUN_LOG" | sed -n '1,160p' | grep -E '^- ' || true;
+            } 1>&2
+        fi
     fi
     echo "$RESPONSE"
     # Auto-restart services if run used old default model (qwen2.5:7b)
@@ -714,7 +799,7 @@ EOF
         RUN_LOG=$(printf '%s' "$RESPONSE" | jq -r '.run_log // empty')
         NEED_RESTART=false
         if [ -n "$RUN_LOG" ] && [ -f "$RUN_LOG" ]; then
-            if grep -q "- Model: qwen2.5:7b" "$RUN_LOG"; then
+            if grep -qE "(- Model: qwen2\.5:7b|- CURLLM_MODEL: qwen2\.5:7b)" "$RUN_LOG"; then
                 NEED_RESTART=true
             fi
         else

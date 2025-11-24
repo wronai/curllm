@@ -1,6 +1,8 @@
 # Playwright + BQL Framework
 
-Docs: [Home](../README.md) | [Installation](Installation.md) | [Environment](Environment.md) | [API](API.md) | [Playwright+BQL](Playwright_BQL.md) | [Examples](EXAMPLES.md) | [Docker](Docker.md) | [Devbox](Devbox.md) | [Troubleshooting](Troubleshooting.md) | [Instrukcja](../INSTRUKCJA.md)
+**[📚 Documentation Index](INDEX.md)** | **[⬅️ Back to Main README](../README.md)**
+
+---
 
 ## Overview
 
@@ -61,3 +63,7 @@ with sync_playwright() as pw:
 ## CAPTCHA note
 
 This framework only detects CAPTCHA-like widgets and returns an interrupt action. The core curllm executor can solve widget CAPTCHAs via 2captcha token injection if `--captcha` is enabled and `CAPTCHA_API_KEY` is set.
+
+---
+
+**[📚 Documentation Index](INDEX.md)** | **[⬆️ Back to Top](#playwright--bql-framework)** | **[Next: Examples →](EXAMPLES.md)**

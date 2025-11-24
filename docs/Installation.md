@@ -1,6 +1,8 @@
 # Installation
 
-Docs: [Home](../README.md) | [Installation](Installation.md) | [Environment](Environment.md) | [API](API.md) | [Playwright+BQL](Playwright_BQL.md) | [Examples](EXAMPLES.md) | [Docker](Docker.md) | [Devbox](Devbox.md) | [Troubleshooting](Troubleshooting.md) | [Instrukcja](../INSTRUKCJA.md)
+**[📚 Documentation Index](INDEX.md)** | **[⬅️ Back to Main README](../README.md)**
+
+---
 
 ## Quick install (recommended)
 
@@ -40,3 +42,7 @@ Notes:
 - Uses a local `venv` to avoid PEP 668 externally-managed-environment errors.
 - Always prefer `python -m pip ...` and `python -m playwright ...` within the venv.
 - For CAPTCHA solving, set `CAPTCHA_API_KEY`.
+
+---
+
+**[📚 Documentation Index](INDEX.md)** | **[⬆️ Back to Top](#installation)** | **[Next: Environment Configuration →](Environment.md)**

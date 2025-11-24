@@ -1,5 +1,9 @@
 # 📋 curllm - Szczegółowa Lista TODO i Plan Rozwoju
 
+**[📚 Documentation Index](INDEX.md)** | **[⬅️ Back to Main README](../README.md)**
+
+---
+
 ## 🚀 Priorytet WYSOKI (Q1 2025)
 
 ### 1. Rozszerzenia Core Engine
@@ -296,3 +300,7 @@
 - 1x QA Engineer
 
 **Budget Estimate**: $250k - $500k (first year)
+
+---
+
+**[📚 Documentation Index](INDEX.md)** | **[⬆️ Back to Top](#-curllm---szczegółowa-lista-todo-i-plan-rozwoju)** | **[Related: HIERARCHICAL_PLANNER →](HIERARCHICAL_PLANNER.md) | [FORM_FILLING →](FORM_FILLING.md)**
