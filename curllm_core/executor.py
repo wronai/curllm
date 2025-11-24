@@ -1,35 +1,17 @@
 #!/usr/bin/env python3
-import asyncio
 import json
 import logging
 import os
-import socket
-import ssl
-import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse
-import requests
 
-
-
-# optional browser_use agent
-try:
-    from browser_use import Agent as BrowserUseAgent  # type: ignore
-except Exception:
-    BrowserUseAgent = None
-
-class LocalAgent:
-    def __init__(self, browser, llm, max_steps, visual_mode, task=None):
-        self.browser = browser
-        self.llm = llm
-        self.max_steps = max_steps
-        self.visual_mode = visual_mode
 
 from .config import config
 from .logger import RunLogger
-from .llm import SimpleOllama
+from .llm_factory import setup_llm as setup_llm_factory
+from .agent_factory import create_agent as create_agent_factory
 from .vision import VisionAnalyzer
 from .captcha import CaptchaSolver
 from .stealth import StealthConfig
@@ -47,8 +29,21 @@ from .extraction import generic_fastpath, direct_fastpath, product_heuristics, f
 from .captcha_slider import attempt_slider_challenge
 from .slider_plugin import try_external_slider_solver
 from .bql import BQLExecutor
+from .validation_utils import should_validate
+from .screenshots import take_screenshot as _take_screenshot_func
+from .form_fill import deterministic_form_fill as _deterministic_form_fill_func, parse_form_pairs as _parse_form_pairs_func
+from .planner_progress import progress_tick as _progress_tick_func
+from .product_extract import multi_stage_product_extract as _multi_stage_product_extract_func
+from .bql_utils import parse_bql as _parse_bql_util
+from .dom_utils import detect_honeypot as _detect_honeypot_func
+from .diagnostics import diagnose_url_issue as _diagnose_url_issue_func
+from .navigation import open_page_with_prechecks as _open_page_with_prechecks_func
+from .rerun_cmd import build_rerun_curl as _build_rerun_curl_func
 
 logger = logging.getLogger(__name__)
+
+def _should_validate(instruction: Optional[str], data: Optional[Any]) -> bool:
+    return should_validate(instruction, data)
 
 class CurllmExecutor:
     """Main browser automation executor with LLM support"""
@@ -58,54 +53,8 @@ class CurllmExecutor:
         self.captcha_solver = CaptchaSolver()
         self.stealth_config = StealthConfig()
 
-def _should_validate(instruction: Optional[str], data: Optional[Any]) -> bool:
-    try:
-        low = (instruction or "").lower()
-        # product-related
-        if any(k in low for k in ["product", "produkt", "price", "zł", "pln"]):
-            return True
-        # article/title-related
-        if any(k in low for k in ["title", "titles", "article", "artyku", "wpis", "blog", "news", "headline", "articl"]):
-            return True
-        if isinstance(data, dict):
-            if "products" in data:
-                return True
-            if "articles" in data:
-                return True
-            try:
-                pg = data.get("page")
-                if isinstance(pg, dict) and isinstance(pg.get("links"), list):
-                    # Looks like page.links extraction
-                    return True
-            except Exception:
-                pass
-    except Exception:
-        pass
-    return False
-
     def _setup_llm(self) -> Any:
-        backend = os.getenv("CURLLM_LLM_BACKEND", "simple").lower()
-        if backend == "langchain":
-            try:
-                from langchain_ollama import OllamaLLM  # type: ignore
-                return OllamaLLM(
-                    base_url=config.ollama_host,
-                    model=config.ollama_model,
-                    temperature=config.temperature,
-                    top_p=config.top_p,
-                    num_ctx=config.num_ctx,
-                    num_predict=config.num_predict,
-                )
-            except Exception as e:
-                logger.warning(f"langchain_ollama requested but unavailable, falling back to SimpleOllama: {e}")
-        return SimpleOllama(
-            base_url=config.ollama_host,
-            model=config.ollama_model,
-            num_ctx=config.num_ctx,
-            num_predict=config.num_predict,
-            temperature=config.temperature,
-            top_p=config.top_p,
-        )
+        return setup_llm_factory()
 
     async def execute_workflow(
         self,
@@ -429,22 +378,7 @@ def _should_validate(instruction: Optional[str], data: Optional[Any]) -> bool:
             }
 
     def _create_agent(self, browser_context, instruction: str, visual_mode: bool):
-        if BrowserUseAgent is not None:
-            try:
-                import inspect
-                params = inspect.signature(BrowserUseAgent.__init__).parameters
-                kwargs = {
-                    "browser": browser_context,
-                    "llm": self.llm,
-                    "max_steps": config.max_steps,
-                    "visual_mode": visual_mode,
-                }
-                if "task" in params:
-                    kwargs["task"] = instruction
-                return BrowserUseAgent(**kwargs)
-            except Exception as e:
-                logger.warning(f"browser_use.Agent init failed: {e}. Falling back to LocalAgent.")
-        return LocalAgent(browser_context, self.llm, config.max_steps, visual_mode, task=instruction)
+        return create_agent_factory(browser_context, self.llm, instruction, config.max_steps, visual_mode)
 
     async def _setup_browser(self, stealth_mode: bool, storage_key: Optional[str] = None, headers: Optional[Dict[str, str]] = None, proxy_config: Optional[Dict[str, Any]] = None, session_id: Optional[str] = None):
         return await setup_browser(
@@ -848,11 +782,7 @@ def _should_validate(instruction: Optional[str], data: Optional[Any]) -> bool:
         return result
 
     async def _take_screenshot(self, page, step: int, target_dir: Optional[Path] = None) -> str:
-        tdir = Path(target_dir) if target_dir else config.screenshot_dir
-        tdir.mkdir(parents=True, exist_ok=True)
-        filename = tdir / f"step_{step}_{datetime.now().timestamp()}.png"
-        await page.screenshot(path=str(filename))
-        return str(filename)
+        return await _take_screenshot_func(page, step, target_dir)
 
     async def _extract_page_context(self, page, include_dom: bool = False, dom_max_chars: int = 20000) -> Dict:
         return await extract_page_context(page, include_dom=include_dom, dom_max_chars=dom_max_chars)
@@ -876,329 +806,22 @@ def _should_validate(instruction: Optional[str], data: Optional[Any]) -> bool:
         return await handle_human_verification(page, run_logger)
 
     async def _detect_honeypot(self, page) -> bool:
-        honeypots = await page.evaluate(
-            """
-            () => {
-                const suspicious = [];
-                const inputs = document.querySelectorAll('input, textarea');
-                inputs.forEach(input => {
-                    const style = window.getComputedStyle(input);
-                    if (style.display === 'none' || 
-                        style.visibility === 'hidden' ||
-                        input.type === 'hidden' ||
-                        style.opacity === '0' ||
-                        input.offsetHeight === 0) {
-                        suspicious.push(input.name || input.id);
-                    }
-                });
-                return suspicious.length > 0;
-            }
-            """
-        )
-        return bool(honeypots)
+        return await _detect_honeypot_func(page)
 
     def _parse_bql(self, query: str) -> str:
-        if "query" in query and "{" in query:
-            return f"Extract the following fields from the page: {query}"
-        return query
+        return _parse_bql_util(query)
 
     def _build_rerun_curl(self, instruction: str | None, url: str, params: Dict[str, Any], top_level: Dict[str, Any] | None = None) -> str:
-        try:
-            inner = {"instruction": instruction or "", "params": params}
-            instr_json = json.dumps(inner, ensure_ascii=False)
-            payload = {
-                "data": instr_json,
-                "url": url,
-                "visual_mode": False,
-                "stealth_mode": False,
-                "captcha_solver": False,
-                "use_bql": False,
-            }
-            if isinstance(top_level, dict):
-                try:
-                    payload.update({k: v for k, v in top_level.items() if k in ("visual_mode","stealth_mode","captcha_solver","use_bql","url")})
-                except Exception:
-                    pass
-            payload_text = json.dumps(payload, ensure_ascii=False)
-            api_url = f"http://localhost:{config.api_port}/api/execute"
-            return f"curl -s -X POST '{api_url}' -H 'Content-Type: application/json' -d '{payload_text}'"
-        except Exception:
-            return ""
+        return _build_rerun_curl_func(instruction, url, params, top_level)
 
     def _diagnose_url_issue(self, url: str) -> Dict[str, Any]:
-        out: Dict[str, Any] = {"url": url}
-        try:
-            pr = urlparse(url)
-            host = pr.hostname or ""
-            scheme = pr.scheme or ""
-            out["host"] = host
-            out["scheme"] = scheme
-            # DNS resolution
-            try:
-                infos = socket.getaddrinfo(host, None)
-                ips = []
-                for i in infos:
-                    ip = i[4][0]
-                    if ip not in ips:
-                        ips.append(ip)
-                out["dns_resolves"] = True
-                out["ips"] = ips
-            except Exception as e:
-                out["dns_resolves"] = False
-                out["dns_error"] = str(e)
-                return out
+        return _diagnose_url_issue_func(url)
 
     def _parse_form_pairs(self, instruction: str | None) -> Dict[str, str]:
-        pairs: Dict[str, str] = {}
-        text = instruction or ""
-        # If JSON-like wrapper is used, parse to get inner instruction
-        try:
-            obj = json.loads(text)
-            if isinstance(obj, dict) and isinstance(obj.get("instruction"), str):
-                text = obj.get("instruction") or text
-        except Exception:
-            pass
-        # Extract key=value pairs separated by commas/semicolons/newlines
-        for m in re.finditer(r"([A-Za-ząćęłńóśźż\- ]+)\s*=\s*([^,;\n]+)", text, flags=re.IGNORECASE):
-            k = (m.group(1) or "").strip().lower()
-            v = (m.group(2) or "").strip()
-            if k and v:
-                pairs[k] = v
-        return pairs
+        return _parse_form_pairs_func(instruction)
 
     async def _deterministic_form_fill(self, instruction: str, page, run_logger: RunLogger | None = None) -> Optional[Dict[str, Any]]:
-        try:
-            raw_pairs = self._parse_form_pairs(instruction)
-            # Normalize keys to canonical fields
-            canonical: Dict[str, str] = {}
-            for k, v in raw_pairs.items():
-                lk = k.lower()
-                if any(x in lk for x in ["email", "e-mail", "mail"]):
-                    canonical["email"] = v
-                elif any(x in lk for x in ["name", "imi", "nazw", "full name", "fullname", "first name", "last name"]):
-                    if "name" not in canonical:
-                        canonical["name"] = v
-                elif any(x in lk for x in ["message", "wiadomo", "treść", "tresc", "content", "komentarz"]):
-                    canonical["message"] = v
-                elif any(x in lk for x in ["subject", "temat"]):
-                    canonical["subject"] = v
-                elif any(x in lk for x in ["phone", "telefon", "tel"]):
-                    canonical["phone"] = v
-            # Mark target fields in DOM and obtain stable selectors
-            selectors = await page.evaluate(
-                r"""
-                () => {
-                  const visible = (el) => {
-                    if (!el) return false;
-                    const r = el.getBoundingClientRect();
-                    return r && r.width > 1 && r.height > 1 && !el.disabled && el.offsetParent !== null;
-                  };
-                  const intoView = (el) => { try { el.scrollIntoView({behavior:'auto', block:'center'}); } catch(e){} };
-                  const add = (arr, el, score) => { if (el && visible(el)) { intoView(el); arr.push({el, score}); } };
-                  const findField = (keywords, prefer) => {
-                    const C = [];
-                    const by = (sel, s) => { try { document.querySelectorAll(sel).forEach(el => add(C, el, s)); } catch(e){} };
-                    keywords.forEach(k => {
-                      by(`input[name*="${k}"]`, 12);
-                      by(`input[id*="${k}"]`, 11);
-                      by(`input[placeholder*="${k}"]`, 10);
-                      by(`input[aria-label*="${k}"]`, 10);
-                      by(`textarea[name*="${k}"]`, 12);
-                      by(`textarea[id*="${k}"]`, 11);
-                      by(`textarea[placeholder*="${k}"]`, 10);
-                      by(`textarea[aria-label*="${k}"]`, 10);
-                    });
-                    // label association
-                    Array.from(document.querySelectorAll('label')).forEach(lb => {
-                      const t = (lb.innerText||'').toLowerCase();
-                      keywords.forEach(k => {
-                        if (t.includes(k)) {
-                          const forId = lb.getAttribute('for');
-                          let el = null;
-                          if (forId) el = document.getElementById(forId);
-                          if (!el) el = lb.querySelector('input,textarea');
-                          add(C, el, 13);
-                        }
-                      });
-                    });
-                    if (C.length === 0 && prefer === 'input') {
-                      by('input[type="email"]', 9);
-                      by('input[type="text"]', 5);
-                    }
-                    C.sort((a,b)=>b.score-a.score);
-                    return C.length ? C[0].el : null;
-                  };
-                  const res = {};
-                  const mark = (el, key) => { if (!el) return null; el.setAttribute('data-curllm-target', key); return `[data-curllm-target="${key}"]`; };
-                  const nameEl = findField(['name','fullname','full name','imi','imię','nazw'], 'input');
-                  if (nameEl) res.name = mark(nameEl, 'name');
-                  const emailEl = findField(['email','e-mail','mail'], 'input');
-                  if (emailEl) res.email = mark(emailEl, 'email');
-                  const msgEl = findField(['message','wiadomo','treść','tresc','content','komentarz'], 'textarea');
-                  if (msgEl) res.message = mark(msgEl, 'message');
-                  // subject optional
-                  const subjEl = findField(['subject','temat'], 'input');
-                  if (subjEl) res.subject = mark(subjEl, 'subject');
-                  // phone optional
-                  const phoneEl = findField(['phone','telefon','tel'], 'input');
-                  if (phoneEl) res.phone = mark(phoneEl, 'phone');
-                  // consent checkbox (GDPR/RODO)
-                  const consentKeywords = ['zgod', 'akcept', 'regulamin', 'polityk', 'rodo', 'privacy', 'consent', 'agree'];
-                  let consent = null;
-                  // label-associated checkboxes
-                  Array.from(document.querySelectorAll('label')).forEach(lb => {
-                    const t = (lb.innerText||'').toLowerCase();
-                    consentKeywords.forEach(k => {
-                      if (!consent && t.includes(k)) {
-                        const forId = lb.getAttribute('for');
-                        if (forId) {
-                          const cb = document.getElementById(forId);
-                          if (cb && cb.type === 'checkbox') consent = cb;
-                        } else {
-                          const cb2 = lb.querySelector('input[type="checkbox"]');
-                          if (cb2) consent = cb2;
-                        }
-                      }
-                    });
-                  });
-                  if (!consent) {
-                    consent = document.querySelector('input[type="checkbox"][required]') || document.querySelector('input[type="checkbox"]');
-                  }
-                  if (consent && visible(consent)) {
-                    res.consent = mark(consent, 'consent');
-                  }
-                  // submit button
-                  const subs = Array.from(document.querySelectorAll('button, input[type="submit"], .wpcf7-submit'))
-                    .filter(el => visible(el) && ((el.getAttribute('type')||'').toLowerCase()==='submit' || /(wyślij|wyslij|wyślij wiadomość|send message|send|submit)/i.test((el.innerText||el.value||'').toLowerCase())));
-                  if (subs.length) res.submit = mark(subs[0], 'submit');
-                  return res;
-                }
-                """
-            )
-            if not isinstance(selectors, dict):
-                selectors = {}
-            filled: Dict[str, Any] = {"filled": {}, "submitted": False}
-            # Fill fields
-            if canonical.get("name") and selectors.get("name"):
-                try:
-                    await page.fill(str(selectors["name"]), canonical["name"])
-                    filled["filled"]["name"] = True
-                except Exception:
-                    pass
-            if canonical.get("email") and selectors.get("email"):
-                try:
-                    await page.fill(str(selectors["email"]), canonical["email"])
-                    filled["filled"]["email"] = True
-                except Exception:
-                    pass
-            if canonical.get("subject") and selectors.get("subject"):
-                try:
-                    await page.fill(str(selectors["subject"]), canonical["subject"])
-                    filled["filled"]["subject"] = True
-                except Exception:
-                    pass
-            if canonical.get("phone") and selectors.get("phone"):
-                try:
-                    await page.fill(str(selectors["phone"]), canonical["phone"])
-                    filled["filled"]["phone"] = True
-                except Exception:
-                    pass
-            if canonical.get("message") and selectors.get("message"):
-                try:
-                    await page.fill(str(selectors["message"]), canonical["message"])
-                    filled["filled"]["message"] = True
-                except Exception:
-                    pass
-            # Consent checkbox if present
-            if selectors.get("consent"):
-                try:
-                    await page.check(str(selectors["consent"]))
-                    filled["filled"]["consent"] = True
-                except Exception:
-                    try:
-                        await page.click(str(selectors["consent"]))
-                        filled["filled"]["consent"] = True
-                    except Exception:
-                        pass
-            # Attempt submit
-            if selectors.get("submit"):
-                try:
-                    await page.click(str(selectors["submit"]))
-                    # Wait briefly for AJAX-based responses (CF7/Elementor)
-                    try:
-                        await page.wait_for_selector('.wpcf7-response-output, .elementor-message-success, .elementor-alert.elementor-alert-success', timeout=5000)
-                    except Exception:
-                        pass
-                    try:
-                        await page.wait_for_load_state("networkidle")
-                    except Exception:
-                        pass
-                    # Detect success message heuristically
-                    ok = await page.evaluate(
-                        """
-                        () => {
-                          const t = (document.body.innerText||'').toLowerCase();
-                          if (/(dziękujemy|dziekujemy|wiadomość została|wiadomosc zostala|wiadomość wysłana|wiadomosc wyslana|message sent|thank you|success)/i.test(t)) return true;
-                          if (document.querySelector('.wpcf7-mail-sent-ok, .wpcf7-response-output, .elementor-message-success, .elementor-alert.elementor-alert-success')) return true;
-                          return false;
-                        }
-                        """
-                    )
-                    filled["submitted"] = bool(ok)
-                except Exception:
-                    pass
-            filled["selectors"] = selectors
-            filled["values"] = canonical
-            return filled
-        except Exception as e:
-            if run_logger:
-                run_logger.log_kv("deterministic_form_fill_error", str(e))
-            return None
-            # TCP connectivity
-            def _tcp(port: int) -> bool:
-                try:
-                    with socket.create_connection((host, port), timeout=5):
-                        return True
-                except Exception:
-                    return False
-            out["tcp_443_open"] = _tcp(443)
-            out["tcp_80_open"] = _tcp(80)
-            # HTTPS handshake
-            https_info: Dict[str, Any] = {}
-            if out["tcp_443_open"]:
-                try:
-                    ctx = ssl.create_default_context()
-                    with socket.create_connection((host, 443), timeout=5) as sock:
-                        with ctx.wrap_socket(sock, server_hostname=host) as ssock:
-                            cert = ssock.getpeercert()
-                            https_info["handshake_ok"] = True
-                            try:
-                                https_info["cert_subject"] = cert.get("subject")
-                            except Exception:
-                                pass
-                except Exception as e:
-                    https_info["handshake_ok"] = False
-                    https_info["ssl_error"] = str(e)
-            out["https"] = https_info
-            # HTTP probe
-            http_url = f"http://{host}/"
-            try:
-                r = requests.get(http_url, timeout=6, allow_redirects=True)
-                out["http_probe"] = {"url": http_url, "status": getattr(r, "status_code", None)}
-            except Exception as e:
-                out["http_probe"] = {"url": http_url, "error": str(e)}
-            # HTTPS probe
-            if scheme == "https":
-                try:
-                    r2 = requests.get(url, timeout=6, allow_redirects=True)
-                    out["https_probe"] = {"status": getattr(r2, "status_code", None)}
-                except requests.exceptions.SSLError as e:
-                    out["https_probe"] = {"ssl_error": str(e)}
-                except Exception as e:
-                    out["https_probe"] = {"error": str(e)}
-        except Exception as e:
-            out["diagnostic_error"] = str(e)
-        return out
+        return await _deterministic_form_fill_func(instruction, page, run_logger)
 
     async def _open_page_with_prechecks(
         self,
@@ -1212,176 +835,23 @@ def _should_validate(instruction: Optional[str], data: Optional[Any]) -> bool:
         result: Dict[str, Any],
         lower_instr: str,
     ):
-        if url:
-            page = await agent.browser.new_page()
-            try:
-                await page.goto(url)
-                try:
-                    await page.wait_for_load_state("domcontentloaded")
-                    await page.wait_for_load_state("networkidle")
-                except Exception:
-                    pass
-            except Exception as e:
-                # Diagnose URL issues and return early with structured error info
-                diag = self._diagnose_url_issue(url)
-                if run_logger:
-                    run_logger.log_kv("navigation_error", str(e))
-                    try:
-                        run_logger.log_code("json", json.dumps({"diagnostics": diag}, ensure_ascii=False, indent=2)[:2000])
-                    except Exception:
-                        pass
-                result["data"] = {
-                    "error": {
-                        "type": "navigation_error",
-                        "message": str(e),
-                        "diagnostics": diag,
-                    }
-                }
-                # Suggest retry with http if https handshake failed but HTTP reachable
-                try:
-                    host = urlparse(url).hostname or ""
-                    if isinstance(diag, dict):
-                        https = diag.get("https", {}) or {}
-                        http_probe = diag.get("http_probe", {}) or {}
-                        if (https.get("handshake_ok") is False) and http_probe.get("status") in (200, 301, 302, 303, 307, 308):
-                            http_url = f"http://{host}/"
-                            cmd = self._build_rerun_curl(instruction, http_url, {"include_dom_html": True}, top_level={"url": http_url})
-                            result["meta"]["hints"].append("HTTPS handshake failed but HTTP is reachable. Try HTTP.")
-                            if cmd:
-                                result["meta"]["suggested_commands"].append(cmd)
-                except Exception:
-                    pass
-                return page, config.screenshot_dir, stealth_mode, result
-            try:
-                hv = await handle_human_verification(page, run_logger)
-                run_logger.log_kv("human_verify_clicked_on_nav", str(bool(hv)))
-            except Exception as e:
-                run_logger.log_kv("human_verify_on_nav_error", str(e))
-            if runtime.get("scroll_load"):
-                try:
-                    await _auto_scroll(page, steps=4, delay_ms=600)
-                except Exception:
-                    pass
-            if captcha_solver:
-                try:
-                    solved = await _handle_widget_captcha(page, current_url=url, solver=self.captcha_solver, run_logger=run_logger)
-                    run_logger.log_kv("widget_captcha_on_nav", str(bool(solved)))
-                except Exception as e:
-                    run_logger.log_kv("widget_captcha_on_nav_error", str(e))
-            if bool(runtime.get("use_external_slider_solver")):
-                try:
-                    ext = await try_external_slider_solver(page, run_logger)
-                    if ext is not None:
-                        run_logger.log_kv("ext_slider_solver_on_nav", str(bool(ext)))
-                except Exception as e:
-                    run_logger.log_kv("ext_slider_solver_on_nav_error", str(e))
-            try:
-                slid = await attempt_slider_challenge(page, run_logger)
-                if slid:
-                    run_logger.log_kv("slider_attempt_on_nav", "True")
-            except Exception as e:
-                run_logger.log_kv("slider_attempt_on_nav_error", str(e))
-        else:
-            page = await agent.browser.new_page()
-        try:
-            if await _is_block_page(page) and not stealth_mode:
-                if run_logger:
-                    run_logger.log_text("Block page detected; retrying with stealth mode...")
-                try:
-                    # Suggest rerun with stealth mode
-                    params = {
-                        "include_dom_html": True,
-                        "scroll_load": True,
-                    }
-                    cmd = self._build_rerun_curl(instruction, url or "", params, top_level={"stealth_mode": True, "url": url or ""})
-                    result["meta"]["hints"].append("Block page detected. Retry with stealth_mode=true or use a proxy.")
-                    result["meta"]["suggested_commands"].append(cmd)
-                except Exception:
-                    pass
-                try:
-                    await page.close()
-                except Exception:
-                    pass
-                host = None
-                try:
-                    host = await page.evaluate("() => window.location.hostname")
-                except Exception:
-                    try:
-                        if url:
-                            host = urlparse(url).hostname
-                    except Exception:
-                        pass
-                new_ctx = await self._setup_browser(True, host, headers=None)
-                agent.browser = new_ctx
-                page = await agent.browser.new_page()
-                await page.goto(url)
-                try:
-                    await page.wait_for_load_state("domcontentloaded")
-                    await page.wait_for_load_state("networkidle")
-                except Exception:
-                    pass
-                stealth_mode = True
-        except Exception:
-            pass
-        domain_dir = config.screenshot_dir
-        try:
-            host = await page.evaluate("() => window.location.hostname")
-            if host:
-                domain_dir = config.screenshot_dir / host
-                domain_dir.mkdir(parents=True, exist_ok=True)
-        except Exception:
-            try:
-                if url:
-                    host = urlparse(url).hostname
-                    if host:
-                        domain_dir = config.screenshot_dir / host
-                        domain_dir.mkdir(parents=True, exist_ok=True)
-            except Exception:
-                pass
-        try:
-            if ("screenshot" in lower_instr) or ("zrzut" in lower_instr):
-                shot_path = await self._take_screenshot(page, 0, target_dir=domain_dir)
-                result["screenshots"].append(shot_path)
-                if run_logger:
-                    run_logger.log_text(f"Initial screenshot saved: {shot_path}")
-                result["data"] = {"screenshot_saved": shot_path}
-                if not ("extract" in lower_instr or "product" in lower_instr or "produkt" in lower_instr):
-                    return page, domain_dir, stealth_mode, result
-        except Exception:
-            pass
-        try:
-            await _accept_cookies(page)
-            run_logger.log_kv("accept_cookies", "attempted")
-        except Exception as e:
-            run_logger.log_kv("accept_cookies_error", str(e))
-        return page, domain_dir, stealth_mode, None
+        return await _open_page_with_prechecks_func(
+            agent,
+            url,
+            instruction,
+            stealth_mode,
+            captcha_solver,
+            runtime,
+            run_logger,
+            result,
+            lower_instr,
+            self._setup_browser,
+            self.captcha_solver,
+            self._build_rerun_curl,
+        )
 
     async def _multi_stage_product_extract(self, instruction: str, page, run_logger: RunLogger | None):
-        extraction_stages = [
-            {"scroll_steps": 2, "wait_ms": 500},
-            {"scroll_steps": 3, "wait_ms": 800},
-            {"scroll_steps": 5, "wait_ms": 1000},
-        ]
-        for stage_idx, stage in enumerate(extraction_stages):
-            if run_logger:
-                run_logger.log_text(f"Product extraction stage {stage_idx + 1}/{len(extraction_stages)}")
-            for _ in range(stage["scroll_steps"]):
-                try:
-                    await page.evaluate("window.scrollBy(0, window.innerHeight * 0.8);")
-                    await page.wait_for_timeout(stage["wait_ms"])
-                except Exception:
-                    pass
-            try:
-                res_products = await product_heuristics(instruction, page, run_logger)
-                if res_products and res_products.get("products"):
-                    if len(res_products["products"]) >= 3:
-                        return res_products
-            except Exception as e:
-                if run_logger:
-                    run_logger.log_text(f"Stage {stage_idx + 1} extraction failed: {e}")
-        if run_logger:
-            run_logger.log_text("Multi-stage extraction incomplete, continuing with LLM planner")
-        return None
+        return await _multi_stage_product_extract_func(instruction, page, run_logger)
 
     def _progress_tick(
         self,
@@ -1396,62 +866,15 @@ def _should_validate(instruction: Optional[str], data: Optional[Any]) -> bool:
         url: Optional[str],
         stall_limit: int,
     ) -> tuple[Optional[str], int, int, bool]:
-        sig = f"{page_context.get('url','')}|{page_context.get('title','')}|{len(page_context.get('interactive',[])):04d}|{len(page_context.get('dom_preview',''))}"
-        if last_sig is None:
-            last_sig = sig
-            no_progress = 0
-        elif sig == last_sig:
-            no_progress += 1
-            if no_progress > 1:
-                progressive_depth = min(progressive_depth + 1, 3)
-                dom_cap = int(runtime.get("dom_max_cap", 60000) or 60000)
-                runtime["dom_max_chars"] = min(int(runtime.get("dom_max_chars", 20000)) * progressive_depth, dom_cap)
-                if run_logger:
-                    run_logger.log_text(f"No progress for {no_progress} steps. Increasing DOM depth to {runtime['dom_max_chars']} chars")
-                try:
-                    params = {
-                        "include_dom_html": True,
-                        "dom_max_chars": runtime.get("dom_max_chars", 20000),
-                        "stall_limit": stall_limit,
-                        "planner_growth_per_step": int(runtime.get("planner_growth_per_step", 2000)),
-                        "planner_max_cap": int(runtime.get("planner_max_cap", 20000)),
-                        "preset": "deep_scan",
-                    }
-                    cmd = self._build_rerun_curl(instruction, url or "", params)
-                    result["meta"]["hints"].append("Increased DOM depth due to no progress. You can also retry with these parameters.")
-                    result["meta"]["suggested_commands"].append(cmd)
-                except Exception:
-                    pass
-        else:
-            last_sig = sig
-            no_progress = 0
-            progressive_depth = 1
-        if no_progress >= stall_limit:
-            if progressive_depth < 3:
-                progressive_depth = 3
-                runtime["dom_max_chars"] = int(runtime.get("dom_max_cap", 60000) or 60000)
-                no_progress = stall_limit - 1
-            else:
-                if run_logger:
-                    run_logger.log_text(f"No progress detected for {stall_limit} consecutive steps. Stopping early.")
-                try:
-                    params = {
-                        "include_dom_html": True,
-                        "dom_max_chars": int(runtime.get("dom_max_cap", 60000) or 60000),
-                        "stall_limit": stall_limit + 2,
-                        "planner_growth_per_step": int(runtime.get("planner_growth_per_step", 2000)) + 1000,
-                        "planner_max_cap": int(runtime.get("planner_max_cap", 20000)) + 5000,
-                        "preset": "deep_scan",
-                    }
-                    cmd = self._build_rerun_curl(instruction, url or "", params)
-                    result["meta"]["hints"].append("Stall limit reached. Consider increasing stall_limit and DOM cap and retry.")
-                    result["meta"]["suggested_commands"].append(cmd)
-                    status = page_context.get("status") or {}
-                    if bool(status.get("human_verify_possible")):
-                        result["meta"]["hints"].append("Human verification likely. Consider retrying with stealth and/or manual verification strategies.")
-                        cmd2 = self._build_rerun_curl(instruction, url or "", {**params}, top_level={"stealth_mode": True, "url": url or ""})
-                        result["meta"]["suggested_commands"].append(cmd2)
-                except Exception:
-                    pass
-                return last_sig, no_progress, progressive_depth, True
-        return last_sig, no_progress, progressive_depth, False
+        return _progress_tick_func(
+            page_context,
+            last_sig,
+            no_progress,
+            progressive_depth,
+            runtime,
+            run_logger,
+            result,
+            instruction,
+            url,
+            stall_limit,
+        )
