@@ -37,9 +37,10 @@ from .actions import execute_action
 from .human_verify import handle_human_verification, looks_like_human_verify_text
 from .captcha_widget import handle_captcha_image as _handle_captcha_image_widget, handle_widget_captcha as _handle_widget_captcha
 from .page_utils import auto_scroll as _auto_scroll, accept_cookies as _accept_cookies, is_block_page as _is_block_page
-from .extraction import generic_fastpath, direct_fastpath, product_heuristics, fallback_extract
+from .extraction import generic_fastpath, direct_fastpath, product_heuristics, fallback_extract, extract_articles_eval
 from .captcha_slider import attempt_slider_challenge
 from .slider_plugin import try_external_slider_solver
+from .bql import BQLExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -115,7 +116,9 @@ class CurllmExecutor:
 
         browser_context = None
         try:
+            bql_query_raw: Optional[str] = None
             if use_bql:
+                bql_query_raw = instruction
                 instruction = self._parse_bql(instruction)
                 run_logger.log_text("BQL parsed instruction:")
                 run_logger.log_code("text", instruction)
@@ -127,6 +130,73 @@ class CurllmExecutor:
             norm_headers = normalize_headers(headers)
             browser_context = await self._setup_browser(stealth_mode, storage_key=host, headers=norm_headers)
             run_logger.log_text("Browser context initialized.")
+
+            # If BQL mode, execute BQL directly and short-circuit
+            if use_bql and bql_query_raw:
+                try:
+                    bql_exec = BQLExecutor(browser_context)
+                    bql_result = await bql_exec.execute(bql_query_raw)
+                    if run_logger:
+                        run_logger.log_text("BQL execution finished.")
+                        try:
+                            run_logger.log_code("json", json.dumps(bql_result, indent=2))
+                        except Exception:
+                            pass
+                    # Normalize to a convenient top-level shape when possible
+                    result_data: Any = None
+                    try:
+                        data = bql_result.get("data") if isinstance(bql_result, dict) else None
+                        if isinstance(data, dict) and "page" in data:
+                            page_obj = data.get("page") or {}
+                            items = page_obj.get("items") or []
+                            if isinstance(items, list):
+                                articles = []
+                                for it in items:
+                                    if isinstance(it, dict):
+                                        title = it.get("title") or it.get("text")
+                                        url2 = it.get("url") or it.get("href")
+                                        articles.append({"title": title or "", "url": url2 or ""})
+                                result_data = {"articles": articles}
+                    except Exception:
+                        pass
+                    if result_data is None:
+                        result_data = bql_result.get("data", bql_result)
+
+                    # Close browser resources before returning
+                    if browser_context is not None:
+                        try:
+                            try:
+                                storage_path = getattr(browser_context, "_curllm_storage_path", None)
+                                if storage_path:
+                                    await browser_context.storage_state(path=storage_path)
+                            except Exception:
+                                logger.warning("Unable to persist storage state", exc_info=True)
+                            await browser_context.close()
+                        except Exception as e:
+                            logger.warning(f"Error during browser close: {e}")
+                        try:
+                            br = getattr(browser_context, "_curllm_browser", None)
+                            if br is not None:
+                                await br.close()
+                            pw = getattr(browser_context, "_curllm_playwright", None)
+                            if pw is not None:
+                                await pw.stop()
+                        except Exception as e:
+                            logger.warning(f"Error closing Playwright resources: {e}")
+
+                    res = {
+                        "success": True,
+                        "result": result_data,
+                        "steps_taken": 1,
+                        "screenshots": [],
+                        "timestamp": datetime.now().isoformat(),
+                        "run_log": str(run_logger.path),
+                    }
+                    run_logger.log_text("Run finished successfully.")
+                    return res
+                except Exception as e:
+                    run_logger.log_text("BQL execution error:")
+                    run_logger.log_code("text", str(e))
 
             agent = self._create_agent(
                 browser_context=browser_context,
@@ -173,6 +243,8 @@ class CurllmExecutor:
                 "screenshots": result.get("screenshots", []),
                 "timestamp": datetime.now().isoformat(),
                 "run_log": str(run_logger.path),
+                "hints": (result.get("meta", {}) or {}).get("hints", []),
+                "suggested_commands": (result.get("meta", {}) or {}).get("suggested_commands", []),
             }
             run_logger.log_text("Run finished successfully.")
             return res
@@ -201,11 +273,33 @@ class CurllmExecutor:
                         await pw.stop()
                 except Exception as e2:
                     logger.warning(f"Error closing Playwright resources after failure: {e2}")
+            # Provide interactive hints and ready commands on failure
+            try:
+                params = {
+                    "include_dom_html": True,
+                    "scroll_load": True,
+                    "dom_max_chars": 60000,
+                    "stall_limit": int(os.getenv("CURLLM_STALL_LIMIT", "7")),
+                    "planner_growth_per_step": int(os.getenv("CURLLM_PLANNER_GROWTH", "3000")),
+                    "planner_max_cap": int(os.getenv("CURLLM_PLANNER_MAX", "30000")),
+                }
+                cmd = self._build_rerun_curl(instruction, url or "", params)
+                run_logger.log_text("Suggested retry command:")
+                run_logger.log_code("bash", cmd)
+                hints = [
+                    "Enable DOM snapshot and deeper analysis, increase stall limit, and retry.",
+                    "If blocked, set stealth_mode=true or use a proxy.",
+                ]
+                suggested = [cmd]
+            except Exception:
+                hints, suggested = [], []
             return {
                 "success": False,
                 "error": str(e),
                 "timestamp": datetime.now().isoformat(),
                 "run_log": str(run_logger.path),
+                "hints": hints,
+                "suggested_commands": suggested,
             }
 
     def _create_agent(self, browser_context, instruction: str, visual_mode: bool):
@@ -250,7 +344,7 @@ class CurllmExecutor:
         run_logger: RunLogger,
         runtime: Dict[str, Any],
     ) -> Dict:
-        result: Dict[str, Any] = {"data": None, "steps": 0, "screenshots": []}
+        result: Dict[str, Any] = {"data": None, "steps": 0, "screenshots": [], "meta": {"hints": [], "suggested_commands": []}}
         lower_instr = (instruction or "").lower()
         if url:
             page = await agent.browser.new_page()
@@ -376,9 +470,44 @@ class CurllmExecutor:
                     return result
             except Exception as e:
                 run_logger.log_kv("direct_fastpath_error", str(e))
+        # Multi-stage extraction strategy for products
+        if "product" in lower_instr or "produkt" in lower_instr:
+            extraction_stages = [
+                {"scroll_steps": 2, "wait_ms": 500},
+                {"scroll_steps": 3, "wait_ms": 800},
+                {"scroll_steps": 5, "wait_ms": 1000},
+            ]
+
+            for stage_idx, stage in enumerate(extraction_stages):
+                if run_logger:
+                    run_logger.log_text(f"Product extraction stage {stage_idx + 1}/{len(extraction_stages)}")
+
+                # Scroll to load more content
+                for _ in range(stage["scroll_steps"]):
+                    try:
+                        await page.evaluate("window.scrollBy(0, window.innerHeight * 0.8);")
+                        await page.wait_for_timeout(stage["wait_ms"])
+                    except Exception:
+                        pass
+
+                # Try extraction
+                try:
+                    res_products = await product_heuristics(instruction, page, run_logger)
+                    if res_products and res_products.get("products"):
+                        if len(res_products["products"]) >= 3:
+                            result["data"] = res_products
+                            await page.close()
+                            return result
+                except Exception as e:
+                    if run_logger:
+                        run_logger.log_text(f"Stage {stage_idx + 1} extraction failed: {e}")
+
+            if run_logger:
+                run_logger.log_text("Multi-stage extraction incomplete, continuing with LLM planner")
         last_sig = None
         no_progress = 0
-        stall_limit = 3
+        stall_limit = int(runtime.get("stall_limit", 5) or 5)
+        progressive_depth = 1
         last_screenshot_path: Optional[str] = None
         last_visual_analysis: Optional[Dict[str, Any]] = None
         for step in range(config.max_steps):
@@ -503,21 +632,65 @@ class CurllmExecutor:
             except Exception:
                 pass
             try:
-                sig = f"{page_context.get('url','')}|{page_context.get('title','')}|{(page_context.get('text','') or '')[:500]}"
+                sig = f"{page_context.get('url','')}|{page_context.get('title','')}|{len(page_context.get('interactive',[])):04d}|{len(page_context.get('dom_preview',''))}"
+
                 if last_sig is None:
                     last_sig = sig
                     no_progress = 0
                 elif sig == last_sig:
                     no_progress += 1
+                    # If no progress, increase DOM analysis depth progressively
+                    if no_progress > 1:
+                        progressive_depth = min(progressive_depth + 1, 3)
+                        dom_cap = int(runtime.get("dom_max_cap", 60000) or 60000)
+                        runtime["dom_max_chars"] = min(int(runtime.get("dom_max_chars", 20000)) * progressive_depth, dom_cap)
+                        if run_logger:
+                            run_logger.log_text(f"No progress for {no_progress} steps. Increasing DOM depth to {runtime['dom_max_chars']} chars")
+                        try:
+                            params = {
+                                "include_dom_html": True,
+                                "dom_max_chars": runtime.get("dom_max_chars", 20000),
+                                "stall_limit": stall_limit,
+                                "planner_growth_per_step": int(runtime.get("planner_growth_per_step", 2000)),
+                                "planner_max_cap": int(runtime.get("planner_max_cap", 20000)),
+                            }
+                            cmd = self._build_rerun_curl(instruction, url or "", params)
+                            result["meta"]["hints"].append("Increased DOM depth due to no progress. You can also retry with these parameters.")
+                            result["meta"]["suggested_commands"].append(cmd)
+                        except Exception:
+                            pass
                 else:
                     last_sig = sig
                     no_progress = 0
+                    progressive_depth = 1
+
                 if no_progress >= stall_limit:
-                    if run_logger:
-                        run_logger.log_text(f"No progress detected for {stall_limit} consecutive steps. Stopping early.")
-                    break
-            except Exception:
-                pass
+                    # Before stopping, try once with maximum depth
+                    if progressive_depth < 3:
+                        progressive_depth = 3
+                        runtime["dom_max_chars"] = int(runtime.get("dom_max_cap", 60000) or 60000)
+                        no_progress = stall_limit - 1  # Give one more chance
+                    else:
+                        if run_logger:
+                            run_logger.log_text(f"No progress detected for {stall_limit} consecutive steps. Stopping early.")
+                        # Attach hints and a ready-to-run command
+                        try:
+                            params = {
+                                "include_dom_html": True,
+                                "dom_max_chars": int(runtime.get("dom_max_cap", 60000) or 60000),
+                                "stall_limit": stall_limit + 2,
+                                "planner_growth_per_step": int(runtime.get("planner_growth_per_step", 2000)) + 1000,
+                                "planner_max_cap": int(runtime.get("planner_max_cap", 20000)) + 5000,
+                            }
+                            cmd = self._build_rerun_curl(instruction, url or "", params)
+                            result["meta"]["hints"].append("Stall limit reached. Consider increasing stall_limit and DOM cap and retry.")
+                            result["meta"]["suggested_commands"].append(cmd)
+                        except Exception:
+                            pass
+                        break
+            except Exception as e:
+                if run_logger:
+                    run_logger.log_text(f"Progress check error: {e}")
             if run_logger:
                 try:
                     run_logger.log_text("Page context snapshot (truncated):")
@@ -531,6 +704,19 @@ class CurllmExecutor:
                     break
             except Exception:
                 pass
+            # Deterministic extraction shortcut for article titles when no_click and DOM is rich
+            try:
+                looks_articles = any(k in (instruction or "").lower() for k in ["article", "artyku", "wpis", "blog", "title"])  # noqa: E501
+                if looks_articles and runtime.get("no_click") and (page_context.get("headings") or page_context.get("article_candidates")):
+                    det_items = await extract_articles_eval(page)
+                    if det_items:
+                        result["data"] = {"articles": det_items}
+                        if run_logger:
+                            run_logger.log_text(f"Deterministic articles extracted: {len(det_items)}")
+                        break
+            except Exception as e:
+                if run_logger:
+                    run_logger.log_kv("deterministic_articles_error", str(e))
             # Planner: log size of provided context
             try:
                 ctx_bytes = len(json.dumps(page_context)[:100000])
@@ -542,12 +728,28 @@ class CurllmExecutor:
                 page_context=page_context,
                 step=step,
                 run_logger=run_logger,
+                runtime=runtime,
             )
             if run_logger:
                 run_logger.log_text("Planned action:")
                 run_logger.log_code("json", json.dumps(action))
             if action.get("type") == "complete":
-                result["data"] = action.get("extracted_data", page_context)
+                data = action.get("extracted_data", page_context)
+                # If LLM returned empty, try deterministic extraction as final fill-in
+                try:
+                    is_empty = (data is None) or (isinstance(data, (list, dict)) and len(data) == 0)
+                except Exception:
+                    is_empty = False
+                if is_empty:
+                    try:
+                        items2 = await extract_articles_eval(page)
+                        if items2:
+                            data = {"articles": items2}
+                            if run_logger:
+                                run_logger.log_text(f"Filled extracted_data from deterministic extractor: {len(items2)}")
+                    except Exception:
+                        pass
+                result["data"] = data
                 if run_logger:
                     run_logger.log_text("Planner returned complete with extracted_data.")
                 break
@@ -589,9 +791,13 @@ class CurllmExecutor:
     async def _extract_page_context(self, page, include_dom: bool = False, dom_max_chars: int = 20000) -> Dict:
         return await extract_page_context(page, include_dom=include_dom, dom_max_chars=dom_max_chars)
 
-    async def _generate_action(self, instruction: str, page_context: Dict, step: int, run_logger: RunLogger | None = None) -> Dict:
+    async def _generate_action(self, instruction: str, page_context: Dict, step: int, run_logger: RunLogger | None = None, runtime: Dict[str, Any] | None = None) -> Dict:
         from .llm_planner import generate_action
-        return await generate_action(self.llm, instruction, page_context, step, run_logger)
+        rt = runtime or {}
+        max_chars = int(rt.get("planner_max_cap", 20000) or 20000)
+        growth = int(rt.get("planner_growth_per_step", 2000) or 2000)
+        max_cap = int(rt.get("planner_max_cap", 20000) or 20000)
+        return await generate_action(self.llm, instruction, page_context, step, run_logger, max_chars=max_chars, growth_per_step=growth, max_cap=max_cap)
 
     async def _execute_action(self, page, action: Dict, runtime: Dict[str, Any]):
         return await execute_action(page, action, runtime)
@@ -629,3 +835,21 @@ class CurllmExecutor:
         if "query" in query and "{" in query:
             return f"Extract the following fields from the page: {query}"
         return query
+
+    def _build_rerun_curl(self, instruction: str | None, url: str, params: Dict[str, Any]) -> str:
+        try:
+            inner = {"instruction": instruction or "", "params": params}
+            instr_json = json.dumps(inner, ensure_ascii=False)
+            payload = {
+                "data": instr_json,
+                "url": url,
+                "visual_mode": False,
+                "stealth_mode": False,
+                "captcha_solver": False,
+                "use_bql": False,
+            }
+            payload_text = json.dumps(payload, ensure_ascii=False)
+            api_url = f"http://localhost:{config.api_port}/api/execute"
+            return f"curl -s -X POST '{api_url}' -H 'Content-Type: application/json' -d '{payload_text}'"
+        except Exception:
+            return ""

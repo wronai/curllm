@@ -91,18 +91,21 @@ fi
 # Activate virtual environment
 source venv/bin/activate
 
-# Upgrade pip
-pip install --upgrade pip
+# Upgrade pip/setuptools/wheel using venv python
+python -m pip install --upgrade pip setuptools wheel
 
-# Install Python dependencies
+# Install Python dependencies (inside venv)
 echo "Installing Python packages..."
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 echo -e "${GREEN}✓ Python packages installed${NC}"
 
-# Install Playwright browsers
+# Ensure playwright Python package is present (redundant if in requirements.txt, but safe)
+python -m pip install playwright || true
+
+# Install Playwright browsers via venv python to avoid PATH issues
 echo "Installing Playwright browsers..."
-playwright install chromium > /dev/null 2>&1
-playwright install-deps chromium > /dev/null 2>&1 || true
+python -m playwright install chromium > /dev/null 2>&1 || python -m playwright install > /dev/null 2>&1 || true
+python -m playwright install-deps chromium > /dev/null 2>&1 || true
 echo -e "${GREEN}✓ Playwright browsers installed${NC}"
 
 echo ""

@@ -4,31 +4,53 @@ from typing import Any, Dict
 
 from .logger import RunLogger
 
-async def generate_action(llm: Any, instruction: str, page_context: Dict, step: int, run_logger: RunLogger | None = None, max_chars: int = 8000) -> Dict:
-    context_str = json.dumps(page_context, indent=2)[: max(1000, int(max_chars))]
+async def generate_action(llm: Any, instruction: str, page_context: Dict, step: int, run_logger: RunLogger | None = None, max_chars: int = 8000, growth_per_step: int = 2000, max_cap: int = 20000) -> Dict:
+    adaptive_chars = min(max_chars + (step * growth_per_step), max_cap)
+    context_str = json.dumps(page_context, indent=2)[:adaptive_chars]
+
+    product_context = ""
+    if "product" in (instruction or "").lower() or "cen" in (instruction or "").lower():
+        product_context = (
+            "\n"
+            "IMPORTANT: You are looking for products with prices. Analyze the DOM carefully:\n"
+            "1. Look for repeating patterns that contain both text and numbers\n"
+            "2. Prices in Polish format: \"XXX,YY zł\" or \"od XXX,YY zł\" or just \"XXX.YY\"\n"
+            "3. If you see products, extract them in the extracted_data field\n"
+            "4. If the page doesn't show products yet, suggest navigation action (scroll, click on category)\n"
+            "5. Check interactive elements for filters or sorting options\n\n"
+            "Signs that indicate product listings:\n"
+            "- Multiple similar DOM structures with prices\n"
+            "- Links with product IDs (numbers in URLs)\n"
+            "- Text patterns like \"od XXX zł\", \"cena:\", \"price:\"\n\n"
+            "If you found products matching the criteria, return type=\"complete\" with extracted_data.\n"
+            "If page needs more loading, return type=\"scroll\".\n"
+            "If you see category links but no products, return type=\"click\" on relevant category.\n"
+        )
+
     prompt_text = (
         "You are a browser automation expert. Analyze the current page and determine the next action.\n\n"
         f"Instruction: {instruction}\n"
-        f"Current Step: {step}\n"
-        f"Page Context: {context_str}\n\n"
-        "If 'interactive' or 'dom_preview' are present, prefer using selectors for existing elements.\n"
-        "If the instruction asks to extract data (titles, prices, urls, emails, etc.), and clicking is unnecessary, respond with type=complete and return extracted_data only.\n"
-        "Use 'headings' and 'article_candidates' when extracting article titles. Return a list under extracted_data.articles with {title, url}.\n"
-        "For article titles, look for headings in <article>, <main>, <section> (h1/h2/h3) and anchor texts that look like article links.\n"
+        f"Current Step: {step + 1}\n"
+        f"Page Context (truncated to {len(context_str)} chars): {context_str}\n\n"
+        f"{product_context}\n"
+        "Analyze the DOM structure in 'dom_preview' and 'interactive' fields carefully.\n"
+        "The 'headings' field shows main content structure.\n"
+        "The 'article_candidates' may contain product links.\n\n"
+        "If you see enough data to complete the task, return type='complete' with extracted_data.\n"
+        "If page needs interaction, return appropriate action (click/scroll/wait).\n\n"
         "Generate a JSON action:\n"
         "{\n"
         "    \"type\": \"click|fill|scroll|wait|complete\",\n"
         "    \"selector\": \"CSS selector if applicable\",\n"
         "    \"value\": \"value to fill if applicable\",\n"
-        "    \"waitFor\": \"optional selector to wait for\",\n"
-        "    \"timeoutMs\": 8000\n"
-        "    \"extracted_data\": \"data if task is complete (e.g., {\\\"articles\\\": [{\\\"title\\\": \\\"...\\\", \\\"url\\\": \\\"...\\\"}]})\"\n"
+        "    \"extracted_data\": \"data if task is complete\",\n"
+        "    \"reason\": \"brief explanation of your decision\"\n"
         "}\n\n"
         "Response (JSON only):"
     )
     if run_logger:
-        run_logger.log_text("LLM Prompt:")
-        run_logger.log_code("json", prompt_text)
+        run_logger.log_text(f"LLM Prompt (step {step + 1}, context: {len(context_str)} chars)")
+        run_logger.log_code("text", prompt_text[:1000] + "...[truncated]...")
     try:
         response = await llm.ainvoke(prompt_text)
         text = response["text"] if isinstance(response, dict) and "text" in response else str(response)
@@ -40,7 +62,7 @@ async def generate_action(llm: Any, instruction: str, page_context: Dict, step: 
     if run_logger:
         run_logger.log_text("LLM Raw Response:")
         run_logger.log_code("json", text)
-    # Robust JSON parsing: strip code fences, then load; if fails, extract first JSON object by brace matching
+    # Robust JSON parsing: strip code fences, then load; if fails, scan for valid JSON action objects
     def _strip_fences(s: str) -> str:
         s = s.strip()
         if s.startswith("```"):
@@ -54,11 +76,18 @@ async def generate_action(llm: Any, instruction: str, page_context: Dict, step: 
     raw = _strip_fences(text)
     # Strategy 1: direct JSON
     try:
-        return json.loads(raw)
+        obj = json.loads(raw)
+        if isinstance(obj, dict):
+            if "type" in obj or "extracted_data" in obj:
+                return obj
+            if "articles" in obj:
+                return {"type": "complete", "extracted_data": {"articles": obj.get("articles")}}
     except Exception:
         pass
-    # Strategy 2: find first balanced JSON object, ignoring braces in strings
-    def _first_json_object(s: str) -> str | None:
+
+    # Strategy 2: collect all balanced JSON objects, ignoring braces in strings
+    def _all_json_objects(s: str) -> list[str]:
+        objs: list[str] = []
         start = -1
         depth = 0
         in_str = False
@@ -84,28 +113,44 @@ async def generate_action(llm: Any, instruction: str, page_context: Dict, step: 
                 if ch == '}' and depth > 0:
                     depth -= 1
                     if depth == 0 and start != -1:
-                        return s[start : i + 1]
-        return None
+                        objs.append(s[start : i + 1])
+                        start = -1
+        return objs
 
     try:
-        cand = _first_json_object(raw)
-        if cand:
-            return json.loads(cand)
+        candidates = _all_json_objects(raw)
+        # Prefer later candidates in case the model echoed an example first
+        for cand in reversed(candidates):
+            try:
+                obj = json.loads(cand)
+            except Exception:
+                continue
+            if isinstance(obj, dict):
+                if "type" in obj or "extracted_data" in obj:
+                    return obj
+                if "articles" in obj:
+                    return {"type": "complete", "extracted_data": {"articles": obj.get("articles")}}
     except Exception as e:
         if run_logger:
             run_logger.log_text("Planner parse error (balanced scan):")
             run_logger.log_code("text", str(e))
-    # Strategy 3: incremental closing brace trial
+
+    # Strategy 3: incremental closing brace trial from the last opening brace
     try:
-        start = raw.find('{')
-        if start != -1:
-            positions = [i for i, ch in enumerate(raw, start=0) if ch == '}']
+        last_start = raw.rfind('{')
+        if last_start != -1:
+            positions = [i for i, ch in enumerate(raw) if ch == '}']
             for pos in positions:
-                if pos <= start:
+                if pos <= last_start:
                     continue
-                sl = raw[start : pos + 1]
+                sl = raw[last_start : pos + 1]
                 try:
-                    return json.loads(sl)
+                    obj = json.loads(sl)
+                    if isinstance(obj, dict):
+                        if "type" in obj or "extracted_data" in obj:
+                            return obj
+                        if "articles" in obj:
+                            return {"type": "complete", "extracted_data": {"articles": obj.get("articles")}}
                 except Exception:
                     continue
     except Exception as e:

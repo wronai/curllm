@@ -146,6 +146,112 @@ For a comprehensive, curated set of examples and ready-to-run scripts, see:
 - docs/EXAMPLES.md
 - Generate scripts: make examples (scripts are created in examples/ as curllm-*.sh)
 
+### Playwright + BQL (Sync) Agent — captcha/playwright_bql_framework.py
+
+This repository now includes a simple synchronous Playwright + BQL agent you can run directly, with built-in cookie-consent handling and CAPTCHA detection (no bypass). The agent expects your LLM to return a JSON array of BQL actions (fill, click, wait, select, submit, scroll, screenshot).
+
+Install prerequisites (inside your virtualenv):
+
+```bash
+pip install -r requirements.txt
+pip install playwright
+python -m playwright install
+```
+
+Run a demo:
+
+```bash
+python captcha/playwright_bql_framework.py
+```
+
+Use your preferred LLM:
+
+- Default: Ollama (env: CURLLM_OLLAMA_HOST, CURLLM_MODEL)
+- OpenAI: set BQL_FRAMEWORK_LLM=openai and OPENAI_API_KEY, optionally OPENAI_MODEL
+
+Examples (pseudo-code snippets):
+
+```python
+from playwright.sync_api import sync_playwright
+from captcha.playwright_bql_framework import BQLAgent, select_llm_caller
+
+# WordPress Login
+with sync_playwright() as pw:
+    browser = pw.chromium.launch(headless=False)
+    page = browser.new_page()
+    page.goto("https://www.prototypowanie.pl/wp-login.php", wait_until="networkidle")
+    agent = BQLAgent(page, call_llm=select_llm_caller())
+    res = agent.run_instruction("Zaloguj się do WordPress. Login: admin, Hasło: test123.")
+    print(res)
+    browser.close()
+
+# Contact form fill
+with sync_playwright() as pw:
+    browser = pw.chromium.launch(headless=False)
+    page = browser.new_page()
+    page.goto("https://softreck.com/contact", wait_until="networkidle")
+    agent = BQLAgent(page, call_llm=select_llm_caller())
+    res = agent.run_instruction("Wypełnij formularz: Imię Jan, Email jan@example.com, Wiadomość 'Test wysyłki'. Wyślij formularz.")
+    print(res)
+    browser.close()
+
+# Structured product search (example site)
+with sync_playwright() as pw:
+    browser = pw.chromium.launch(headless=False)
+    page = browser.new_page()
+    page.goto("https://ceneo.pl", wait_until="networkidle")
+    agent = BQLAgent(page, call_llm=select_llm_caller())
+    res = agent.run_instruction("Znajdź wszystkie produkty poniżej 150 zł i zwróć nazwy, ceny i URL-e.")
+    print(res)
+    browser.close()
+```
+
+Notes:
+
+- The agent detects CAPTCHA-like widgets and returns an interrupt; the core curllm executor can optionally solve widget CAPTCHAs using a 2captcha sitekey token injection if you enable captcha_solver and provide an API key.
+- The agent clicks obvious cookie-consent buttons if found (configurable).
+
+### product extractor from ceneo.pl
+
+#### Find all products under 150zł and extract names, prices and urls
+command:
+```bash
+curllm --visual -H "Accept-Language: pl-PL,pl;q=0.9" "https://ceneo.pl" -d '{
+  "instruction":"Find all products under 150zł and extract names, prices and urls",
+  "params": {
+    "include_dom_html": true,
+    "no_click": true,
+    "scroll_load": true,
+    "action_timeout_ms": 120000,
+    "use_external_slider_solver": true
+  }
+}'
+```
+output:
+```bash
+{"result":{"products":[{"name":"Bestseller\n4,9\n414\n\nIbuvit D3 4000Iu 150kaps.\n\n1000+ kupionych ostatnio\nod41,18z\u0142","price":41.18,"url":"https://redirect.ceneo.pl/offers/164000259/9026?e=EOpjbVPvmeU84eOvTVLW8x9ZNVMTIBt6BegLfpT4JtD%2BafUImi8vsfWXXtr8DMq0X88TaxMLTJxeJJJaUCdmGyCBcPvOgXaqbCITGHMyX4V962NVaZY%2Bh2BDFZdla0ceoMYEHuJZOUGcft4g2WWpqA%3D%3D"},{"name":"Bestseller\n4,1\n4\n\nPucio urz\u0105dza wigili\u0119, czyli \u015bwi\u0105teczne s\u0142owa i zadania dla przedszkolak\u00f3w\n\n1000+ kupionych ostatnio\nod59,99z\u0142","price":59.99,"url":"https://redirect.ceneo.pl/offers/188774853/22637?e=EOpjbVPvmeU84eOvTVLW8x9ZNVMTIBt6BegLfpT4JtCwjwfoZvABCMIa%2FwfTTUpPf4CAMmDEyEScec%2B8scvyCzN7ApkOegh4hO7WcMD5rND9Me7F6rLgCr57%2FozD%2BnbXTw2P4a2bsfGGmyuUb5%2B3hg%3D%3D"},{"name":"Popularny teraz\n4,9\n145\n\nPOLECANY Redmi Note 14 Pro 5G 8/256GB Czarny\n\n100+ kupionych ostatnio\nod1 149,00z\u0142","price":149,"url":"https://redirect.ceneo.pl/offers/179314788/16202?e=EOpjbVPvmeU84eOvTVLW8x9ZNVMTIBt6BegLfpT4JtAvV6%2BS4wDNiNcN5EmHT8vDqqLH2IKSXS8KzGnDtg%2FbqsDHDbhVHROeNVvRqlGBtTeOdxI29gon%2BiwiDIya1tRUIgi%2BTBEfSGLmPlqqNWLwhYlxKTfZiD4Rmu5c76aN5UA%3D"},{"name":"Bestseller\n4,9\n290\n\nMagne B6 Forte 180tabl.\n\n1000+ kupionych ostatnio\nod51,39z\u0142","price":51.39,"url":"https://redirect.ceneo.pl/offers/179038790/53026?e=EOpjbVPvmeU84eOvTVLW8x9ZNVMTIBt6BegLfpT4JtCmPDC7YdxN%2BF7%2Fy0ISj9ExuVkXTt2NudXZZU56TcEZ2uGAFeUdeZtQYVoyLrdjVtHkaMz4diwSkaxjcRkzBlz807saI8VD%2Fvb8scsPalmrQw%3D%3D"},{"name":"Wysoko oceniany\n4,8\n1256\n\nArkada TC16 Serum Kolagenowe Do Paznokci Regeneracja Sk\u00f3ry i Paznokci 11ml\n\n1000+ kupionych ostatnio\nod55,52z\u0142","price":55.52,"url":"https://redirect.ceneo.pl/offers/59277115/25070?e=EOpjbVPvmeU84eOvTVLW8x9ZNVMTIBt6BegLfpT4JtAhLmvnQSQBSHnxEyLKI8qxLQ1Ov3dEovwLdmEUpc8ANFic2hPQTFmMasy%2BMujUksXpCwuxpyFt9y19r9FK%2FoMsezPwMnrTTugS2BRrRFxiuA%3D%3D"},{"name":"Wysoko oceniany\n4,8\n3677\n\nCalperos 1000mg 100 kaps.\n\n1000+ kupionych ostatnio\nod58,79z\u0142","price":58.79,"url":"https://redirect.ceneo.pl/offers/4775603/53026?e=EOpjbVPvmeU84eOvTVLW8x9ZNVMTIBt6BegLfpT4JtBSU6%2B7XF%2F5RnZJSpyYGBIKDR1obcne7UAlbggOIO%2BGj9n2ommNYSmAtgJ3D%2FN81i%2FXENXjBiYZcHX8qh%2FMidtTISBIy0RqMmaUoHscKQ9TQg%3D%3D"},{"name":"Superceny do 100z\u0142\nWi\u0119cej supercen do 100z\u0142 \u2794","price":100,"url":"https://www.ceneo.pl/;n100;discount.htm#tag=insp-superceny-gfx"}]},"run_log":"logs/run-20251124-082625.md","screenshots":[],"steps_taken":0,"success":true,"timestamp":"2025-11-24T08:27:36.528472"}
+```
+
+#### Find all products under 50zł and extract names, prices and urls
+command:
+```bash
+curllm --visual -H "Accept-Language: pl-PL,pl;q=0.9" "https://ceneo.pl" -d '{
+  "instruction":"Find all products under 50zł and extract names, prices and urls",
+  "params": {
+    "include_dom_html": true,
+    "no_click": true,
+    "scroll_load": true,
+    "action_timeout_ms": 120000,
+    "use_external_slider_solver": true
+  }
+}'
+```
+output:
+```bash
+{"result":{"products":[{"name":"Bestseller\n4,9\n414\n\nIbuvit D3 4000Iu 150kaps.\n\n1000+ kupionych ostatnio\nod41,18z\u0142","price":41.18,"url":"https://redirect.ceneo.pl/offers/164000259/9026?e=EOpjbVPvmeU84eOvTVLW8x9ZNVMTIBt6BegLfpT4JtD%2BafUImi8vsfWXXtr8DMq0X88TaxMLTJxeJJJaUCdmGyCBcPvOgXaqbCITGHMyX4V962NVaZY%2Bh2BDFZdla0ceoMYEHuJZOUGcft4g2WWpqA%3D%3D"}]},"run_log":"logs/run-20251124-082824.md","screenshots":["screenshots/www.ceneo.pl/step_0_1763969385.938158.png"],"steps_taken":1,"success":true,"timestamp":"2025-11-24T08:29:48.844432"}
+```
+
+
 ### Validated examples (tested)
 
 - Extract links (basic)

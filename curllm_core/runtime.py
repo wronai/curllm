@@ -4,15 +4,19 @@ from typing import Any, Dict, Tuple
 
 DEFAULT_RUNTIME: Dict[str, Any] = {
     "include_dom_html": True,
-    "dom_max_chars": 20000,
+    "dom_max_chars": 30000,
+    "dom_max_cap": 60000,
     "smart_click": True,
-    "action_timeout_ms": 8000,
-    "wait_after_click_ms": 800,
-    "wait_after_nav_ms": 800,
+    "action_timeout_ms": 15000,
+    "wait_after_click_ms": 1200,
+    "wait_after_nav_ms": 1500,
     "no_click": False,
-    "scroll_load": False,
+    "scroll_load": True,
     "fastpath": False,
     "use_external_slider_solver": True,
+    "stall_limit": 5,
+    "planner_growth_per_step": 2000,
+    "planner_max_cap": 20000,
 }
 
 

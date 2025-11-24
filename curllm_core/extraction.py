@@ -109,6 +109,7 @@ async def product_heuristics(instruction: str, page, run_logger=None) -> Optiona
     lower_instr = (instruction or "").lower()
     if not (("product" in lower_instr or "produkt" in lower_instr) and ("under" in lower_instr or "poniżej" in lower_instr or "below" in lower_instr or re.search(r"\b(<=?|mniej niż)\b", lower_instr))):
         return None
+
     m = re.search(r"under\s*(\d+)|poniżej\s*(\d+)|below\s*(\d+)|mniej\s*niż\s*(\d+)", lower_instr)
     thr = None
     if m:
@@ -118,42 +119,94 @@ async def product_heuristics(instruction: str, page, run_logger=None) -> Optiona
                 break
     if thr is None:
         thr = 150
-    try:
-        await page.evaluate("window.scrollBy(0, window.innerHeight);")
-    except Exception:
-        pass
+
+    for _ in range(3):
+        try:
+            await page.evaluate("window.scrollBy(0, window.innerHeight);")
+            await page.wait_for_timeout(500)
+        except Exception:
+            pass
+
     items = await page.evaluate(
         r"""
         (thr) => {
           const asNumber = (t) => {
-            const m = (t||'').replace(/\s/g,'').match(/(\d+[\.,]\d{2}|\d+)(?=\s*(?:zł|PLN|\$|€)?)/i);
-            if (!m) return null;
-            return parseFloat(m[1].replace(',', '.'));
+            const patterns = [
+              /(\d+(?:[,\.]\d{2})?)\s*(?:zł|PLN|złotych)/i,
+              /od\s*(\d+(?:[,\.]\d{2})?)/i,
+              /cena[:\s]*(\d+(?:[,\.]\d{2})?)/i
+            ];
+            for (const pattern of patterns) {
+              const m = (t||'').match(pattern);
+              if (m) {
+                return parseFloat(m[1].replace(',', '.'));
+              }
+            }
+            return null;
           };
-          const cards = Array.from(document.querySelectorAll('article, li, div'));
-          const out = [];
-          for (const el of cards) {
+          const cards = Array.from(document.querySelectorAll('*'));
+          const possibleContainers = Array.from(document.querySelectorAll('*'))
+            .filter(el => {
+              const text = el.innerText || '';
+              const hasPrice = asNumber(text) !== null;
+              const hasLink = el.querySelector('a[href]') !== null;
+              const textLength = text.length;
+              return hasPrice && hasLink && textLength > 20 && textLength < 500;
+            });
+          const products = new Map();
+          for (const el of possibleContainers) {
             const text = el.innerText || '';
             const price = asNumber(text);
-            if (price == null || price > thr) continue;
-            let a = el.querySelector('a[href]');
-            const name = (a && a.innerText && a.innerText.trim()) || (text.split('\n')[0]||'').trim();
-            const url = a ? a.href : null;
-            if (!url || !name) continue;
-            out.push({ name, price, url });
-            if (out.length >= 50) break;
+            if (price === null || price > thr || price < 1) continue;
+            const link = el.querySelector('a[href]');
+            if (!link) continue;
+            const url = link.href;
+            const nameFromLink = (link.innerText || '').trim();
+            let name = nameFromLink;
+            if (!name || name.length < 5) {
+              const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 5);
+              name = lines.find(line => 
+                !/^\d+/.test(line) &&
+                !/zł|PLN/i.test(line) &&
+                line.length > 10 && line.length < 100
+              ) || nameFromLink;
+            }
+            if (!name || !url) continue;
+            const isProductUrl = /\d{4,}/.test(url) || url.includes('/p/') || url.includes('/product/') || url.includes('.htm');
+            if (!isProductUrl) continue;
+            const key = url;
+            if (!products.has(key)) {
+              products.set(key, { name, price, url });
+            }
           }
-          return out;
+          return Array.from(products.values()).slice(0, 50);
         }
         """,
         thr,
     )
+
     if isinstance(items, list) and items:
-        data = {"products": items}
-        if run_logger:
-            run_logger.log_text("Heuristic product extraction used:")
-            run_logger.log_code("json", json.dumps(data, indent=2))
-        return data
+        valid_items = []
+        for item in items:
+            if (
+                item.get("price")
+                and item["price"] > 0
+                and item.get("name")
+                and len(item["name"]) > 5
+                and not any(skip in item["name"].lower() for skip in [
+                    "szukaj","koszyk","kategorie","zobacz","pokaż","następne","poprzednie"
+                ])
+            ):
+                valid_items.append(item)
+        if valid_items:
+            data = {"products": valid_items}
+            if run_logger:
+                try:
+                    run_logger.log_text(f"Product heuristics found {len(valid_items)} products")
+                    run_logger.log_code("json", json.dumps(data, indent=2)[:2000])
+                except Exception:
+                    pass
+            return data
     return None
 
 async def fallback_extract(instruction: str, page, run_logger=None) -> Dict[str, Any]:
