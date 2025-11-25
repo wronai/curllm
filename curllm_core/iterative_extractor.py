@@ -85,17 +85,23 @@ class IterativeExtractor:
                 indicators.product_link_count = productLinks;
                 indicators.has_product_links = productLinks > 0;
                 
-                // Check for list structure
-                const listSelectors = [
-                    '.product-list', '.products', '[data-product]',
-                    '.cat-prod-row', '.offers', '.items-list'
-                ];
-                for (const sel of listSelectors) {
-                    if (document.querySelector(sel)) {
-                        indicators.has_list_structure = true;
-                        break;
+                // Check for list structure (dynamic detection)
+                // Look for repeating elements with similar structure (not hard-coded selectors)
+                const allElements = document.querySelectorAll('*');
+                const classCount = {};
+                
+                // Count elements with same class (potential list)
+                for (const el of allElements) {
+                    if (el.className && typeof el.className === 'string') {
+                        const firstClass = el.className.split(' ')[0];
+                        if (firstClass && /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(firstClass)) {
+                            classCount[firstClass] = (classCount[firstClass] || 0) + 1;
+                        }
                     }
                 }
+                
+                // If any class appears 5+ times, likely a list structure
+                indicators.has_list_structure = Object.values(classCount).some(count => count >= 5);
                 
                 // Determine page type
                 if (indicators.has_prices && indicators.has_product_links) {
@@ -211,11 +217,12 @@ class IterativeExtractor:
                     else if (c.specificity >= 2) score += 35;
                     else if (c.specificity >= 1) score += 20;
                     
-                    // PENALTY for generic utility classes (Tailwind/Bootstrap)
+                    // PENALTY for generic utility/layout classes (Tailwind/Bootstrap/Generic)
                     const firstClass = c.classes.split(' ')[0] || '';
                     const utilityPrefixes = ['mt-', 'mb-', 'ml-', 'mr-', 'mx-', 'my-', 'p-', 'px-', 'py-', 'pt-', 'pb-', 'pl-', 'pr-', 'flex', 'grid', 'block', 'inline', 'hidden', 'relative', 'absolute', 'fixed', 'static', 'w-', 'h-', 'text-', 'bg-', 'border-', 'rounded', 'shadow'];
-                    const isUtilityClass = utilityPrefixes.some(prefix => firstClass.startsWith(prefix));
-                    if (isUtilityClass) score -= 30;  // Heavy penalty
+                    const genericLayouts = ['container', 'row', 'col', 'wrapper', 'inner', 'outer', 'main', 'content', 'section', 'header', 'footer', 'sidebar', 'nav'];
+                    const isUtilityClass = utilityPrefixes.some(prefix => firstClass.startsWith(prefix)) || genericLayouts.includes(firstClass);
+                    if (isUtilityClass) score -= 30;  // Heavy penalty for layout classes
                     
                     // SIZE score (reduced importance)
                     score += Math.min(c.count / 50, 1) * 15;  // Max 15 (reduced from 25)

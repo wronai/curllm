@@ -51,12 +51,13 @@ class AtomicFunctionExecutor:
         """
         self._log("find_containers", f"Looking for {entity_type} containers...")
         
-        # Known selectors by entity type
+        # DEPRECATED: Hard-coded selectors removed
+        # Now using dynamic pattern detection from iterative_extractor
+        # Use iterative_extract() or dynamic_detector instead
         selector_map = {
             "product": [
-                ".product-box", ".product-item", ".product-card",
-                "[data-product-id]", "[data-offer-id]",
-                "article[itemtype*='Product']"
+                # NO HARD-CODED SELECTORS!
+                # Dynamic detection will find patterns automatically
             ],
             "article": [
                 "article", ".post", ".entry", ".story",

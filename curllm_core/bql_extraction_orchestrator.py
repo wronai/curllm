@@ -187,13 +187,13 @@ class BQLExtractionOrchestrator:
         
         if self._is_product_task():
             task_intro = "Analyze DOM for products."
-            specifics = "Find: container, price, name, link selectors"
+            specifics = "Find: container, price, name, link selectors (use ACTUAL classes from DOM, not examples)"
             schema = (
                 "{\n"
-                "  \"container\": \".product-card|article\",\n"
+                "  \"container\": \"<detect from DOM - find repeating elements with prices>\",\n"
                 "  \"link\": \"a[href]\",\n"
-                "  \"price\": \".price|span.price\",\n"
-                "  \"name\": \".name|h3\",\n"
+                "  \"price\": \"<detect from DOM - element containing price text>\",\n"
+                "  \"name\": \"<detect from DOM - longest text element>\",\n"
                 "  \"confidence\": 0.8\n"
                 "}"
             )

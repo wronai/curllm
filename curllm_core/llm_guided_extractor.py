@@ -3,11 +3,11 @@ LLM-Guided Atomic Extractor - Decision Tree with Small Steps
 
 Instead of monolithic heuristics, LLM makes decisions at each atomic step:
 
-1. LLM: "What container selector should I use?" → ".product-box"
-2. LLM: "How do I extract name?" → "querySelector('h3.title')"
-3. LLM: "How do I extract price?" → "querySelector('.price')"
+1. LLM: "What container selector should I use?" → Dynamically detected from DOM
+2. LLM: "How do I extract name?" → Analyze text patterns in containers
+3. LLM: "How do I extract price?" → Detect price patterns dynamically
 4. Execute extraction with LLM-chosen strategy
-5. LLM: "Should I filter results?" → Yes, price < 150
+5. LLM: "Should I filter results?" → Yes, price < threshold
 
 Each step is small, atomic, and LLM-guided.
 """

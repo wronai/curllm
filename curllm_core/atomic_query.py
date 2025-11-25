@@ -43,13 +43,10 @@ class AtomicQuery:
     
     Usage:
         query = AtomicQuery(page)
-        products = await (
-            query
-            .find(".product-box")
-            .filter(lambda el: has_class(el, "available"))
-            .map(extract_product)
-            .execute()
-        )
+        # Use dynamic detection instead of hard-coded selectors:
+        # from curllm_core.iterative_extractor import IterativeExtractor
+        # extractor = IterativeExtractor(page)
+        # products = await extractor.extract(...)
     """
     
     def __init__(self, page, run_logger=None):
@@ -272,7 +269,10 @@ async def quick_find(page, selector: str, limit: int = 50) -> List[Any]:
     Quick find with selector
     
     Usage:
-        elements = await quick_find(page, ".product-box", limit=20)
+        # For product extraction, use dynamic detection:
+        # from curllm_core.iterative_extractor import IterativeExtractor
+        # extractor = IterativeExtractor(page)
+        # results = await extractor.extract(instruction, page_type="product_listing")
     """
     query = AtomicQuery(page)
     result = await query.find(selector).limit(limit).execute()
@@ -309,12 +309,10 @@ async def quick_extract_products(
     Quick product extraction with filtering
     
     Usage:
-        products = await quick_extract_products(
-            page,
-            container_selector=".product-box",
-            name_selector="h3",
-            price_selector=".price",
-            url_selector="a",
+        # DEPRECATED: Use dynamic detection instead
+        # from curllm_core.iterative_extractor import IterativeExtractor
+        # extractor = IterativeExtractor(page)
+        # products = await extractor.extract(instruction="Find products")
             max_price=150,
             limit=50
         )
