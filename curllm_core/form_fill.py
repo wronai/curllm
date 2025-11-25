@@ -80,7 +80,7 @@ async def _robust_fill_field(page, selector: str, value: str) -> bool:
         return False
 
 
-async def deterministic_form_fill(instruction: str, page, run_logger=None) -> Optional[Dict[str, Any]]:
+async def deterministic_form_fill(instruction: str, page, run_logger=None, domain_dir: Optional[str] = None) -> Optional[Dict[str, Any]]:
     try:
         # Priority: instruction > window.__curllm_canonical
         # First, get values from window.__curllm_canonical (from tool args)
@@ -339,7 +339,11 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None) -> Op
                         try:
                             import time
                             timestamp = str(time.time()).replace('.', '')
-                            screenshot_path = f"screenshots/debug_before_submit_{timestamp}.png"
+                            # Save in domain folder if provided, otherwise root screenshots/
+                            if domain_dir:
+                                screenshot_path = f"{domain_dir}/debug_before_submit_{timestamp}.png"
+                            else:
+                                screenshot_path = f"screenshots/debug_before_submit_{timestamp}.png"
                             await page.screenshot(path=screenshot_path)
                             run_logger.log_text(f"📸 Screenshot before submit (attempt {attempts}): {screenshot_path}")
                         except Exception as e:

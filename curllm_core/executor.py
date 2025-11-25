@@ -33,6 +33,7 @@ from .bql import BQLExecutor
 from .validation_utils import should_validate
 from .screenshots import take_screenshot as _take_screenshot_func
 from .form_fill import deterministic_form_fill as _deterministic_form_fill_func, parse_form_pairs as _parse_form_pairs_func
+from .llm_field_filler import llm_guided_field_fill as _llm_guided_field_fill_func
 from .planner_progress import progress_tick as _progress_tick_func
 from .product_extract import multi_stage_product_extract as _multi_stage_product_extract_func
 from .bql_utils import parse_bql as _parse_bql_util
@@ -81,6 +82,10 @@ class CurllmExecutor:
         run_logger.log_kv("VISUAL_MODE", str(visual_mode))
         run_logger.log_kv("STEALTH_MODE", str(stealth_mode))
         run_logger.log_kv("USE_BQL", str(use_bql))
+        # Log LLM field filler config
+        run_logger.log_kv("CURLLM_LLM_FIELD_FILLER_ENABLED", str(config.llm_field_filler_enabled))
+        run_logger.log_kv("CURLLM_LLM_FIELD_MAX_ATTEMPTS", str(config.llm_field_max_attempts))
+        run_logger.log_kv("CURLLM_LLM_FIELD_TIMEOUT_MS", str(config.llm_field_timeout_ms))
         # Log runtime flags with corresponding .env names
         try:
             env_map = {
@@ -541,8 +546,87 @@ class CurllmExecutor:
     def _parse_form_pairs(self, instruction: str | None) -> Dict[str, str]:
         return _parse_form_pairs_func(instruction)
 
-    async def _deterministic_form_fill(self, instruction: str, page, run_logger: RunLogger | None = None) -> Optional[Dict[str, Any]]:
-        return await _deterministic_form_fill_func(instruction, page, run_logger)
+    async def _deterministic_form_fill(self, instruction: str, page, run_logger: RunLogger | None = None, domain_dir: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """
+        Fill form using deterministic approach, with optional LLM-guided fallback.
+        
+        Hybrid approach:
+        1. Try deterministic first (fast)
+        2. If failed and LLM filler enabled, try LLM-guided per-field (smart)
+        """
+        # Try deterministic approach first
+        result = await _deterministic_form_fill_func(instruction, page, run_logger, domain_dir)
+        
+        # If failed and LLM filler is enabled, try LLM-guided approach
+        if config.llm_field_filler_enabled:
+            if not result or not result.get("submitted"):
+                if run_logger:
+                    run_logger.log_text("⚠️  Deterministic form fill failed or incomplete")
+                    run_logger.log_text("🤖 Attempting LLM-guided per-field filling...")
+                
+                try:
+                    # Get form fields from page context
+                    form_fields = await page.evaluate("""
+                        () => {
+                            const forms = [];
+                            document.querySelectorAll('form').forEach(form => {
+                                const fields = [];
+                                form.querySelectorAll('input, textarea, select').forEach(el => {
+                                    if (el.offsetParent !== null) {  // visible
+                                        fields.push({
+                                            name: el.name || el.id,
+                                            id: el.id,
+                                            type: el.type || 'text',
+                                            required: el.required,
+                                            placeholder: el.placeholder,
+                                            label: (el.labels && el.labels[0]) ? el.labels[0].innerText : ''
+                                        });
+                                    }
+                                });
+                                if (fields.length > 0) {
+                                    forms.push({id: form.id, fields: fields});
+                                }
+                            });
+                            return forms;
+                        }
+                    """)
+                    
+                    if form_fields and len(form_fields) > 0:
+                        # Use first form's fields
+                        fields = form_fields[0].get("fields", [])
+                        if fields:
+                            # Call LLM-guided filler
+                            llm_result = await _llm_guided_field_fill_func(
+                                page=page,
+                                instruction=instruction,
+                                form_fields=fields,
+                                llm_client=self.llm,
+                                run_logger=run_logger
+                            )
+                            
+                            if llm_result and llm_result.get("submitted"):
+                                if run_logger:
+                                    run_logger.log_text("✅ LLM-guided form fill succeeded!")
+                                return {
+                                    "form_fill": llm_result,
+                                    "submitted": True,
+                                    "method": "llm_guided"
+                                }
+                            else:
+                                if run_logger:
+                                    run_logger.log_text("⚠️  LLM-guided form fill also failed")
+                        else:
+                            if run_logger:
+                                run_logger.log_text("⚠️  No form fields detected for LLM-guided approach")
+                    else:
+                        if run_logger:
+                            run_logger.log_text("⚠️  No forms detected on page")
+                            
+                except Exception as e:
+                    if run_logger:
+                        run_logger.log_text(f"❌ LLM-guided form fill error: {e}")
+        
+        return result
 
     async def _open_page_with_prechecks(
         self,

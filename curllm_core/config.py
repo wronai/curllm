@@ -35,6 +35,11 @@ class Config:
     vision_model: str = os.getenv("CURLLM_VISION_MODEL", "") or os.getenv("CURLLM_MODEL", "qwen2.5:7b")
     vision_confidence_threshold: float = float(os.getenv("CURLLM_VISION_CONFIDENCE_THRESHOLD", "0.7"))
     vision_detect_honeypots: bool = os.getenv("CURLLM_VISION_DETECT_HONEYPOTS", "true").lower() in ["true", "1", "yes"]
+    
+    # LLM-guided per-field form filling
+    llm_field_filler_enabled: bool = os.getenv("CURLLM_LLM_FIELD_FILLER_ENABLED", "false").lower() in ["true", "1", "yes"]
+    llm_field_max_attempts: int = int(os.getenv("CURLLM_LLM_FIELD_MAX_ATTEMPTS", "2"))
+    llm_field_timeout_ms: int = int(os.getenv("CURLLM_LLM_FIELD_TIMEOUT_MS", "5000"))
 
     def __post_init__(self):
         self.screenshot_dir.mkdir(parents=True, exist_ok=True)

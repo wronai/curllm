@@ -32,7 +32,7 @@ from .result_store import previous_for_context as _previous_for_context
 async def _try_early_form_fill(executor, instruction: str, page, domain_dir, run_logger, result: Dict[str, Any], lower_instr: str) -> Optional[Dict[str, Any]]:
     try:
         if any(k in lower_instr for k in ["form", "formularz", "fill", "wypełnij", "wypelnij", "submit"]):
-            det_form = await executor._deterministic_form_fill(instruction, page, run_logger)
+            det_form = await executor._deterministic_form_fill(instruction, page, run_logger, domain_dir)
             if isinstance(det_form, dict) and (det_form.get("submitted") is True):
                 try:
                     shot_path = await executor._take_screenshot(page, 0, target_dir=domain_dir)
@@ -473,7 +473,7 @@ async def _execute_tool(executor, page, instruction: str, tool_name: str, args: 
                         await page.evaluate("(data) => { window.__curllm_canonical = Object.assign({}, window.__curllm_canonical||{}, data); }", merged_args)
                     except Exception:
                         pass
-                det = await executor._deterministic_form_fill(instruction, page, run_logger)
+                det = await executor._deterministic_form_fill(instruction, page, run_logger, domain_dir)
                 if run_logger and isinstance(det, dict):
                     try:
                         run_logger.log_code("json", json.dumps({
@@ -696,12 +696,12 @@ async def _maybe_articles_no_click(executor, instruction: str, page, run_logger,
     return False
 
 
-async def _finalize_fallback(executor, instruction: str, url: Optional[str], page, run_logger, result: Dict[str, Any]) -> None:
+async def _finalize_fallback(executor, instruction: str, url: Optional[str], page, run_logger, result: Dict[str, Any], domain_dir: Optional[str] = None) -> None:
     try:
         lower_instr2 = (instruction or "").lower()
         if any(k in lower_instr2 for k in ["form", "formularz", "fill", "wypełnij", "wypelnij", "submit"]):
             try:
-                det2 = await executor._deterministic_form_fill(instruction, page, run_logger)
+                det2 = await executor._deterministic_form_fill(instruction, page, run_logger, domain_dir)
             except Exception:
                 det2 = None
             if isinstance(det2, dict) and det2.get("submitted") is True:
@@ -906,7 +906,7 @@ async def run_task(
             logger.warning("Honeypot detected, skipping field")
 
     if result.get("data") is None:
-        await _finalize_fallback(executor, instruction, url, page, run_logger, result)
+        await _finalize_fallback(executor, instruction, url, page, run_logger, result, domain_dir)
 
     await page.close()
     return result

@@ -13,7 +13,7 @@ from .extraction import (
 async def try_early_form_fill(executor, instruction: str, page, domain_dir, run_logger, result: Dict[str, Any], lower_instr: str) -> Optional[Dict[str, Any]]:
     try:
         if any(k in lower_instr for k in ["form", "formularz", "fill", "wypełnij", "wypelnij", "submit"]):
-            det_form = await executor._deterministic_form_fill(instruction, page, run_logger)
+            det_form = await executor._deterministic_form_fill(instruction, page, run_logger, domain_dir)
             if isinstance(det_form, dict) and (det_form.get("submitted") is True):
                 try:
                     shot_path = await executor._take_screenshot(page, 0, target_dir=domain_dir)
