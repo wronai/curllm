@@ -53,6 +53,32 @@
 
 ## 🚀 Quick Start
 
+### Installation from PyPI (Recommended)
+
+```bash
+# Install curllm from PyPI
+pip install -U curllm
+
+# Run post-installation setup
+curllm-setup
+
+# Verify your installation
+curllm-doctor
+```
+
+The `curllm-setup` command will:
+- ✓ Check Python version (3.10+)
+- ✓ Create necessary directories (`logs/`, `screenshots/`, `downloads/`, `workspace/`)
+- ✓ Set up `.env` configuration file
+- ✓ Install Playwright browsers
+- ✓ Check for Ollama
+
+The `curllm-doctor` command verifies all dependencies and configuration.
+
+**[→ CLI Commands Documentation](CLI_COMMANDS_USAGE.md)**
+
+### Development Installation
+
 ```shell
 make install
 ```

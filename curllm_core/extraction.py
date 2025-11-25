@@ -348,15 +348,17 @@ async def product_heuristics(instruction: str, page, run_logger=None) -> Optiona
             if (!name || !url) continue;
             const isPdf = /\.pdf(\?|$)/i.test(url);
             if (isPdf || url.includes('custom_document')) continue;
-            // Only accept canonical Ceneo product pages: ceneo.pl/<digits>
+            // Only accept Ceneo product pages (ceneo.pl/<productId> or ceneo.pl/<category>/<productId>)
             try {
               const u = new URL(url);
               const hostOk = /(^|\.)ceneo\.pl$/i.test(u.hostname);
-              const pathOk = /\/(\d{4,})(?:[\/#?]|$)/.test(u.pathname + (u.search||'') + (u.hash||''));
+              // Product URLs: /12345678 or /Category/12345678 or /Category_Name/12345678
+              // Must have at least 6 consecutive digits in path (product ID)
+              const pathOk = /\/\d{6,}(?:[\/#?]|$)/.test(u.pathname);
               if (!(hostOk && pathOk)) continue;
             } catch (e) { continue; }
-            // Skip redirects and tracking endpoints
-            if (/redirect\.ceneo\.pl|GotoBoxUrl|from\?site=|lp,\d+/i.test(url)) continue;
+            // Skip redirects, tracking, navigation endpoints, and special URLs
+            if (/redirect\.ceneo\.pl|GotoBoxUrl|from\?site=|lp,\d+|\/search|\/ssl-|\/wydarzenia|;n\d+;|discount\.htm|\.htm|\.html/i.test(url)) continue;
             const key = url;
             if (!products.has(key)) {
               products.set(key, { name, price, url });

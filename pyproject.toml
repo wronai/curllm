@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "curllm"
-version = "1.0.22"
+version = "1.0.23"
 description = "Browser Automation with Local LLM (8GB GPU compatible)"
 readme = "README.md"
 authors = [
@@ -39,8 +39,14 @@ dependencies = [
 Homepage = "https://github.com/wronai/curllm"
 Issues = "https://github.com/wronai/curllm/issues"
 
+[project.scripts]
+curllm-setup = "curllm_core.cli.setup:main"
+curllm-doctor = "curllm_core.cli.doctor:main"
+
 [tool.setuptools]
 # Install non-Python CLI script and top-level modules
 script-files = ["curllm"]
 py-modules = ["curllm_server", "bql_parser"]
-packages = ["curllm_core"]
+
+[tool.setuptools.packages.find]
+include = ["curllm_core*"]
