@@ -218,8 +218,22 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None, domai
               };
               
               // STEP 2: Find and mark fields within the best form
-              const nameEl = findField(['name','fullname','full name','imi','imię','nazw'], 'input', targetForm);
-              if (nameEl) res.name = mark(nameEl, 'name');
+              
+              // NAME FIELD: Check for split fields (First + Last) first
+              const firstNameEl = findField(['first','firstname','first name','imi','imię'], 'input', targetForm);
+              const lastNameEl = findField(['last','lastname','last name','nazwisko','nazw'], 'input', targetForm);
+              
+              if (firstNameEl && lastNameEl && !marked.has(firstNameEl) && !marked.has(lastNameEl)) {
+                // Split name field detected
+                res.name_first = mark(firstNameEl, 'name_first');
+                res.name_last = mark(lastNameEl, 'name_last');
+                res._split_name = true;  // Flag for Python to split name
+              } else {
+                // Single name field
+                const nameEl = findField(['name','fullname','full name','imi','imię','nazw'], 'input', targetForm);
+                if (nameEl && !marked.has(nameEl)) res.name = mark(nameEl, 'name');
+              }
+              
               const emailEl = findField(['email','e-mail','mail','adres'], 'email', targetForm);
               if (emailEl && !marked.has(emailEl)) res.email = mark(emailEl, 'email');
               const msgEl = findField(['message','wiadomo','treść','tresc','content','komentarz'], 'textarea', targetForm);
@@ -392,8 +406,31 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None, domai
                 run_logger.log_text(f"      These will be SKIPPED (not filled)")
         
         filled: Dict[str, Any] = {"filled": {}, "submitted": False}
-        # Fill fields using robust filling
-        if canonical.get("name") and selectors.get("name"):
+        
+        # Handle SPLIT NAME FIELDS (First + Last)
+        if selectors.get("_split_name") and canonical.get("name"):
+            full_name = canonical["name"].strip()
+            # Split on first space: "John Doe" -> "John", "Doe"
+            parts = full_name.split(None, 1)  # Split on whitespace, max 1 split
+            first_name = parts[0] if len(parts) > 0 else ""
+            last_name = parts[1] if len(parts) > 1 else ""
+            
+            if run_logger:
+                run_logger.log_text(f"   🔀 Split name detected: '{full_name}' → First: '{first_name}', Last: '{last_name}'")
+            
+            if selectors.get("name_first") and first_name:
+                if run_logger:
+                    run_logger.log_text(f"   ▶️  Filling name (first): '{first_name}' → {selectors['name_first']}")
+                if await _robust_fill_field(page, str(selectors["name_first"]), first_name):
+                    filled["filled"]["name_first"] = True
+            
+            if selectors.get("name_last") and last_name:
+                if run_logger:
+                    run_logger.log_text(f"   ▶️  Filling name (last): '{last_name}' → {selectors['name_last']}")
+                if await _robust_fill_field(page, str(selectors["name_last"]), last_name):
+                    filled["filled"]["name_last"] = True
+        # Standard single name field
+        elif canonical.get("name") and selectors.get("name"):
             if run_logger:
                 run_logger.log_text(f"   ▶️  Filling name: '{canonical['name']}' → {selectors['name']}")
             if await _robust_fill_field(page, str(selectors["name"]), canonical["name"]):
@@ -454,6 +491,8 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None, domai
                 };
               };
               results.name = check('name');
+              results.name_first = check('name_first');
+              results.name_last = check('name_last');
               results.email = check('email');
               results.subject = check('subject');
               results.phone = check('phone');
