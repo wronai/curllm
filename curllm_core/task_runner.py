@@ -485,28 +485,74 @@ async def _execute_tool(executor, page, instruction: str, tool_name: str, args: 
                 # TRY LLM ORCHESTRATOR MODE FIRST (if enabled and LLM available)
                 if use_llm_orchestrator and hasattr(executor, 'llm') and executor.llm:
                     try:
-                        if run_logger:
-                            run_logger.log_text("🤖 LLM Orchestrator mode enabled")
+                        # Check if transparent mode is enabled
+                        use_transparent = runtime.get("llm_transparent_orchestrator", False)
                         
-                        from curllm_core.llm_form_orchestrator import llm_orchestrated_form_fill
-                        det = await llm_orchestrated_form_fill(
-                            instruction, page, executor.llm, run_logger, domain_dir
-                        )
-                        
-                        if det and det.get("executed"):
+                        if use_transparent:
+                            # TRANSPARENT ORCHESTRATOR - Multi-phase with full LLM control
                             if run_logger:
-                                run_logger.log_text("✅ LLM Orchestrator succeeded")
-                            # Convert to standard format
-                            det_standard = {
-                                "submitted": det.get("submitted", False),
-                                "filled": {op.get("field_id"): True for op in det.get("executed", [])},
-                                "errors": det.get("errors")
-                            }
-                            det = det_standard
+                                run_logger.log_text("🎭 TRANSPARENT LLM ORCHESTRATOR mode enabled")
+                            
+                            from curllm_core.llm_transparent_orchestrator import TransparentOrchestrator
+                            from curllm_core.form_detector import detect_all_form_fields
+                            from curllm_core.form_fill import parse_form_pairs
+                            
+                            # Detect fields
+                            detection_result = await detect_all_form_fields(page)
+                            detected_fields = detection_result.get('detected_fields', [])
+                            
+                            # Parse user data
+                            user_data = parse_form_pairs(instruction)
+                            
+                            # Create transparent orchestrator
+                            orchestrator = TransparentOrchestrator(executor.llm, run_logger)
+                            
+                            # Run multi-phase orchestration
+                            det = await orchestrator.orchestrate_form_fill(
+                                instruction, page, user_data, detected_fields
+                            )
+                            
+                            if det and det.get("success"):
+                                if run_logger:
+                                    run_logger.log_text("✅ Transparent Orchestrator succeeded")
+                                    run_logger.log_text(f"   Phases completed: {len(det.get('phases', []))}")
+                                    run_logger.log_text(f"   Decisions logged: {len(det.get('decisions', []))}")
+                                # Convert to standard format
+                                det_standard = {
+                                    "submitted": det.get("submitted", False),
+                                    "filled": det.get("filled_fields", {}),
+                                    "phases": det.get("phases", []),
+                                    "decisions": det.get("decisions", [])
+                                }
+                                det = det_standard
+                            else:
+                                if run_logger:
+                                    run_logger.log_text("⚠️  Transparent Orchestrator returned no result, falling back")
+                                det = None
                         else:
+                            # SIMPLE LLM ORCHESTRATOR (existing)
                             if run_logger:
-                                run_logger.log_text("⚠️  LLM Orchestrator returned no result, falling back to deterministic")
-                            det = None
+                                run_logger.log_text("🤖 LLM Orchestrator mode enabled")
+                            
+                            from curllm_core.llm_form_orchestrator import llm_orchestrated_form_fill
+                            det = await llm_orchestrated_form_fill(
+                                instruction, page, executor.llm, run_logger, domain_dir
+                            )
+                            
+                            if det and det.get("executed"):
+                                if run_logger:
+                                    run_logger.log_text("✅ LLM Orchestrator succeeded")
+                                # Convert to standard format
+                                det_standard = {
+                                    "submitted": det.get("submitted", False),
+                                    "filled": {op.get("field_id"): True for op in det.get("executed", [])},
+                                    "errors": det.get("errors")
+                                }
+                                det = det_standard
+                            else:
+                                if run_logger:
+                                    run_logger.log_text("⚠️  LLM Orchestrator returned no result, falling back to deterministic")
+                                det = None
                     except Exception as llm_err:
                         if run_logger:
                             run_logger.log_text(f"⚠️  LLM Orchestrator failed: {str(llm_err)}, falling back to deterministic")
