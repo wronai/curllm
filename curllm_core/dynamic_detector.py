@@ -152,7 +152,7 @@ class DynamicPatternDetector:
                     // Must have at least price OR (link + image)
                     if (hasPrice || (hasLink && hasImage)) {
                         signals.push({
-                            element: el.tagName.toLowerCase() + (el.className ? '.' + el.className.split(' ')[0] : ''),
+                            element: el.tagName.toLowerCase() + (el.className && typeof el.className === 'string' ? '.' + el.className.split(' ')[0] : ''),
                             hasPrice: hasPrice,
                             hasLink: hasLink,
                             hasImage: hasImage,
@@ -190,9 +190,15 @@ class DynamicPatternDetector:
                         parent = parent.parentElement;
                         if (!parent) break;
                         
-                        // Get classes
-                        const classes = parent.className ? 
-                            parent.className.split(' ').filter(c => c.length > 0) : 
+                        // Get classes (handle SVG elements where className is SVGAnimatedString)
+                        const classNameStr = typeof parent.className === 'string' 
+                            ? parent.className 
+                            : (parent.className && parent.className.baseVal ? parent.className.baseVal : '');
+                        const classes = classNameStr ? 
+                            classNameStr.split(' ')
+                                .filter(c => c.length > 0)
+                                .filter(c => /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(c))
+                            : 
                             [];
                         
                         // Build selector
@@ -448,7 +454,7 @@ class GenericFieldExtractor:
                 }
                 
                 if (priceEl) {
-                    const classes = priceEl.className.split(' ').filter(c => c);
+                    const classes = (typeof priceEl.className === 'string' ? priceEl.className : (priceEl.className?.baseVal || '')).split(' ').filter(c => c);
                     fields.price = {
                         selector: priceEl.tagName.toLowerCase() + 
                                  (classes[0] ? '.' + classes[0] : ''),
@@ -475,7 +481,7 @@ class GenericFieldExtractor:
                         return text.length > bestText.length ? link : best;
                     });
                     
-                    const classes = mainLink.className.split(' ').filter(c => c);
+                    const classes = (typeof mainLink.className === 'string' ? mainLink.className : (mainLink.className?.baseVal || '')).split(' ').filter(c => c);
                     fields.url = {
                         selector: 'a' + (classes[0] ? '.' + classes[0] : '[href]'),
                         strategy: 'href_attribute'
@@ -520,7 +526,7 @@ class GenericFieldExtractor:
                 }
                 
                 if (nameEl) {
-                    const classes = nameEl.className.split(' ').filter(c => c);
+                    const classes = (typeof nameEl.className === 'string' ? nameEl.className : (nameEl.className?.baseVal || '')).split(' ').filter(c => c);
                     fields.name = {
                         selector: nameEl.tagName.toLowerCase() + 
                                  (classes[0] ? '.' + classes[0] : ''),

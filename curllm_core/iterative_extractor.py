@@ -155,9 +155,15 @@ class IterativeExtractor:
                         parent = parent.parentElement;
                         if (!parent) break;
                         
-                        // Build selector
-                        const classes = parent.className ? 
-                            parent.className.split(' ').filter(c => c.length > 0) : [];
+                        // Build selector (filter invalid CSS class names)
+                        const classNameStr = typeof parent.className === 'string'
+                            ? parent.className
+                            : (parent.className?.baseVal || '');
+                        const classes = classNameStr ? 
+                            classNameStr.split(' ')
+                                .filter(c => c.length > 0)
+                                .filter(c => /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(c))
+                            : [];
                         
                         if (classes.length === 0) continue;  // Skip elements without classes
                         
@@ -196,14 +202,42 @@ class IterativeExtractor:
                 // Convert map to array and sort
                 const dynamicCandidates = Array.from(parentPatterns.values());
                 
-                // Score and sort candidates
+                // Score and sort candidates with smart heuristics
                 dynamicCandidates.forEach(c => {
                     let score = 0;
-                    score += Math.min(c.count / 50, 1) * 25;  // Size score
+                    
+                    // SPECIFICITY (most important for precision)
+                    if (c.specificity >= 3) score += 50;  // Very specific
+                    else if (c.specificity >= 2) score += 35;
+                    else if (c.specificity >= 1) score += 20;
+                    
+                    // PENALTY for generic utility classes (Tailwind/Bootstrap)
+                    const firstClass = c.classes.split(' ')[0] || '';
+                    const utilityPrefixes = ['mt-', 'mb-', 'ml-', 'mr-', 'mx-', 'my-', 'p-', 'px-', 'py-', 'pt-', 'pb-', 'pl-', 'pr-', 'flex', 'grid', 'block', 'inline', 'hidden', 'relative', 'absolute', 'fixed', 'static', 'w-', 'h-', 'text-', 'bg-', 'border-', 'rounded', 'shadow'];
+                    const isUtilityClass = utilityPrefixes.some(prefix => firstClass.startsWith(prefix));
+                    if (isUtilityClass) score -= 30;  // Heavy penalty
+                    
+                    // SIZE score (reduced importance)
+                    score += Math.min(c.count / 50, 1) * 15;  // Max 15 (reduced from 25)
+                    
+                    // STRUCTURE requirements
                     score += 25;  // Has price (guaranteed)
-                    score += c.has_link ? 15 : 0;
-                    score += c.has_image ? 10 : 0;
-                    score += c.specificity > 0 ? 30 : 0;  // Has classes
+                    score += c.has_link ? 20 : 0;  // Link important
+                    score += c.has_image ? 15 : 0;  // Image bonus
+                    
+                    // TEXT QUALITY heuristics
+                    const text = c.sample_text || '';
+                    const hasProductKeywords = /laptop|phone|notebook|komputer|telefon|monitor|keyboard|mysz|słuchawk/i.test(text);
+                    const hasSpecs = /\d+GB|\d+TB|\d+"|\d+MHz|\d+GHz|Core|Ryzen|GeForce|Radeon/i.test(text);
+                    const hasMarketingNoise = /okazja|promocja|rabat|zwrot|kup|teraz|black|weeks|banner/i.test(text);
+                    
+                    if (hasProductKeywords) score += 15;  // Product-like text
+                    if (hasSpecs) score += 20;  // Technical specs present
+                    if (hasMarketingNoise) score -= 15;  // Marketing content
+                    
+                    // COMPLETE STRUCTURE bonus
+                    if (c.has_price && c.has_link && c.has_image) score += 10;
+                    
                     c.score = score;
                 });
                 
