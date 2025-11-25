@@ -78,6 +78,7 @@ The `curllm-doctor` command verifies all dependencies and configuration.
 **[→ CLI Commands Documentation](CLI_COMMANDS_USAGE.md)**
 
 ### 🌐 Web Client (NEW!)
+![img_1.png](img_1.png)
 
 For users who prefer a graphical interface, curllm now includes a modern web client with **process management**:
 
@@ -189,28 +190,6 @@ Installing curllm dependencies...
   }' \
   -v
 ```
-
-| Funkcja | Status | Uwagi |
-|---------|--------|-------|
-| Wykrywanie zadania | ✅ | Działa |
-| Izolacja formularza | ✅ | Działa |
-| Wypełnianie name | ✅ | Działa |
-| Wypełnianie email | ✅ | Działa |
-| Wypełnianie phone | ✅ | Działa |
-| Wypełnianie message | ✅ | Działa |
-| Autowalidacja | ✅ | Działa + pokazuje `[REQUIRED]` |
-| **🆕 Pre-submission diagnosis** | ✅ | **NOWE** - wykrywa problemy PRZED wysłaniem |
-| **🆕 Auto-fix** | ✅ | **NOWE** - automatycznie naprawia checkboxy |
-| **🆕 Post-submission diagnosis** | ✅ | **NOWE** - diagnozuje PO wysłaniu |
-| Wysyłanie formularza | ✅ | Działa - **tylko 1 raz!** |
-| Auto-zakończenie | ✅ | Kończy po 1 wysłaniu |
-| Checkbox zgody | ✅⚠️ | Auto-fix powinien zaznaczyć jeśli wymagany |
-| Optymalizacja tokenów | ✅ | Działa (~60% oszczędności) |
-| **🤖 LLM Orchestrator** | ✅ | **NOWE** - LLM decyduje jak wypełnić formularz |
-| **🎭 Transparent Orchestrator** | ✅ | **NOWE** - LLM widzi KAŻDĄ decyzję (5 faz) |
-| **🔧 Email field detection** | ✅ | **FIXED** - type="email" ma najwyższy priorytet |
-
----
 
 ## 🎭 Transparent LLM Orchestration (NAJNOWSZA FUNKCJA!)
 

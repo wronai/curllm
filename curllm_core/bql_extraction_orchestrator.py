@@ -17,6 +17,13 @@ class BQLExtractionOrchestrator:
         self.run_logger = run_logger
         self.phases_log = []
         
+    def _is_product_task(self) -> bool:
+        try:
+            low = (self.instruction or "").lower()
+            return any(k in low for k in ["product", "produkt", "price", "cena", "zł", "pln"])  # noqa: E501
+        except Exception:
+            return False
+        
     async def orchestrate(self, page_context: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
         Execute 3-phase BQL extraction:
@@ -168,7 +175,41 @@ class BQLExtractionOrchestrator:
             if isinstance(link, dict)
         ]) if links else "  (no links)"
         
-        return f"""You are analyzing DOM structure to identify product listing patterns.
+        if self._is_product_task():
+            task_intro = "You are analyzing DOM structure to identify product listing patterns."
+            specifics = (
+                "1. Product container patterns (CSS selectors, class names, tags)\n"
+                "2. Price location patterns (where prices appear in product containers)\n"
+                "3. Product name/title patterns\n"
+                "4. Product URL patterns\n"
+            )
+            schema = (
+                "{\n"
+                "  \"product_container_selector\": \".product-card|.product-item|article.product\",\n"
+                "  \"product_link_selector\": \"a.product-link|a[href*='/product/']|h2 a\",\n"
+                "  \"price_selector\": \".price|.product-price|span.price\",\n"
+                "  \"name_selector\": \".product-name|h3.title|.product-title\",\n"
+                "  \"pattern_confidence\": 0.8,\n"
+                "  \"reasoning\": \"Explain briefly\"\n"
+                "}"
+            )
+        else:
+            task_intro = "You are analyzing DOM structure to identify article/title listing patterns."
+            specifics = (
+                "1. Article container patterns (CSS selectors, class names, tags)\n"
+                "2. Title location patterns (where titles/links appear)\n"
+                "3. Link/url selector for the title anchor\n"
+            )
+            schema = (
+                "{\n"
+                "  \"article_container_selector\": \"tr.athing|.story|article\",\n"
+                "  \"title_selector\": \"a.titlelink|a.storylink|h3 a\",\n"
+                "  \"link_selector\": \"a.titlelink|a.storylink|h3 a\",\n"
+                "  \"pattern_confidence\": 0.8,\n"
+                "  \"reasoning\": \"Explain briefly\"\n"
+                "}"
+            )
+        return f"""{task_intro}
 
 Instruction: {self.instruction}
 URL: {url}
@@ -181,26 +222,15 @@ Links (sample):
 {links_text}
 
 TASK: Analyze the page structure and identify:
-1. Product container patterns (CSS selectors, class names, tags)
-2. Price location patterns (where prices appear in product containers)
-3. Product name/title patterns
-4. Product URL patterns
+{specifics}
 
-Look for repeating patterns that indicate product listings:
+Look for repeating patterns indicating listings:
 - Multiple similar elements with same classes
-- Price indicators (zł, PLN, price, cena)
-- Product links with IDs in URLs
+- For products: zł/PLN/price/cena indicators
 - Structured data (lists, grids, cards)
 
 Respond with JSON only:
-{{
-  "product_container_selector": ".product-card|.product-item|article.product",
-  "product_link_selector": "a.product-link|a[href*='/product/']|h2 a",
-  "price_selector": ".price|.product-price|span.price",
-  "name_selector": ".product-name|h3.title|.product-title",
-  "pattern_confidence": 0.8,
-  "reasoning": "Found 20+ elements with class 'product-card' containing prices in 'span.price'"
-}}
+{schema}
 
 JSON:"""
     
@@ -208,50 +238,73 @@ JSON:"""
         """Build prompt for BQL generation phase"""
         url = page_context.get("url", "")
         
-        # Extract price limit from instruction
+        # Extract price limit from instruction (for product tasks)
         price_limit = 150
-        try:
-            import re
-            m = re.search(r'under\s*(\d+)|poniżej\s*(\d+)|below\s*(\d+)', self.instruction.lower())
-            if m:
-                for g in m.groups():
-                    if g:
-                        price_limit = int(g)
-                        break
-        except:
-            pass
+        if self._is_product_task():
+            try:
+                import re
+                m = re.search(r'under\s*(\d+)|poniżej\s*(\d+)|below\s*(\d+)', self.instruction.lower())
+                if m:
+                    for g in m.groups():
+                        if g:
+                            price_limit = int(g)
+                            break
+            except Exception:
+                pass
         
-        return f"""You are generating a BQL (Browser Query Language) query for product extraction.
+        if self._is_product_task():
+            task_desc = "You are generating a BQL (Browser Query Language) query for PRODUCT extraction."
+            bql_ref = (
+                "page.select(\"CSS_CONTAINER\")\n"
+                "  .map(item => ({\n"
+                "    name: item.select(\"NAME_SELECTOR\").text(),\n"
+                "    price: item.select(\"PRICE_SELECTOR\").text(),\n"
+                "    url: item.select(\"LINK_SELECTOR\").attr(\"href\")\n"
+                "  }))\n"
+                f"  .filter(item => parseFloat((item.price||'').replace(/[^0-9.,]/g,'').replace(',', '.')) <= {price_limit})\n"
+            )
+            guidance = (
+                "Use selectors from DOM analysis: product_container_selector/name_selector/price_selector/product_link_selector.\n"
+                "Return products as an array with fields: name, price (string ok), url."
+            )
+        else:
+            task_desc = "You are generating a BQL (Browser Query Language) query for ARTICLE/TITLE extraction."
+            bql_ref = (
+                "page.select(\"CSS_CONTAINER\")\n"
+                "  .map(item => ({\n"
+                "    title: item.select(\"TITLE_SELECTOR\").text(),\n"
+                "    url: item.select(\"LINK_SELECTOR\").attr(\"href\")\n"
+                "  }))\n"
+            )
+            guidance = (
+                "Use selectors from DOM analysis: article_container_selector/title_selector/link_selector.\n"
+                "Return articles as an array with fields: title, url."
+            )
+        
+        return f"""{task_desc}
 
 Instruction: {self.instruction}
 URL: {url}
-Price Limit: {price_limit}
+Price Limit (if applicable): {price_limit}
 
 DOM Analysis Result:
 {json.dumps(dom_analysis, indent=2)}
 
 BQL SYNTAX REFERENCE:
 ```
-page.select("css_selector")                    # Select elements
-  .map(item => ({{                              # Transform each element
-    title: item.select("h3").text(),           # Extract text
-    price: item.select(".price").text(),       # Extract price
-    url: item.select("a").attr("href")         # Extract href attribute
-  }}))
-  .filter(item => parseFloat(item.price) < {price_limit})  # Filter by price
+{bql_ref}
 ```
 
-TASK: Generate a BQL query that:
-1. Selects product containers using patterns from DOM analysis
-2. Extracts: name/title, price, url
-3. Filters products by price limit ({price_limit}zł)
-4. Returns array of products
+TASK: Generate a BQL query that:\n\
+1. Selects containers using patterns from DOM analysis\n\
+2. Extracts the required fields\n\
+3. {('Filters products by price limit (' + str(price_limit) + 'zł) and ' if self._is_product_task() else '')}returns an array
 
-Use the selectors identified in DOM analysis. Be specific and precise.
+{guidance}
 
 Respond with JSON only:
 {{
-  "bql_query": "page.select('.product-card').map(...)...",
+  "bql_query": "...",
   "reasoning": "Brief explanation of the query logic"
 }}
 
@@ -262,7 +315,9 @@ JSON:"""
     async def _llm_invoke(self, prompt: str) -> str:
         """Invoke LLM and extract JSON response"""
         response = await self.llm.ainvoke(prompt)
-        text = response.get("text", "")
+        if response is None:
+            return "{}"
+        text = response.get("text", "") if isinstance(response, dict) else str(response)
         
         # Extract JSON from response
         start = text.find("{")
