@@ -972,6 +972,36 @@ async def run_task(
     except Exception:
         prev_ctx = None
 
+    # Try BQL extraction orchestrator first (highest priority)
+    if config.bql_extraction_orchestrator_enabled and ("product" in lower_instr or "produkt" in lower_instr or "extract" in lower_instr):
+        if run_logger:
+            run_logger.log_text("🔍 BQL Extraction Orchestrator enabled - trying BQL-based extraction")
+        try:
+            from .bql_extraction_orchestrator import BQLExtractionOrchestrator
+            from .page_context import extract_page_context
+            import asyncio
+            
+            page_context = await extract_page_context(page, dom_max_chars=30000, include_dom=False)
+            orchestrator = BQLExtractionOrchestrator(executor.llm, instruction, page, run_logger)
+            
+            data_ms = await asyncio.wait_for(
+                orchestrator.orchestrate(page_context),
+                timeout=config.bql_extraction_orchestrator_timeout
+            )
+            
+            if data_ms is not None:
+                if run_logger:
+                    run_logger.log_text("✅ BQL Orchestrator succeeded - returning result")
+                result["data"] = data_ms
+                await page.close()
+                return result
+            else:
+                if run_logger:
+                    run_logger.log_text("⚠️ BQL Orchestrator returned no data, trying standard extraction orchestrator")
+        except Exception as e:
+            if run_logger:
+                run_logger.log_text(f"⚠️ BQL Orchestrator failed: {e}, trying standard extraction orchestrator")
+    
     # Try extraction orchestrator for product tasks (before planner loop)
     if config.extraction_orchestrator_enabled and ("product" in lower_instr or "produkt" in lower_instr):
         if run_logger:

@@ -44,6 +44,10 @@ class Config:
     # LLM-based extraction orchestrator (similar to form orchestrator)
     extraction_orchestrator_enabled: bool = os.getenv("CURLLM_EXTRACTION_ORCHESTRATOR", "false").lower() in ["true", "1", "yes"]
     extraction_orchestrator_timeout: int = int(os.getenv("CURLLM_EXTRACTION_ORCHESTRATOR_TIMEOUT", "120"))
+    
+    # BQL-based extraction orchestrator (LLM generates BQL queries from DOM analysis)
+    bql_extraction_orchestrator_enabled: bool = os.getenv("CURLLM_BQL_EXTRACTION_ORCHESTRATOR", "false").lower() in ["true", "1", "yes"]
+    bql_extraction_orchestrator_timeout: int = int(os.getenv("CURLLM_BQL_EXTRACTION_ORCHESTRATOR_TIMEOUT", "120"))
 
     def __post_init__(self):
         self.screenshot_dir.mkdir(parents=True, exist_ok=True)

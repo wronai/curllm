@@ -355,13 +355,13 @@ async def product_heuristics(instruction: str, page, run_logger=None) -> Optiona
             try {
               const u = new URL(url);
               const hostOk = /(^|\.)ceneo\.pl$/i.test(u.hostname);
-              // Product URLs: /12345678 or /Category/12345678 or /Category_Name/12345678
-              // Must have at least 6 consecutive digits in path (product ID)
-              const pathOk = /\/\d{6,}(?:[\/#?]|$)/.test(u.pathname);
+              // Product URLs: Accept URLs with at least 4 digits (relaxed from 6)
+              // Format: /12345 or /Category/12345 or /some-product-name/12345
+              const pathOk = /\d{4,}/.test(u.pathname);
               if (!(hostOk && pathOk)) { debugStats.urlFiltered++; continue; }
             } catch (e) { debugStats.urlFiltered++; continue; }
             // Skip redirects, tracking, navigation endpoints, and special URLs
-            if (/redirect\.ceneo\.pl|GotoBoxUrl|from\?site=|lp,\d+|\/search|\/ssl-|\/wydarzenia|;n\d+;|discount\.htm|\.htm|\.html/i.test(url)) { debugStats.redirectFiltered++; continue; }
+            if (/redirect\.ceneo\.pl|GotoBoxUrl|from\?site=|lp,\d+|\/search|\/ssl-|\/wydarzenia|;n\d+;|discount\.htm/i.test(url)) { debugStats.redirectFiltered++; continue; }
             const key = url;
             if (!products.has(key)) {
               products.set(key, { name, price, url });

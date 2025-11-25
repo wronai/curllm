@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "curllm"
-version = "1.0.23"
+version = "1.0.24"
 description = "Browser Automation with Local LLM (8GB GPU compatible)"
 readme = "README.md"
 authors = [
@@ -33,6 +33,7 @@ dependencies = [
   "websockets",
   "requests",
   "python-dotenv",
+  "psutil",
 ]
 
 [project.urls]
