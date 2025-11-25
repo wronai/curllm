@@ -32,10 +32,11 @@ class LLMFilterValidator:
     def _log(self, msg: str, data: Any = None):
         """Log with structured data"""
         if self.run_logger:
-            if data:
-                self.run_logger.log_substep(msg, data)
-            else:
-                self.run_logger.log_substep(msg)
+            # Use log_text (standard RunLogger method)
+            self.run_logger.log_text(msg)
+            if data and isinstance(data, dict):
+                import json
+                self.run_logger.log_code("json", json.dumps(data, indent=2, ensure_ascii=False))
     
     async def validate_product(
         self,

@@ -13,20 +13,37 @@ Each step logs details and makes early decisions.
 import json
 from typing import Dict, List, Optional, Any
 
+# Dynamic detection and filtering systems
+try:
+    from .dynamic_container_detector import DynamicContainerDetector
+    from .multi_criteria_filter import MultiCriteriaFilter
+    DYNAMIC_SYSTEMS_AVAILABLE = True
+except ImportError:
+    DYNAMIC_SYSTEMS_AVAILABLE = False
+
 
 class IterativeExtractor:
     """Iterative extraction with atomic DOM queries"""
     
-    def __init__(self, page, llm, instruction, run_logger=None):
+    def __init__(self, page, llm, instruction, run_logger=None, use_dynamic_detection=True):
         self.page = page
         self.llm = llm
         self.instruction = instruction
         self.run_logger = run_logger
+        self.use_dynamic_detection = use_dynamic_detection and DYNAMIC_SYSTEMS_AVAILABLE
         self.state = {
             "checks_performed": [],
             "decisions": [],
             "extraction_strategy": None
         }
+        
+        # Initialize dynamic systems if available
+        if self.use_dynamic_detection:
+            self.dynamic_detector = DynamicContainerDetector(llm, run_logger)
+            self.multi_filter = MultiCriteriaFilter(llm, run_logger)
+        else:
+            self.dynamic_detector = None
+            self.multi_filter = None
     
     def _log(self, step: str, details: Any):
         """Log with details"""
@@ -133,10 +150,43 @@ class IterativeExtractor:
         Step 2: Detect container structure
         
         Find the PATTERN of product containers without extracting data.
+        Uses DynamicContainerDetector if available (statistical + LLM-based)
         Returns: container selector, count, sample structure
         """
         self._log("Step 2: Container Structure Detection", f"Looking for {page_type} containers...")
         
+        # Try dynamic container detection first (if available)
+        if self.use_dynamic_detection and self.dynamic_detector:
+            try:
+                if self.run_logger:
+                    self.run_logger.log_text("🎯 Using Dynamic Container Detector (Statistical + LLM)")
+                
+                detection = await self.dynamic_detector.detect_containers(
+                    self.page,
+                    instruction=self.instruction,
+                    use_llm=True
+                )
+                
+                if detection.get('best_container'):
+                    best = detection['best_container']
+                    result = {
+                        "found": True,
+                        "best": best,
+                        "candidates": detection.get('containers', [])[:5],  # Top 5 only
+                        "method": "dynamic_detection_llm",
+                        "transparency": detection.get('transparency', {})
+                    }
+                    
+                    self._log("Container Detection Results", result)
+                    return result
+                else:
+                    if self.run_logger:
+                        self.run_logger.log_text("⚠️ Dynamic detector found no containers, using fallback")
+            except Exception as e:
+                if self.run_logger:
+                    self.run_logger.log_text(f"⚠️ Dynamic detection error: {e}, using fallback")
+        
+        # Fallback: Original algorithmic detection
         result = await self.page.evaluate("""
             (pageType) => {
                 const candidates = [];
@@ -235,7 +285,7 @@ class IterativeExtractor:
                     // TEXT QUALITY heuristics
                     const text = c.sample_text || '';
                     const hasProductKeywords = /laptop|phone|notebook|komputer|telefon|monitor|keyboard|mysz|słuchawk/i.test(text);
-                    const hasSpecs = /\d+GB|\d+TB|\d+"|\d+MHz|\d+GHz|Core|Ryzen|GeForce|Radeon/i.test(text);
+                    const hasSpecs = /\\d+GB|\\d+TB|\\d+"|\\d+MHz|\\d+GHz|Core|Ryzen|GeForce|Radeon/i.test(text);
                     const hasMarketingNoise = /okazja|promocja|rabat|zwrot|kup|teraz|black|weeks|banner/i.test(text);
                     
                     if (hasProductKeywords) score += 15;  // Product-like text
@@ -531,8 +581,40 @@ class IterativeExtractor:
         # Step 4: Extract data
         products = await self.extract_with_strategy(self.state["extraction_strategy"], max_items)
         
-        # Apply price filter if specified
-        if price_limit is not None and products:
+        # Step 5: Apply multi-criteria filtering (if available and has products)
+        if products and self.use_dynamic_detection and self.multi_filter:
+            try:
+                if self.run_logger:
+                    self.run_logger.log_text("\n🎯 ═══ MULTI-CRITERIA FILTERING ═══\n")
+                
+                filter_result = await self.multi_filter.filter_products(
+                    products=products,
+                    instruction=self.instruction,
+                    use_llm=True
+                )
+                
+                if self.run_logger:
+                    self.run_logger.log_text(f"📊 Filtering Report")
+                    self.run_logger.log_code("json", json.dumps({
+                        "original_count": filter_result['original_count'],
+                        "filtered_count": filter_result['filtered_count'],
+                        "criteria_summary": filter_result.get('criteria_summary', 'N/A'),
+                        "stages": len(filter_result.get('stages', []))
+                    }, indent=2, ensure_ascii=False))
+                
+                products = filter_result['filtered_products']
+                
+                # Add filtering metadata to state
+                self.state['filtering_applied'] = True
+                self.state['filtering_stages'] = filter_result.get('stages', [])
+                
+            except Exception as e:
+                if self.run_logger:
+                    self.run_logger.log_text(f"⚠️ Multi-criteria filtering failed: {e}")
+                # Continue with unfiltered products on error
+        
+        # Legacy price filter (fallback if multi-criteria not used)
+        elif price_limit is not None and products:
             original_count = len(products)
             products = [p for p in products if p.get("price") and p["price"] <= price_limit]
             filtered_count = len(products)
@@ -552,12 +634,19 @@ class IterativeExtractor:
         }
 
 
-async def iterative_extract(instruction: str, page, llm, run_logger=None) -> Optional[Dict[str, Any]]:
+async def iterative_extract(instruction: str, page, llm, run_logger=None, use_dynamic_detection=True) -> Optional[Dict[str, Any]]:
     """
     Convenience function for iterative extraction
     
     Usage:
         result = await iterative_extract("Find products under 150zł", page, llm, logger)
+    
+    Args:
+        instruction: User's extraction instruction
+        page: Playwright page object
+        llm: LLM client
+        run_logger: Logger instance
+        use_dynamic_detection: Enable DynamicContainerDetector + MultiCriteriaFilter (default: True)
     """
-    extractor = IterativeExtractor(page, llm, instruction, run_logger)
+    extractor = IterativeExtractor(page, llm, instruction, run_logger, use_dynamic_detection=use_dynamic_detection)
     return await extractor.run()
