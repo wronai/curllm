@@ -533,6 +533,69 @@ Notes:
 
 #### Find all products under 150zł and extract names, prices and urls
 command:
+```bash
+curllm --stealth "https://www.ceneo.pl/Urzadzenia_sprzatajace;ptags:OfertySpecjalne.htm" -d "Find all products under 550zł"
+```
+output
+```bash
+{
+  "evaluation": {
+    "checks_performed": [
+      "steps_check",
+      "extraction_task_check"
+    ],
+    "evaluated": true,
+    "failures": [],
+    "warnings": [
+      "Zero steps executed"
+    ]
+  },
+  "hints": [],
+  "reason": "Task completed successfully (0 steps taken)",
+  "result": {
+    "products": [
+      {
+        "name": "SHARK S1000EU\n 5,0\n/ 5\n4 opinie\nDodaj do ulubionych\nKolor: Bia\u0142e\nMoc: 1050 W",
+        "price": 349,
+        "url": "https://www.ceneo.pl/102723109##;02514#tag=nph_row_promotion"
+      },
+      {
+        "name": "Bosch UniversalBrush 06033E0000\n 4,5\n/ 5\n33 opinie\n10+ kupionych ostatnio",
+        "price": 168.3,
+        "url": "https://www.ceneo.pl/110631727"
+      },
+      {
+        "name": "Bosch EasyVac 3 06033D1000\n 4,3\n/ 5\n5 opinii",
+        "price": 349,
+        "url": "https://www.ceneo.pl/52315916"
+      },
+      {
+        "name": "Bosch AdvancedVac 18V-8 06033E1000\nNapisz opini\u0119",
+        "price": 317.99,
+        "url": "https://www.ceneo.pl/118147335"
+      },
+      {
+        "name": "Bosch UniversalVac 15 06033D1100\n 4,6\n/ 5\n11 opinii",
+        "price": 338.9,
+        "url": "https://www.ceneo.pl/52782460"
+      },
+      {
+        "name": "Bosch UniversalBrush 06033E0002\n 5,0\n/ 5\n1 opinia",
+        "price": 182.02,
+        "url": "https://www.ceneo.pl/158836315"
+      }
+    ]
+  },
+  "run_log": "logs/run-20251125-222132.md",
+  "screenshots": [],
+  "steps_taken": 0,
+  "success": true,
+  "suggested_commands": [],
+  "timestamp": "2025-11-25T22:22:01.397203"
+}
+```
+
+command:
 ```aiignore
 curllm --stealth "https://ceneo.pl"-d "Find all products under 150zł and extract names, prices and urls"
   

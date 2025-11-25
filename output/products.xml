@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<data>
+  <item>
+    <name>Product A</name>
+    <price>99.99</price>
+    <url>https://example.com/a</url>
+    <rating>4.5</rating>
+  </item>
+  <item>
+    <name>Product B</name>
+    <price>149.99</price>
+    <url>https://example.com/b</url>
+    <rating>4.8</rating>
+  </item>
+  <item>
+    <name>Product C</name>
+    <price>79.99</price>
+    <url>https://example.com/c</url>
+    <rating>4.2</rating>
+  </item>
+</data>

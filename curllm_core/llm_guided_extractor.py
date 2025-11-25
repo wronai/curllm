@@ -60,12 +60,19 @@ JSON:"""
         
         try:
             response = await self.llm.ainvoke(prompt)
-            # Extract JSON from response
-            json_start = response.find('{')
-            json_end = response.rfind('}') + 1
-            if json_start >= 0 and json_end > json_start:
-                json_str = response[json_start:json_end]
-                return json.loads(json_str)
+            
+            # Check if response is already a dict (some LLMs return parsed JSON)
+            if isinstance(response, dict):
+                return response
+            
+            # If it's a string, extract JSON
+            if isinstance(response, str):
+                json_start = response.find('{')
+                json_end = response.rfind('}') + 1
+                if json_start >= 0 and json_end > json_start:
+                    json_str = response[json_start:json_end]
+                    return json.loads(json_str)
+            
             return {}
         except Exception as e:
             if self.run_logger:

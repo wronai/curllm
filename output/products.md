@@ -1,0 +1,5 @@
+| name | price | url | rating |
+| --- | --- | --- | --- |
+| Product A | 99.99 | https://example.com/a | 4.5 |
+| Product B | 149.99 | https://example.com/b | 4.8 |
+| Product C | 79.99 | https://example.com/c | 4.2 |

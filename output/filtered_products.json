@@ -1,0 +1,76 @@
+{
+  "data": [
+    {
+      "title": "Gaming Laptop",
+      "price": 2999.99,
+      "rating": 4.7,
+      "url": "/laptop-1",
+      "inStock": true
+    },
+    {
+      "title": "Wireless Mouse",
+      "price": 149.99,
+      "rating": 4.5,
+      "url": "/mouse-1",
+      "inStock": true
+    }
+  ],
+  "metadata": {
+    "operations": [
+      {
+        "operation": "find",
+        "details": {
+          "selector": ".product"
+        }
+      },
+      {
+        "operation": "filter",
+        "details": {
+          "predicate": "el => el.classList.contains('available')"
+        }
+      },
+      {
+        "operation": "map",
+        "details": {
+          "transformer": "\n                el => {\n                    const title = el.querySelector('.title')?.innerText || "
+        }
+      },
+      {
+        "operation": "filter",
+        "details": {
+          "predicate": "item => item.rating >= 4.5"
+        }
+      },
+      {
+        "operation": "execute",
+        "details": {
+          "operations_count": 4
+        }
+      },
+      {
+        "operation": "result",
+        "details": {
+          "count": 2,
+          "sample": [
+            {
+              "title": "Gaming Laptop",
+              "price": 2999.99,
+              "rating": 4.7,
+              "url": "/laptop-1",
+              "inStock": true
+            },
+            {
+              "title": "Wireless Mouse",
+              "price": 149.99,
+              "rating": 4.5,
+              "url": "/mouse-1",
+              "inStock": true
+            }
+          ]
+        }
+      }
+    ],
+    "exported_at": "2025-11-25T22:23:59.578290",
+    "count": 2
+  }
+}
