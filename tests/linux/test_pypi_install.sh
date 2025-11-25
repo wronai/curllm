@@ -221,7 +221,7 @@ log_test "Testing basic executor creation"
 TEST_SCRIPT=$(cat <<'EOF'
 from curllm_core.executor import CurllmExecutor
 try:
-    executor = CurllmExecutor(model="test", headless=True)
+    executor = CurllmExecutor()
     print("Executor created successfully")
 except Exception as e:
     print(f"Error: {e}")

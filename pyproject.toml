@@ -4,19 +4,18 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "curllm"
-version = "1.0.21"
+version = "1.0.22"
 description = "Browser Automation with Local LLM (8GB GPU compatible)"
 readme = "README.md"
 authors = [
   { name = "Tom Sapletta" }
 ]
-license = { text = "Apache" }
-requires-python = ">=3.11"
+license = "Apache-2.0"
+requires-python = ">=3.10"
 keywords = ["llm", "browser", "automation", "scraping", "ollama", "playwright"]
 classifiers = [
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
-  "License :: OSI Approved :: Apache Software License",
   "Operating System :: POSIX :: Linux",
   "Framework :: Flask",
   "Topic :: Internet :: WWW/HTTP",

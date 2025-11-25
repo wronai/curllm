@@ -37,14 +37,17 @@ fi
 echo -e "${BLUE}Starting tests on all platforms...${NC}"
 echo ""
 
-# Run docker-compose
+# Run docker-compose (let all tests complete, don't abort on first failure)
 if command -v docker-compose > /dev/null 2>&1; then
-    docker-compose up --build --abort-on-container-exit
+    docker-compose up --build
     EXIT_CODE=$?
 else
-    docker compose up --build --abort-on-container-exit
+    docker compose up --build
     EXIT_CODE=$?
 fi
+
+# Wait for all containers to finish
+sleep 2
 
 echo ""
 echo -e "${BLUE}Tests completed. Generating report...${NC}"
