@@ -1,0 +1,1 @@
+./curllm --stop && make reinstall && ./curllm --start
