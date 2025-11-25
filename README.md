@@ -105,9 +105,13 @@ Installing curllm dependencies...
 | Wypełnianie email | ✅ | Działa |
 | Wypełnianie phone | ✅ | Działa |
 | Wypełnianie message | ✅ | Działa |
-| Autowalidacja | ✅ | Działa |
+| Autowalidacja | ✅ | Działa + pokazuje `[REQUIRED]` |
+| **🆕 Pre-submission diagnosis** | ✅ | **NOWE** - wykrywa problemy PRZED wysłaniem |
+| **🆕 Auto-fix** | ✅ | **NOWE** - automatycznie naprawia checkboxy |
+| **🆕 Post-submission diagnosis** | ✅ | **NOWE** - diagnozuje PO wysłaniu |
 | Wysyłanie formularza | ✅ | Działa - **tylko 1 raz!** |
-| **Auto-zakończenie** | ✅ | **NAPRAWIONE** - kończy po 1 wysłaniu |
+| Auto-zakończenie | ✅ | Kończy po 1 wysłaniu |
+| Checkbox zgody | ✅⚠️ | Auto-fix powinien zaznaczyć jeśli wymagany |
 | Optymalizacja tokenów | ✅ | Działa (~60% oszczędności) |
 
 
