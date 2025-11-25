@@ -1,62 +1,86 @@
 #!/usr/bin/env python3
 import json
-from typing import Dict
+from typing import Dict, Optional
 
-async def extract_page_context(page, include_dom: bool = False, dom_max_chars: int = 20000, include_iframes: bool = True) -> Dict:
-    base = await page.evaluate(
-        """
-        () => {
-            const safeText = (el) => { try { return (el && el.innerText) ? String(el.innerText) : ''; } catch(e){ return ''; } };
-            const safeAttr = (el, name) => { try { return (el && el.getAttribute) ? el.getAttribute(name) : null; } catch(e){ return null; } };
-            const bodyText = (() => { try { return (document.body && document.body.innerText) ? document.body.innerText : ''; } catch(e){ return ''; } })();
-            return {
+async def extract_page_context(page, include_dom: bool = False, dom_max_chars: int = 20000, include_iframes: bool = True, form_focused: bool = False) -> Dict:
+    # Build JavaScript code with conditional data collection based on form_focused
+    js_code = f"""
+        () => {{
+            const formFocused = {str(form_focused).lower()};
+            const safeText = (el) => {{ try {{ return (el && el.innerText) ? String(el.innerText) : ''; }} catch(e){{ return ''; }} }};
+            const safeAttr = (el, name) => {{ try {{ return (el && el.getAttribute) ? el.getAttribute(name) : null; }} catch(e){{ return null; }} }};
+            const bodyText = (() => {{ try {{ return (document.body && document.body.innerText) ? document.body.innerText : ''; }} catch(e){{ return ''; }} }})();
+            
+            const result = {{
                 title: document.title,
                 url: window.location.href,
-                text: ((bodyText||'').substring(0, 5000).trim() || undefined),
-                forms: Array.from(document.forms || []).map(f => ({
+                forms: Array.from(document.forms || []).map(f => ({{
                     id: (f && f.id) || undefined,
                     action: (f && f.action) || undefined,
-                    fields: Array.from((f && f.elements) || []).map(e => ({
+                    fields: Array.from((f && f.elements) || []).map(e => ({{
                         name: (e && e.name) || undefined,
                         type: (e && e.type) || undefined,
                         value: (e && e.value) || '',
                         visible: !!(e && e.offsetParent !== null),
                         required: !!(e && (e.required || e.getAttribute('aria-required') === 'true' || e.getAttribute('data-required') === 'true'))
-                    }))
-                })),
-                links: Array.from(document.links || []).slice(0, 50).map(l => ({
+                    }}))
+                }}))
+            }};
+            
+            // Conditional data based on form_focused
+            if (formFocused) {{
+                // Form-focused: minimal context
+                result.text = ((bodyText||'').substring(0, 1000).trim() || undefined);
+                result.links = [];  // Skip links for form tasks
+                result.buttons = Array.from(document.querySelectorAll('button[type="submit"], button') || []).slice(0, 10).map(b => ({{
+                    text: (safeText(b).trim() || undefined)
+                }}));
+                result.headings = Array.from(document.querySelectorAll('h1, h2') || [])
+                    .filter(h => !!safeText(h).trim())
+                    .slice(0, 5)
+                    .map(h => ({{
+                        tag: (h && h.tagName ? h.tagName.toLowerCase() : undefined),
+                        text: safeText(h).trim()
+                    }}));
+            }} else {{
+                // Full context for non-form tasks
+                result.text = ((bodyText||'').substring(0, 5000).trim() || undefined);
+                result.links = Array.from(document.links || []).slice(0, 50).map(l => ({{
                     href: (l && l.href) ? l.href : '',
                     text: (safeText(l).trim() || undefined)
-                })),
-                buttons: Array.from(document.querySelectorAll('button') || []).map(b => ({
+                }}));
+                result.buttons = Array.from(document.querySelectorAll('button') || []).map(b => ({{
                     text: (safeText(b).trim() || undefined),
                     onclick: (b && b.onclick) ? 'has handler' : undefined
-                })),
-                headings: Array.from(document.querySelectorAll('h1, h2, h3') || [])
+                }}));
+                result.headings = Array.from(document.querySelectorAll('h1, h2, h3') || [])
                     .filter(h => !!safeText(h).trim())
                     .slice(0, 100)
-                    .map(h => ({
+                    .map(h => ({{
                         tag: (h && h.tagName ? h.tagName.toLowerCase() : undefined),
                         text: safeText(h).trim(),
                         id: (h && h.id) || undefined,
                         class: (h && h.className) || undefined
-                    })),
-                article_candidates: (() => {
-                    try {
+                    }}));
+                result.article_candidates = (() => {{
+                    try {{
                         const anchors = Array.from(document.querySelectorAll('a[href]') || []);
                         const pat = /(blog|post|wpis|article|artyk|news|aktualno)/i;
-                        return anchors.filter(a => {
+                        return anchors.filter(a => {{
                             const href = safeAttr(a, 'href') || '';
                             const t = safeText(a).trim();
                             if (!t) return false;
-                            try { return pat.test(href) || !!a.closest('article'); } catch(e){ return pat.test(href); }
-                        }).slice(0, 100).map(a => ({ text: safeText(a).trim(), href: (a && a.href) ? a.href : '' }));
-                    } catch(e){ return []; }
-                })()
-            };
-        }
+                            try {{ return pat.test(href) || !!a.closest('article'); }} catch(e){{ return pat.test(href); }}
+                        }}).slice(0, 100).map(a => ({{ text: safeText(a).trim(), href: (a && a.href) ? a.href : '' }}));
+                    }} catch(e){{ return []; }}
+                }})();
+            }}
+            
+            return result;
+        }}
         """
-    )
+    
+    base = await page.evaluate(js_code)
     if include_dom:
         try:
             dom_tree = await page.evaluate(

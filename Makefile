@@ -1,6 +1,6 @@
 # Makefile for curllm project
 
-.PHONY: help install setup start stop test clean docker-build docker-up docker-down benchmark examples
+.PHONY: help install setup start stop restart fresh-start test clean clean-cache reinstall docker-build docker-up docker-down benchmark examples
 
 # Default target
 help:
@@ -9,11 +9,15 @@ help:
 	@echo "Available targets:"
 	@echo "  make install      - Install all dependencies"
 	@echo "  make setup        - Complete setup (install + pull models)"
-	@echo "  make start        - Start all services"
-	@echo "  make stop         - Stop all services"
+	@echo "  make start        - Start services (auto: clean-cache + reinstall)"
+	@echo "  make stop         - Stop services (auto: clean-cache)"
+	@echo "  make restart      - Restart services (stop + start)"
+	@echo "  make fresh-start  - Complete fresh start with full cache cleanup"
 	@echo "  make test         - Run tests"
 	@echo "  make benchmark    - Run performance benchmarks"
 	@echo "  make clean        - Clean temporary files"
+	@echo "  make clean-cache  - Deep clean: remove all Python cache"
+	@echo "  make reinstall    - Force reinstall curllm package"
 	@echo ""
 	@echo "Docker targets:"
 	@echo "  make docker-build - Build Docker images"
@@ -40,15 +44,18 @@ setup: install
 	@bash scripts/setup.sh
 
 # Service management
-start:
+start: clean-cache reinstall
 	@chmod +x scripts/start.sh 2>/dev/null || true
 	@bash scripts/start.sh
 
 stop:
 	@chmod +x scripts/stop.sh 2>/dev/null || true
 	@bash scripts/stop.sh
+	@$(MAKE) clean-cache
 
 restart: stop start
+
+fresh-start: clean-cache reinstall start
 
 status:
 	@chmod +x scripts/status.sh 2>/dev/null || true
@@ -143,6 +150,27 @@ clean:
 	@rm -rf /tmp/curllm_screenshots/*
 	@rm -f /tmp/curllm.log /tmp/ollama.log
 	@echo "Cleaned!"
+
+clean-cache:
+	@echo "🧹 Cleaning Python cache..."
+	@find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	@find . -type f -name "*.pyc" -delete 2>/dev/null || true
+	@find . -type f -name "*.pyo" -delete 2>/dev/null || true
+	@find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
+	@rm -rf .pytest_cache 2>/dev/null || true
+	@rm -rf build dist 2>/dev/null || true
+	@echo "✅ Cache cleaned!"
+
+reinstall:
+	@echo "🔄 Reinstalling curllm package..."
+	@if [ -d "venv" ]; then \
+		./venv/bin/pip install -e . --force-reinstall --no-cache-dir -q 2>/dev/null || ./venv/bin/pip install -e . --force-reinstall --no-cache-dir; \
+	elif [ -n "$$VIRTUAL_ENV" ]; then \
+		pip install -e . --force-reinstall --no-cache-dir -q 2>/dev/null || pip install -e . --force-reinstall --no-cache-dir; \
+	else \
+		python3 -m pip install -e . --force-reinstall --no-cache-dir --break-system-packages -q 2>/dev/null || python3 -m pip install -e . --force-reinstall --no-cache-dir --break-system-packages; \
+	fi
+	@echo "✅ Package reinstalled!"
 
 logs:
 	@echo "=== Ollama Logs ==="

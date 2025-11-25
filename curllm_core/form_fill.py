@@ -121,9 +121,25 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None, domai
               };
               const intoView = (el) => { try { el.scrollIntoView({behavior:'auto', block:'center'}); } catch(e){} };
               const add = (arr, el, score) => { if (el && visible(el)) { intoView(el); arr.push({el, score}); } };
-              const findField = (keywords, prefer) => {
+              
+              // Get the parent form for an element
+              const getForm = (el) => {
+                if (!el) return null;
+                return el.closest('form');
+              };
+              
+              const findField = (keywords, prefer, targetForm) => {
                 const C = [];
-                const by = (sel, s) => { try { document.querySelectorAll(sel).forEach(el => add(C, el, s)); } catch(e){} };
+                const by = (sel, s) => { 
+                  try { 
+                    document.querySelectorAll(sel).forEach(el => {
+                      // Only include if in target form (or no form restriction)
+                      if (!targetForm || getForm(el) === targetForm) {
+                        add(C, el, s);
+                      }
+                    });
+                  } catch(e){} 
+                };
                 keywords.forEach(k => {
                   by(`input[name*="${k}"]`, 12);
                   by(`input[id*="${k}"]`, 11);
@@ -143,7 +159,10 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None, domai
                       let el = null;
                       if (forId) el = document.getElementById(forId);
                       if (!el) el = lb.querySelector('input,textarea');
-                      add(C, el, 13);
+                      // Check form membership
+                      if (el && (!targetForm || getForm(el) === targetForm)) {
+                        add(C, el, 13);
+                      }
                     }
                   });
                 });
@@ -158,6 +177,33 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None, domai
                 C.sort((a,b)=>b.score-a.score);
                 return C.length ? C[0].el : null;
               };
+              
+              // STEP 1: Find all forms and score them by field matches
+              const forms = Array.from(document.querySelectorAll('form'));
+              let bestForm = null;
+              let bestScore = 0;
+              
+              forms.forEach(form => {
+                let score = 0;
+                // Check for key fields in this form
+                const nameEl = findField(['name','fullname','full name','imi','imię','nazw'], 'input', form);
+                if (nameEl) score += 3;
+                const emailEl = findField(['email','e-mail','mail','adres'], 'email', form);
+                if (emailEl) score += 3;
+                const msgEl = findField(['message','wiadomo','treść','tresc','content','komentarz'], 'textarea', form);
+                if (msgEl) score += 2;
+                const phoneEl = findField(['phone','telefon','tel'], 'input', form);
+                if (phoneEl) score += 1;
+                
+                if (score > bestScore) {
+                  bestScore = score;
+                  bestForm = form;
+                }
+              });
+              
+              // If no form found with fields, try without form restriction
+              const targetForm = bestForm;
+              
               const res = {};
               const marked = new Set();  // Track which elements are already marked
               const mark = (el, key) => { 
@@ -171,12 +217,12 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None, domai
                 return `[data-curllm-target="${key}"]`; 
               };
               
-              // Find and mark REQUIRED fields first (with fallback)
-              const nameEl = findField(['name','fullname','full name','imi','imię','nazw'], 'input');
+              // STEP 2: Find and mark fields within the best form
+              const nameEl = findField(['name','fullname','full name','imi','imię','nazw'], 'input', targetForm);
               if (nameEl) res.name = mark(nameEl, 'name');
-              const emailEl = findField(['email','e-mail','mail','adres'], 'email');
+              const emailEl = findField(['email','e-mail','mail','adres'], 'email', targetForm);
               if (emailEl && !marked.has(emailEl)) res.email = mark(emailEl, 'email');
-              const msgEl = findField(['message','wiadomo','treść','tresc','content','komentarz'], 'textarea');
+              const msgEl = findField(['message','wiadomo','treść','tresc','content','komentarz'], 'textarea', targetForm);
               if (msgEl && !marked.has(msgEl)) res.message = mark(msgEl, 'message');
               
               // Find OPTIONAL fields (NO fallback - only if exact match)
@@ -185,7 +231,9 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None, domai
               ['subject','temat'].forEach(k => {
                 try {
                   document.querySelectorAll(`input[name*="${k}"], input[id*="${k}"], input[placeholder*="${k}"]`).forEach(el => {
-                    if (el && el.offsetParent !== null && !marked.has(el)) subjCandidates.push(el);
+                    if (el && el.offsetParent !== null && !marked.has(el) && (!targetForm || getForm(el) === targetForm)) {
+                      subjCandidates.push(el);
+                    }
                   });
                 } catch(e){}
               });
@@ -194,7 +242,7 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None, domai
               }
               
               // phone optional (with keyword match only)
-              const phoneEl = findField(['phone','telefon','tel'], 'input');
+              const phoneEl = findField(['phone','telefon','tel'], 'input', targetForm);
               if (phoneEl && !marked.has(phoneEl)) res.phone = mark(phoneEl, 'phone');
               // consent checkbox (GDPR/RODO) - enhanced detection
               const consentKeywords = ['zgod', 'akcept', 'regulamin', 'polityk', 'rodo', 'privacy', 'consent', 'agree', 'terms', 'warunki', 'akceptuj', 'potwierdzam'];
@@ -211,9 +259,23 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None, domai
                   if (forId) {
                     cb = document.getElementById(forId);
                   } else {
+                    // Try inside label
                     cb = lb.querySelector('input[type="checkbox"]');
+                    // Try previous sibling
+                    if (!cb && lb.previousElementSibling && lb.previousElementSibling.tagName === 'INPUT' && lb.previousElementSibling.type === 'checkbox') {
+                      cb = lb.previousElementSibling;
+                    }
+                    // Try next sibling
+                    if (!cb && lb.nextElementSibling && lb.nextElementSibling.tagName === 'INPUT' && lb.nextElementSibling.type === 'checkbox') {
+                      cb = lb.nextElementSibling;
+                    }
+                    // Try parent's previous sibling (common pattern: <div><input></div><div><label></div>)
+                    if (!cb && lb.parentElement && lb.parentElement.previousElementSibling) {
+                      const prevInput = lb.parentElement.previousElementSibling.querySelector('input[type="checkbox"]');
+                      if (prevInput) cb = prevInput;
+                    }
                   }
-                  if (cb && cb.type === 'checkbox' && visible(cb)) {
+                  if (cb && cb.type === 'checkbox' && visible(cb) && (!targetForm || getForm(cb) === targetForm)) {
                     consent = cb;
                     consentScore = matchCount;
                   }
@@ -223,7 +285,7 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None, domai
               // If not found by label, try checkbox attributes (name, id, aria-label)
               if (!consent) {
                 Array.from(document.querySelectorAll('input[type="checkbox"]')).forEach(cb => {
-                  if (!visible(cb)) return;
+                  if (!visible(cb) || (targetForm && getForm(cb) !== targetForm)) return;
                   const name = (cb.getAttribute('name')||'').toLowerCase();
                   const id = (cb.getAttribute('id')||'').toLowerCase();
                   const ariaLabel = (cb.getAttribute('aria-label')||'').toLowerCase();
@@ -236,21 +298,59 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None, domai
                 });
               }
               
-              // Fallback: required checkbox
-              if (!consent) {
-                const reqCheckbox = document.querySelector('input[type="checkbox"][required]');
+              // Fallback 1: required checkbox
+              if (!consent && targetForm) {
+                const reqCheckbox = targetForm.querySelector('input[type="checkbox"][required]');
                 if (reqCheckbox && visible(reqCheckbox)) {
                   consent = reqCheckbox;
+                }
+              }
+              
+              // Fallback 2: if form has only ONE checkbox, use it (likely consent)
+              if (!consent && targetForm) {
+                const allCheckboxes = Array.from(targetForm.querySelectorAll('input[type="checkbox"]')).filter(cb => visible(cb));
+                if (allCheckboxes.length === 1) {
+                  consent = allCheckboxes[0];
+                }
+              }
+              
+              // Fallback 3: if still no consent and no target form, try any checkbox with consent keywords
+              if (!consent && !targetForm) {
+                const allCheckboxes = Array.from(document.querySelectorAll('input[type="checkbox"]')).filter(cb => visible(cb));
+                if (allCheckboxes.length === 1) {
+                  consent = allCheckboxes[0];
                 }
               }
               
               if (consent && visible(consent)) {
                 res.consent = mark(consent, 'consent');
               }
-              // submit button
-              const subs = Array.from(document.querySelectorAll('button, input[type="submit"], .wpcf7-submit'))
-                .filter(el => visible(el) && ((el.getAttribute('type')||'').toLowerCase()==='submit' || /(wyślij|wyslij|wyślij wiadomość|send message|send|submit)/i.test((el.innerText||el.value||'').toLowerCase())));
+              
+              // DEBUG: Report checkbox detection details
+              const debugInfo = {
+                targetFormId: targetForm ? (targetForm.id || targetForm.className || 'unnamed') : 'none',
+                allCheckboxes: Array.from(document.querySelectorAll('input[type="checkbox"]')).length,
+                visibleCheckboxes: Array.from(document.querySelectorAll('input[type="checkbox"]')).filter(cb => visible(cb)).length,
+                inFormCheckboxes: targetForm ? Array.from(targetForm.querySelectorAll('input[type="checkbox"]')).filter(cb => visible(cb)).length : 0,
+                consentFound: !!consent,
+                consentScore: consentScore
+              };
+              res._debug_consent = debugInfo;
+              
+              // submit button - prioritize button in target form
+              let subs = [];
+              if (targetForm) {
+                subs = Array.from(targetForm.querySelectorAll('button, input[type="submit"], .wpcf7-submit'));
+              } else {
+                subs = Array.from(document.querySelectorAll('button, input[type="submit"], .wpcf7-submit'));
+              }
+              subs = subs.filter(el => visible(el) && ((el.getAttribute('type')||'').toLowerCase()==='submit' || /(wyślij|wyslij|wyślij wiadomość|send message|send|submit)/i.test((el.innerText||el.value||'').toLowerCase())));
               if (subs.length) res.submit = mark(subs[0], 'submit');
+              
+              // Add debug info about which form was selected
+              if (targetForm) {
+                res._formId = targetForm.id || targetForm.getAttribute('class') || 'unnamed-form';
+              }
               return res;
             }
             """
@@ -261,14 +361,31 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None, domai
         # DEBUG: Log what we're about to fill
         if run_logger:
             run_logger.log_text("🔍 Form fill debug:")
+            
+            # Show which form was selected (if any)
+            if selectors.get("_formId"):
+                run_logger.log_text(f"   🎯 Selected form: {selectors['_formId']}")
+            
+            # Show consent checkbox debug info
+            if selectors.get("_debug_consent"):
+                debug_consent = selectors["_debug_consent"]
+                run_logger.log_text(f"   📋 Checkbox detection:")
+                run_logger.log_text(f"      - All checkboxes: {debug_consent.get('allCheckboxes', 0)}")
+                run_logger.log_text(f"      - Visible checkboxes: {debug_consent.get('visibleCheckboxes', 0)}")
+                run_logger.log_text(f"      - In target form: {debug_consent.get('inFormCheckboxes', 0)}")
+                run_logger.log_text(f"      - Consent found: {debug_consent.get('consentFound', False)}")
+                run_logger.log_text(f"      - Consent score: {debug_consent.get('consentScore', 0)}")
+            
             run_logger.log_text(f"   Canonical values: {canonical}")
-            run_logger.log_text(f"   Found selectors: {list(selectors.keys())}")
-            for key, selector in selectors.items():
+            # Filter out internal keys like _formId
+            display_selectors = {k: v for k, v in selectors.items() if not k.startswith('_')}
+            run_logger.log_text(f"   Found selectors: {list(display_selectors.keys())}")
+            for key, selector in display_selectors.items():
                 run_logger.log_text(f"   {key} → {selector}")
             
             # Warn about fields in instruction but not in form
             instruction_fields = set(canonical.keys())
-            form_fields = set(selectors.keys())
+            form_fields = set(display_selectors.keys())
             missing_fields = instruction_fields - form_fields
             if missing_fields:
                 run_logger.log_text(f"   ⚠️  Fields in instruction but NOT in form: {missing_fields}")
@@ -312,6 +429,179 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None, domai
                     filled["filled"]["consent"] = True
                 except Exception:
                     pass
+        
+        # AUTO-VALIDATION: Verify fields were actually filled
+        if run_logger:
+            run_logger.log_text("🔍 Auto-validation: Checking field values in DOM...")
+        
+        validation_results = await page.evaluate(
+            """
+            () => {
+              const results = {};
+              const check = (key) => {
+                const el = document.querySelector(`[data-curllm-target="${key}"]`);
+                if (!el) return { found: false };
+                const value = el.value || '';
+                const checked = el.type === 'checkbox' ? el.checked : null;
+                const required = el.required || el.getAttribute('aria-required') === 'true' || el.getAttribute('data-required') === 'true';
+                return { 
+                  found: true, 
+                  value: value,
+                  checked: checked,
+                  isEmpty: value.trim() === '' && checked === null,
+                  isChecked: checked === true,
+                  required: required
+                };
+              };
+              results.name = check('name');
+              results.email = check('email');
+              results.subject = check('subject');
+              results.phone = check('phone');
+              results.message = check('message');
+              results.consent = check('consent');
+              return results;
+            }
+            """
+        )
+        
+        if run_logger and isinstance(validation_results, dict):
+            for field, result in validation_results.items():
+                if result.get("found"):
+                    req_marker = " [REQUIRED]" if result.get("required") else ""
+                    if result.get("checked") is not None:
+                        status = "✅ CHECKED" if result.get("isChecked") else "❌ UNCHECKED"
+                        run_logger.log_text(f"   {field}: {status}{req_marker}")
+                    elif result.get("isEmpty"):
+                        run_logger.log_text(f"   {field}: ❌ EMPTY (failed to fill){req_marker}")
+                    else:
+                        value_preview = str(result.get("value", ""))[:30]
+                        run_logger.log_text(f"   {field}: ✅ '{value_preview}'{req_marker}")
+        
+        # PRE-SUBMISSION DIAGNOSIS: Check for potential blocking issues
+        if run_logger:
+            run_logger.log_text("🔬 Pre-submission diagnosis:")
+        
+        pre_submit_diagnosis = await page.evaluate(
+            """
+            () => {
+              const issues = [];
+              const warnings = [];
+              
+              // Check all required fields in the form
+              const targetForm = document.querySelector('[data-curllm-target="submit"]')?.closest('form');
+              if (targetForm) {
+                // Required checkboxes
+                const requiredCheckboxes = targetForm.querySelectorAll('input[type="checkbox"][required], input[type="checkbox"][aria-required="true"]');
+                requiredCheckboxes.forEach(cb => {
+                  if (!cb.checked) {
+                    const label = cb.labels?.[0]?.innerText || cb.id || 'unnamed checkbox';
+                    issues.push({
+                      type: 'required_checkbox_unchecked',
+                      field: label.substring(0, 100),
+                      element: cb.id || cb.name || 'unknown'
+                    });
+                  }
+                });
+                
+                // Required inputs not filled
+                const requiredInputs = targetForm.querySelectorAll('input[required], textarea[required], input[aria-required="true"], textarea[aria-required="true"]');
+                requiredInputs.forEach(inp => {
+                  if (inp.type !== 'checkbox' && !inp.value?.trim()) {
+                    const label = inp.labels?.[0]?.innerText || inp.placeholder || inp.id || inp.name || 'unnamed field';
+                    issues.push({
+                      type: 'required_field_empty',
+                      field: label.substring(0, 100),
+                      element: inp.id || inp.name || 'unknown'
+                    });
+                  }
+                });
+                
+                // Check for visible validation errors already present
+                const errorSelectors = ['.error', '.invalid', '.forminator-error-message', '.wpcf7-not-valid-tip', '[aria-invalid="true"]'];
+                errorSelectors.forEach(sel => {
+                  const errors = targetForm.querySelectorAll(sel);
+                  errors.forEach(err => {
+                    if (err.offsetParent !== null) {
+                      warnings.push({
+                        type: 'existing_validation_error',
+                        message: err.innerText?.substring(0, 100) || 'validation error present'
+                      });
+                    }
+                  });
+                });
+              }
+              
+              return { issues, warnings, hasBlockingIssues: issues.length > 0 };
+            }
+            """
+        )
+        
+        if run_logger and isinstance(pre_submit_diagnosis, dict):
+            issues = pre_submit_diagnosis.get("issues", [])
+            warnings = pre_submit_diagnosis.get("warnings", [])
+            
+            if issues:
+                run_logger.log_text(f"   ⚠️  Found {len(issues)} blocking issue(s):")
+                for issue in issues[:5]:  # Show max 5
+                    issue_type = issue.get("type", "unknown")
+                    field = issue.get("field", "unknown")
+                    run_logger.log_text(f"      - {issue_type}: {field}")
+            
+            if warnings:
+                run_logger.log_text(f"   ⚠️  Found {len(warnings)} warning(s):")
+                for warning in warnings[:3]:  # Show max 3
+                    msg = warning.get("message", "unknown")
+                    run_logger.log_text(f"      - {msg}")
+            
+            if not issues and not warnings:
+                run_logger.log_text("   ✅ No blocking issues detected")
+        
+        # AUTO-FIX: Try to fix blocking issues before submission
+        if isinstance(pre_submit_diagnosis, dict) and pre_submit_diagnosis.get("hasBlockingIssues"):
+            if run_logger:
+                run_logger.log_text("🔧 Auto-fix: Attempting to resolve blocking issues...")
+            
+            fix_results = await page.evaluate(
+                """
+                () => {
+                  const fixed = [];
+                  const targetForm = document.querySelector('[data-curllm-target="submit"]')?.closest('form');
+                  if (!targetForm) return { fixed, success: false };
+                  
+                  // Fix 1: Check all unchecked required checkboxes
+                  const requiredCheckboxes = targetForm.querySelectorAll('input[type="checkbox"][required], input[type="checkbox"][aria-required="true"]');
+                  requiredCheckboxes.forEach(cb => {
+                    if (!cb.checked && cb.offsetParent !== null) {
+                      try {
+                        cb.click();
+                        fixed.push({ type: 'checkbox_checked', element: cb.id || cb.name || 'unnamed' });
+                      } catch(e) {
+                        // Try clicking parent label
+                        try {
+                          const label = cb.labels?.[0] || cb.closest('label');
+                          if (label) {
+                            label.click();
+                            fixed.push({ type: 'checkbox_checked_via_label', element: cb.id || cb.name || 'unnamed' });
+                          }
+                        } catch(e2) {}
+                      }
+                    }
+                  });
+                  
+                  return { fixed, success: fixed.length > 0 };
+                }
+                """
+            )
+            
+            if run_logger and isinstance(fix_results, dict):
+                fixed = fix_results.get("fixed", [])
+                if fixed:
+                    run_logger.log_text(f"   ✅ Fixed {len(fixed)} issue(s):")
+                    for fix in fixed:
+                        run_logger.log_text(f"      - {fix.get('type')}: {fix.get('element')}")
+                else:
+                    run_logger.log_text("   ⚠️  Could not auto-fix any issues")
+        
         # Attempt submit with basic validation-aware remediation
         if selectors.get("submit"):
             try:
@@ -362,17 +652,99 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None, domai
                         await page.wait_for_load_state("networkidle")
                     except Exception:
                         pass
-                    ok = await page.evaluate(
+                    
+                    # POST-SUBMISSION DIAGNOSIS: Detailed check of what happened after submit
+                    post_submit_result = await page.evaluate(
                         """
                         () => {
+                          const result = { success: false, errors: [], warnings: [], successIndicators: [] };
                           const t = (document.body.innerText||'').toLowerCase();
-                          if (/(dziękujemy|dziekujemy|wiadomość została|wiadomosc zostala|wiadomość wysłana|wiadomosc wyslana|message sent|thank you|success)/i.test(t)) return true;
-                          if (document.querySelector('.wpcf7-mail-sent-ok, .wpcf7-response-output, .elementor-message-success, .elementor-alert.elementor-alert-success')) return true;
-                          return false;
+                          
+                          // Check for success indicators
+                          if (/(dziękujemy|dziekujemy|wiadomość została|wiadomosc zostala|wiadomość wysłana|wiadomosc wyslana|message sent|thank you|success)/i.test(t)) {
+                            result.successIndicators.push('success_text_found');
+                          }
+                          if (document.querySelector('.wpcf7-mail-sent-ok, .wpcf7-response-output, .elementor-message-success, .elementor-alert.elementor-alert-success')) {
+                            result.successIndicators.push('success_element_found');
+                          }
+                          
+                          if (result.successIndicators.length > 0) {
+                            result.success = true;
+                            return result;
+                          }
+                          
+                          // Check for specific error types
+                          const targetForm = document.querySelector('[data-curllm-target="submit"]')?.closest('form');
+                          if (targetForm) {
+                            // Error 1: Required checkbox not checked
+                            const errorCheckboxes = targetForm.querySelectorAll('input[type="checkbox"][required]:not(:checked), input[type="checkbox"][aria-required="true"]:not(:checked)');
+                            errorCheckboxes.forEach(cb => {
+                              const label = cb.labels?.[0]?.innerText || cb.id || 'checkbox';
+                              result.errors.push({
+                                type: 'required_checkbox_unchecked',
+                                field: label.substring(0, 100)
+                              });
+                            });
+                            
+                            // Error 2: Required fields empty
+                            const emptyRequired = targetForm.querySelectorAll('input[required]:not([type="checkbox"]), textarea[required]');
+                            emptyRequired.forEach(inp => {
+                              if (!inp.value?.trim()) {
+                                const label = inp.labels?.[0]?.innerText || inp.placeholder || inp.id || 'field';
+                                result.errors.push({
+                                  type: 'required_field_empty',
+                                  field: label.substring(0, 100)
+                                });
+                              }
+                            });
+                            
+                            // Error 3: Visible validation errors
+                            const errorMessages = targetForm.querySelectorAll('.forminator-error-message, .wpcf7-not-valid-tip, .error-message, [role="alert"]');
+                            errorMessages.forEach(msg => {
+                              if (msg.offsetParent !== null && msg.innerText?.trim()) {
+                                result.errors.push({
+                                  type: 'validation_error',
+                                  message: msg.innerText.substring(0, 150)
+                                });
+                              }
+                            });
+                            
+                            // Error 4: Fields marked as invalid
+                            const invalidFields = targetForm.querySelectorAll('[aria-invalid="true"], .invalid, .wpcf7-not-valid, .forminator-error');
+                            invalidFields.forEach(field => {
+                              if (field.offsetParent !== null) {
+                                const label = field.labels?.[0]?.innerText || field.placeholder || field.name || field.id || 'field';
+                                result.errors.push({
+                                  type: 'invalid_field',
+                                  field: label.substring(0, 100)
+                                });
+                              }
+                            });
+                          }
+                          
+                          return result;
                         }
                         """
                     )
-                    if bool(ok):
+                    
+                    # Log post-submission diagnosis
+                    if run_logger and isinstance(post_submit_result, dict) and attempts == 1:
+                        run_logger.log_text("🔬 Post-submission diagnosis:")
+                        if post_submit_result.get("success"):
+                            run_logger.log_text(f"   ✅ SUCCESS - Found {len(post_submit_result.get('successIndicators', []))} success indicator(s)")
+                        else:
+                            errors = post_submit_result.get("errors", [])
+                            if errors:
+                                run_logger.log_text(f"   ❌ Found {len(errors)} error(s) blocking submission:")
+                                for error in errors[:5]:  # Show max 5
+                                    error_type = error.get("type", "unknown")
+                                    field = error.get("field") or error.get("message", "unknown")
+                                    run_logger.log_text(f"      - {error_type}: {field}")
+                            else:
+                                run_logger.log_text("   ⚠️  Submission status unclear - no success or error indicators found")
+                    
+                    ok = bool(post_submit_result.get("success")) if isinstance(post_submit_result, dict) else False
+                    if ok:
                         filled["submitted"] = True
                         break
                     try:

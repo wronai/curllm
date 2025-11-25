@@ -15,12 +15,150 @@ Example for "Fill contact form":
 
 from typing import Dict, Any, Optional, List
 import json
+import logging
 from .config import config
 from .vision_form_analysis import (
     analyze_form_fields_vision,
     build_vision_enhanced_field_list,
     create_vision_decision_tree
 )
+
+logger = logging.getLogger(__name__)
+
+
+def should_use_hierarchical(instruction: str, page_context: Dict[str, Any]) -> bool:
+    """
+    Decide if hierarchical planner is worth the overhead.
+    
+    Hierarchical planner takes 20-25 seconds but is valuable for:
+    - Complex multi-step tasks
+    - Large page contexts
+    
+    For simple form fills with small contexts, skip it and use direct form.fill.
+    
+    Args:
+        instruction: Task instruction
+        page_context: Page context dictionary
+        
+    Returns:
+        True if hierarchical planner should be used, False to bypass
+    """
+    # Check if this is a simple form task
+    if is_simple_form_task(instruction, page_context):
+        logger.info("✂️ Bypassing hierarchical planner: simple form task detected")
+        return False
+    
+    # Check if multi-step task (keep hierarchical)
+    if requires_multi_step(instruction):
+        logger.info("🔧 Using hierarchical planner: multi-step task detected")
+        return True
+    
+    # Check context size
+    context_size = estimate_context_size(page_context)
+    threshold = config.hierarchical_planner_chars if hasattr(config, 'hierarchical_planner_chars') else 25000
+    
+    if context_size < threshold:
+        logger.info(f"✂️ Bypassing hierarchical planner: context too small ({context_size} < {threshold})")
+        return False
+    
+    logger.info(f"🔧 Using hierarchical planner: large context ({context_size} chars)")
+    return True
+
+
+def is_simple_form_task(instruction: str, page_context: Dict[str, Any]) -> bool:
+    """
+    Check if this is a simple, single-form fill task.
+    
+    Simple form criteria:
+    - Instruction contains form keywords
+    - Only 1 form on page
+    - Form has <= 10 fields
+    
+    Args:
+        instruction: Task instruction
+        page_context: Page context dictionary
+        
+    Returns:
+        True if this is a simple form task
+    """
+    if not instruction:
+        return False
+    
+    lower = instruction.lower()
+    
+    # Keywords suggesting simple form
+    form_keywords = ["fill form", "fill contact", "wypełnij formularz", "submit form"]
+    if not any(k in lower for k in form_keywords):
+        return False
+    
+    # Check if only 1 form present
+    forms = page_context.get("forms", [])
+    if len(forms) != 1:
+        return False
+    
+    # Check form complexity
+    fields = forms[0].get("fields", [])
+    if len(fields) <= 10:  # Simple form
+        logger.debug(f"Simple form detected: 1 form, {len(fields)} fields")
+        return True
+    
+    return False
+
+
+def requires_multi_step(instruction: str) -> bool:
+    """
+    Check if instruction requires multiple steps.
+    
+    Multi-step indicators:
+    - "then", "after", "next"
+    - "click and", "navigate and"
+    - Multiple actions listed
+    
+    Args:
+        instruction: Task instruction
+        
+    Returns:
+        True if multi-step task detected
+    """
+    if not instruction:
+        return False
+    
+    lower = instruction.lower()
+    
+    # Multi-step keywords
+    multi_step_keywords = [
+        " then ", " after ", " next ",
+        "click and", "navigate and",
+        "first ", "second ",
+        "step 1", "step 2"
+    ]
+    
+    return any(keyword in lower for keyword in multi_step_keywords)
+
+
+def estimate_context_size(page_context: Dict[str, Any]) -> int:
+    """
+    Estimate the size of page context in characters.
+    
+    Args:
+        page_context: Page context dictionary
+        
+    Returns:
+        Estimated size in characters
+    """
+    try:
+        return len(json.dumps(page_context))
+    except Exception:
+        # Fallback rough estimate
+        size = 0
+        for key, value in page_context.items():
+            if isinstance(value, str):
+                size += len(value)
+            elif isinstance(value, list):
+                size += len(value) * 100  # Rough estimate
+            elif isinstance(value, dict):
+                size += len(str(value))
+        return size
 
 
 def extract_strategic_context(page_context: Dict[str, Any]) -> Dict[str, Any]:

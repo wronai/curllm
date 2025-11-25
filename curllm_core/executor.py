@@ -473,8 +473,8 @@ class CurllmExecutor:
     async def _take_screenshot(self, page, step: int, target_dir: Optional[Path] = None) -> str:
         return await _take_screenshot_func(page, step, target_dir)
 
-    async def _extract_page_context(self, page, include_dom: bool = False, dom_max_chars: int = 20000) -> Dict:
-        return await extract_page_context(page, include_dom=include_dom, dom_max_chars=dom_max_chars)
+    async def _extract_page_context(self, page, include_dom: bool = False, dom_max_chars: int = 20000, form_focused: bool = False) -> Dict:
+        return await extract_page_context(page, include_dom=include_dom, dom_max_chars=dom_max_chars, form_focused=form_focused)
 
     async def _generate_action(self, instruction: str, page_context: Dict, step: int, run_logger: RunLogger | None = None, runtime: Dict[str, Any] | None = None) -> Dict:
         from .llm_planner import generate_action
@@ -522,7 +522,15 @@ class CurllmExecutor:
         
         # If failed and LLM filler is enabled, try LLM-guided approach
         if config.llm_field_filler_enabled:
-            if not result or not result.get("submitted"):
+            # Check if deterministic ACTUALLY succeeded
+            is_success = (
+                result and 
+                isinstance(result, dict) and 
+                result.get("submitted") is True and
+                "error" not in result
+            )
+            
+            if not is_success:
                 if run_logger:
                     run_logger.log_text("⚠️  Deterministic form fill failed or incomplete")
                     run_logger.log_text("🤖 Attempting LLM-guided per-field filling...")

@@ -27,6 +27,7 @@ from .page_utils import auto_scroll as _auto_scroll, accept_cookies as _accept_c
 from .captcha_slider import attempt_slider_challenge
 from .slider_plugin import try_external_slider_solver
 from .result_store import previous_for_context as _previous_for_context
+from .tool_retry import ToolRetryManager
 
 
 async def _try_early_form_fill(executor, instruction: str, page, domain_dir, run_logger, result: Dict[str, Any], lower_instr: str) -> Optional[Dict[str, Any]]:
@@ -159,11 +160,12 @@ async def _step_visual(executor, page, step: int, domain_dir, captcha_solver: bo
     return last_screenshot_path, last_visual_analysis
 
 
-async def _step_page_context(executor, page, runtime: Dict[str, Any], last_screenshot_path: Optional[str], last_visual_analysis: Optional[Dict[str, Any]]):
+async def _step_page_context(executor, page, runtime: Dict[str, Any], last_screenshot_path: Optional[str], last_visual_analysis: Optional[Dict[str, Any]], form_focused: bool = False):
     page_context = await executor._extract_page_context(
         page,
         include_dom=bool(runtime.get("include_dom_html")),
         dom_max_chars=int(runtime.get("dom_max_chars", 20000) or 20000),
+        form_focused=form_focused,
     )
     if last_screenshot_path:
         page_context.setdefault("status", {})
@@ -282,7 +284,7 @@ async def _progress_and_maybe_break(executor, page_context: Dict[str, Any], last
         return last_sig, no_progress, progressive_depth, False
 
 
-async def _execute_tool(executor, page, instruction: str, tool_name: str, args: Dict[str, Any], runtime: Dict[str, Any], run_logger):
+async def _execute_tool(executor, page, instruction: str, tool_name: str, args: Dict[str, Any], runtime: Dict[str, Any], run_logger, domain_dir: Optional[str] = None):
     try:
         tn = str(tool_name or "").strip().lower()
         _t_tool = time.time()
@@ -497,7 +499,7 @@ async def _execute_tool(executor, page, instruction: str, tool_name: str, args: 
         return {"error": str(e)}
 
 
-async def _planner_cycle(executor, instruction: str, page_context: Dict[str, Any], step: int, run_logger, runtime: Dict[str, Any], page, tool_history: list[Dict[str, Any]], domain_dir: Optional[str] = None):
+async def _planner_cycle(executor, instruction: str, page_context: Dict[str, Any], step: int, run_logger, runtime: Dict[str, Any], page, tool_history: list[Dict[str, Any]], domain_dir: Optional[str] = None, retry_manager=None):
     _t_gen = time.time()
     
     # Try hierarchical planner first (only for form-filling tasks)
@@ -507,10 +509,24 @@ async def _planner_cycle(executor, instruction: str, page_context: Dict[str, Any
     
     if hierarchical_enabled and step == 1:  # Only on first step
         try:
-            from .hierarchical_planner import hierarchical_plan
-            if run_logger:
-                run_logger.log_text("⚙️  Attempting hierarchical planner...")
-            action = await hierarchical_plan(instruction, page_context, executor.llm, run_logger)
+            from .hierarchical_planner import hierarchical_plan, should_use_hierarchical
+            
+            # Smart bypass: check if hierarchical planner is worth the overhead
+            if not should_use_hierarchical(instruction, page_context):
+                if run_logger:
+                    run_logger.log_text("✂️ Bypassing hierarchical planner (simple task detected)")
+                # Fall through to standard planner
+                action = await executor._generate_action(
+                    instruction=instruction,
+                    page_context=page_context,
+                    step=step,
+                    run_logger=run_logger,
+                    runtime=runtime,
+                )
+            else:
+                if run_logger:
+                    run_logger.log_text("⚙️  Attempting hierarchical planner...")
+                action = await hierarchical_plan(instruction, page_context, executor.llm, run_logger)
             if action is not None:
                 # Hierarchical planner succeeded, use its action
                 try:
@@ -608,13 +624,46 @@ async def _planner_cycle(executor, instruction: str, page_context: Dict[str, Any
     if action.get("type") == "tool":
         tool_name = action.get("tool_name")
         args = action.get("args") or {}
-        tool_res = await _execute_tool(executor, page, instruction, str(tool_name or ""), args if isinstance(args, dict) else {}, runtime, run_logger)
+        tool_res = await _execute_tool(executor, page, instruction, str(tool_name or ""), args if isinstance(args, dict) else {}, runtime, run_logger, domain_dir)
         if run_logger:
             try:
                 run_logger.log_text(f"Tool executed: {tool_name}")
                 run_logger.log_code("json", json.dumps(tool_res))
             except Exception:
                 pass
+        
+        # AUTO-COMPLETE: If form was successfully submitted, end task immediately
+        if str(tool_name).lower() == "form.fill" and isinstance(tool_res, dict):
+            form_fill_result = tool_res.get("form_fill")
+            if isinstance(form_fill_result, dict) and form_fill_result.get("submitted") is True:
+                if run_logger:
+                    run_logger.log_text("✅ Form successfully submitted - auto-completing task")
+                try:
+                    tool_history.append({"tool": tool_name, "args": args, "result": tool_res})
+                except Exception:
+                    pass
+                # Return True to signal task completion
+                return True, {
+                    "form_submitted": True,
+                    "message": "Contact form submitted successfully",
+                    "fields_filled": form_fill_result.get("filled", {}),
+                }
+        
+        # Check for tool failures and apply retry logic
+        if retry_manager and isinstance(tool_res, dict) and "error" in tool_res:
+            error_msg = str(tool_res.get("error", ""))
+            if not retry_manager.should_retry(str(tool_name), error_msg):
+                if run_logger:
+                    run_logger.log_text(f"🛑 Tool {tool_name} failed repeatedly with same error - SKIPPING further retries")
+                    summary = retry_manager.get_failure_summary(str(tool_name))
+                    run_logger.log_code("json", json.dumps(summary, indent=2))
+                
+                # Try alternative approach
+                alternative = retry_manager.get_alternative_approach(str(tool_name))
+                if alternative:
+                    if run_logger:
+                        run_logger.log_text(f"🔄 Suggested alternative: {alternative}")
+        
         try:
             tool_history.append({"tool": tool_name, "args": args, "result": tool_res})
         except Exception:
@@ -745,6 +794,11 @@ async def run_task(
 ) -> Dict:
     result: Dict[str, Any] = {"data": None, "steps": 0, "screenshots": [], "meta": {"hints": [], "suggested_commands": []}}
     lower_instr = (instruction or "").lower()
+    
+    # Detect form-filling tasks to enable optimized context extraction
+    is_form_task = any(k in lower_instr for k in ["form", "formularz", "fill", "wypełnij", "wypelnij", "submit", "wyślij", "wyslij", "contact"])
+    if run_logger and is_form_task:
+        run_logger.log_text("🎯 Form task detected - enabling form-focused context extraction")
 
     page, domain_dir, stealth_mode, early = await executor._open_page_with_prechecks(
         agent=agent,
@@ -806,6 +860,10 @@ async def run_task(
     last_screenshot_path: Optional[str] = None
     last_visual_analysis: Optional[Dict[str, Any]] = None
     tool_history: list[Dict[str, Any]] = []
+    
+    # Initialize Tool Retry Manager to prevent infinite loops
+    retry_manager = ToolRetryManager(max_same_error=2)
+    
     for step in range(config.max_steps):
         result["steps"] = step + 1
         if run_logger:
@@ -834,7 +892,7 @@ async def run_task(
             pass
 
         _t_pc = time.time()
-        page_context = await _step_page_context(executor, page, runtime, last_screenshot_path, last_visual_analysis)
+        page_context = await _step_page_context(executor, page, runtime, last_screenshot_path, last_visual_analysis, form_focused=is_form_task)
         try:
             run_logger.log_kv("fn:_extract_page_context_ms", str(int((time.time() - _t_pc) * 1000)))
         except Exception:
@@ -897,7 +955,7 @@ async def run_task(
                 pass
 
         # Planner step
-        done, data = await _planner_cycle(executor, instruction, page_context, step, run_logger, runtime, page, tool_history, domain_dir)
+        done, data = await _planner_cycle(executor, instruction, page_context, step, run_logger, runtime, page, tool_history, domain_dir, retry_manager)
         if done:
             result["data"] = data
             break

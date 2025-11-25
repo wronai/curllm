@@ -83,6 +83,34 @@ Installing curllm dependencies...
 ...
 ```
 
+### How it works?
+
+![img.png](img.png)
+
+```bash
+ curllm --visual --stealth --session kontakt \
+  "https://www.prototypowanie.pl/kontakt/" \
+  -d '{
+    "instruction":"Fill contact form: name=John Doe, email=john@example.com, phone=+48123456789, subject=Test, message=Hello i need quota for my MVP project",
+    "params":{"hierarchical_planner":true}
+  }' \
+  -v
+```
+
+| Funkcja | Status | Uwagi |
+|---------|--------|-------|
+| Wykrywanie zadania | ✅ | Działa |
+| Izolacja formularza | ✅ | Działa |
+| Wypełnianie name | ✅ | Działa |
+| Wypełnianie email | ✅ | Działa |
+| Wypełnianie phone | ✅ | Działa |
+| Wypełnianie message | ✅ | Działa |
+| Autowalidacja | ✅ | Działa |
+| Wysyłanie formularza | ✅ | Działa - **tylko 1 raz!** |
+| **Auto-zakończenie** | ✅ | **NAPRAWIONE** - kończy po 1 wysłaniu |
+| Optymalizacja tokenów | ✅ | Działa (~60% oszczędności) |
+
+
 ### 1. Installation
 
 ```bash
