@@ -96,10 +96,12 @@ source /test/venv/bin/activate
 
 log_test "Installing curllm from PyPI"
 
-# Check if we should use local wheel
-if [ -f "/test/curllm-*.whl" ]; then
-    log_test "Local wheel found, installing from file"
-    if pip install /test/curllm-*.whl; then
+# Check if we should use local wheel (PRIORITY)
+WHEEL_FILE=$(ls /test/curllm-*.whl 2>/dev/null | head -1)
+
+if [ -n "$WHEEL_FILE" ] && [ -f "$WHEEL_FILE" ]; then
+    log_test "Local wheel found: $(basename $WHEEL_FILE)"
+    if pip install "$WHEEL_FILE"; then
         log_pass "Installed from local wheel"
     else
         log_fail "Installation from wheel failed" "pip install wheel error"
@@ -114,11 +116,12 @@ elif [ "$USE_TEST_PYPI" = "true" ]; then
         exit 1
     fi
 else
-    log_test "Installing from PyPI"
+    log_test "Installing from PyPI (NOTE: Package must be published first!)"
     if pip install curllm; then
         log_pass "Installed from PyPI"
     else
-        log_fail "Installation from PyPI failed" "pip install error"
+        log_fail "Installation from PyPI failed" "Package not published or pip error"
+        log_test "TIP: Use local wheel by building package first: python3 -m build"
         exit 1
     fi
 fi

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   test-ubuntu:
     build:
@@ -8,12 +6,12 @@ services:
     container_name: curllm-test-ubuntu
     volumes:
       - ./results:/test/results
-      - ../../dist:/test/dist:ro
+      - ../../dist:/dist:ro
     environment:
       - USE_TEST_PYPI=${USE_TEST_PYPI:-false}
     command: >
       bash -c "
-        cp /test/dist/*.whl /test/ 2>/dev/null || true &&
+        cp /dist/*.whl /test/ 2>/dev/null || true &&
         /test/test_pypi_install.sh &&
         cp /test/results.json /test/results/ubuntu.json
       "
@@ -25,12 +23,12 @@ services:
     container_name: curllm-test-debian
     volumes:
       - ./results:/test/results
-      - ../../dist:/test/dist:ro
+      - ../../dist:/dist:ro
     environment:
       - USE_TEST_PYPI=${USE_TEST_PYPI:-false}
     command: >
       bash -c "
-        cp /test/dist/*.whl /test/ 2>/dev/null || true &&
+        cp /dist/*.whl /test/ 2>/dev/null || true &&
         /test/test_pypi_install.sh &&
         cp /test/results.json /test/results/debian.json
       "
@@ -42,12 +40,12 @@ services:
     container_name: curllm-test-fedora
     volumes:
       - ./results:/test/results
-      - ../../dist:/test/dist:ro
+      - ../../dist:/dist:ro
     environment:
       - USE_TEST_PYPI=${USE_TEST_PYPI:-false}
     command: >
       bash -c "
-        cp /test/dist/*.whl /test/ 2>/dev/null || true &&
+        cp /dist/*.whl /test/ 2>/dev/null || true &&
         /test/test_pypi_install.sh &&
         cp /test/results.json /test/results/fedora.json
       "
@@ -59,12 +57,12 @@ services:
     container_name: curllm-test-alpine
     volumes:
       - ./results:/test/results
-      - ../../dist:/test/dist:ro
+      - ../../dist:/dist:ro
     environment:
       - USE_TEST_PYPI=${USE_TEST_PYPI:-false}
     command: >
       bash -c "
-        cp /test/dist/*.whl /test/ 2>/dev/null || true &&
+        cp /dist/*.whl /test/ 2>/dev/null || true &&
         /test/test_pypi_install.sh &&
         cp /test/results.json /test/results/alpine.json
       "

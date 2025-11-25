@@ -49,6 +49,7 @@
 - **[API Reference](docs/API.md)** - REST API endpoints
 - **[Environment Config](docs/Environment.md)** - Configuration guide
 - **[Troubleshooting](docs/Troubleshooting.md)** - Common issues
+- **[Linux Testing](LINUX_TESTING.md)** - Cross-platform Linux tests
 
 ## 🚀 Quick Start
 

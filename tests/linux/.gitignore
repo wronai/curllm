@@ -1,0 +1,16 @@
+# Test results
+results/
+*.json
+LINUX_TEST_RESULTS.md
+
+# Docker volumes
+.docker/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Temporary files
+*.log
+*.tmp
