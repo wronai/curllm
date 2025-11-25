@@ -1,0 +1,28 @@
+# Alpine Test Environment for curllm
+FROM alpine:3.19
+
+ENV PYTHONUNBUFFERED=1
+
+RUN apk add --no-cache \
+    python3 \
+    py3-pip \
+    curl \
+    wget \
+    git \
+    bash \
+    gcc \
+    musl-dev \
+    python3-dev \
+    libffi-dev \
+    openssl-dev \
+    build-base
+
+RUN adduser -D -s /bin/bash testuser
+WORKDIR /test
+RUN chown testuser:testuser /test
+USER testuser
+
+COPY --chown=testuser:testuser test_pypi_install.sh /test/
+RUN chmod +x /test/test_pypi_install.sh
+
+CMD ["/test/test_pypi_install.sh"]

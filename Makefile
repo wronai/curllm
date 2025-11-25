@@ -7,17 +7,19 @@ help:
 	@echo "curllm - Browser Automation with Local LLM"
 	@echo ""
 	@echo "Available targets:"
-	@echo "  make install      - Install all dependencies"
-	@echo "  make setup        - Complete setup (install + pull models)"
-	@echo "  make start        - Start services (auto: clean-cache + reinstall)"
-	@echo "  make stop         - Stop services (auto: clean-cache)"
-	@echo "  make restart      - Restart services (stop + start)"
-	@echo "  make fresh-start  - Complete fresh start with full cache cleanup"
-	@echo "  make test         - Run tests"
-	@echo "  make benchmark    - Run performance benchmarks"
-	@echo "  make clean        - Clean temporary files"
-	@echo "  make clean-cache  - Deep clean: remove all Python cache"
-	@echo "  make reinstall    - Force reinstall curllm package"
+	@echo "  make install         - Install all dependencies"
+	@echo "  make install-browsers - Install Playwright browsers only"
+	@echo "  make setup           - Complete setup (install + pull models)"
+	@echo "  make start           - Start services (auto: clean-cache + reinstall + browsers)"
+	@echo "  make stop            - Stop services (auto: clean-cache)"
+	@echo "  make restart         - Restart services (stop + start)"
+	@echo "  make fresh-start     - Complete fresh start with full cache cleanup"
+	@echo "  make test            - Run tests"
+	@echo "  make test-linux      - Run cross-platform Linux tests (Docker)"
+	@echo "  make benchmark       - Run performance benchmarks"
+	@echo "  make clean           - Clean temporary files"
+	@echo "  make clean-cache     - Deep clean: remove all Python cache"
+	@echo "  make reinstall       - Force reinstall curllm package"
 	@echo ""
 	@echo "Docker targets:"
 	@echo "  make docker-build - Build Docker images"
@@ -39,12 +41,26 @@ install:
 	@chmod +x install.sh
 	@./install.sh
 
+install-browsers:
+	@echo "🌐 Installing Playwright browsers..."
+	@if [ -d "venv" ]; then \
+		./venv/bin/python -m playwright install chromium 2>&1 | grep -v "Downloading" || true; \
+		./venv/bin/python -m playwright install-deps chromium > /dev/null 2>&1 || true; \
+	elif [ -n "$$VIRTUAL_ENV" ]; then \
+		python -m playwright install chromium 2>&1 | grep -v "Downloading" || true; \
+		python -m playwright install-deps chromium > /dev/null 2>&1 || true; \
+	else \
+		python3 -m playwright install chromium 2>&1 | grep -v "Downloading" || true; \
+		python3 -m playwright install-deps chromium > /dev/null 2>&1 || true; \
+	fi
+	@echo "✅ Playwright browsers ready!"
+
 setup: install
 	@chmod +x scripts/setup.sh 2>/dev/null || true
 	@bash scripts/setup.sh
 
 # Service management
-start: clean-cache reinstall
+start: clean-cache reinstall install-browsers
 	@chmod +x scripts/start.sh 2>/dev/null || true
 	@bash scripts/start.sh
 
@@ -84,6 +100,14 @@ test-curlx-compose:
 test-integration:
 	@echo "Running integration tests..."
 	@python3 examples.py
+
+test-linux:
+	@echo "Running cross-platform Linux tests..."
+	@chmod +x tests/linux/run_tests.sh
+	@cd tests/linux && ./run_tests.sh
+	@echo ""
+	@echo "✓ Results available in tests/linux/LINUX_TEST_RESULTS.md"
+	@echo "✓ Also copied to LINUX_TEST_RESULTS.md in project root"
 
 benchmark:
 	@echo "Running performance benchmark..."

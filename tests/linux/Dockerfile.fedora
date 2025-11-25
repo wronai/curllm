@@ -1,0 +1,26 @@
+# Fedora Test Environment for curllm
+FROM fedora:39
+
+ENV PYTHONUNBUFFERED=1
+
+RUN dnf install -y \
+    python3 \
+    python3-pip \
+    curl \
+    wget \
+    git \
+    gcc \
+    gcc-c++ \
+    make \
+    openssl-devel \
+    && dnf clean all
+
+RUN useradd -m -s /bin/bash testuser
+WORKDIR /test
+RUN chown testuser:testuser /test
+USER testuser
+
+COPY --chown=testuser:testuser test_pypi_install.sh /test/
+RUN chmod +x /test/test_pypi_install.sh
+
+CMD ["/test/test_pypi_install.sh"]

@@ -56,6 +56,24 @@
 make install
 ```
 
+### ⚠️ Troubleshooting: Missing Browsers
+
+Jeśli widzisz błąd `Executable doesn't exist at ...playwright/chromium...`:
+
+```bash
+# Quick fix
+playwright install
+
+# Lub automatycznie przy starcie
+make start  # Teraz automatycznie instaluje przeglądarki!
+```
+
+**Dlaczego?** `make clean` reinstaluje pakiet Python, ale **nie** instaluje przeglądarek Playwright (są osobne). 
+
+**Rozwiązanie:** Zaktualizowany `make start` teraz **automatycznie instaluje przeglądarki**.
+
+📚 **Więcej:** `PLAYWRIGHT_BROWSERS_FIX.md`
+
 ### Generate Example Scripts
 
 Generate runnable example scripts:
@@ -114,7 +132,71 @@ Installing curllm dependencies...
 | Checkbox zgody | ✅⚠️ | Auto-fix powinien zaznaczyć jeśli wymagany |
 | Optymalizacja tokenów | ✅ | Działa (~60% oszczędności) |
 | **🤖 LLM Orchestrator** | ✅ | **NOWE** - LLM decyduje jak wypełnić formularz |
+| **🎭 Transparent Orchestrator** | ✅ | **NOWE** - LLM widzi KAŻDĄ decyzję (5 faz) |
 | **🔧 Email field detection** | ✅ | **FIXED** - type="email" ma najwyższy priorytet |
+
+---
+
+## 🎭 Transparent LLM Orchestration (NAJNOWSZA FUNKCJA!)
+
+### Multi-Phase Control z Pełną Transparentnością
+
+**Problem:** Hardcoded algorytmy podejmują decyzje bez wiedzy LLM → błędy
+
+**Rozwiązanie:** LLM widzi KAŻDĄ decyzję i kontroluje KAŻDY krok
+
+### 5 Faz Orkiestracji
+
+```
+1. FIELD MAPPING     → LLM planuje mapowanie pól
+2. VERIFICATION      → LLM weryfikuje i koryguje
+3. FILLING PLAN      → LLM tworzy plan wypełnienia
+4. EXECUTION         → LLM kontroluje każdy krok
+5. VALIDATION        → LLM decyduje czy submit
+```
+
+### Quick Start
+
+```bash
+# Enable transparent orchestration
+echo "CURLLM_LLM_ORCHESTRATOR=true" >> .env
+echo "CURLLM_LLM_TRANSPARENT_ORCHESTRATOR=true" >> .env
+
+# Test
+curllm --visual --stealth \
+  "https://www.prototypowanie.pl/" \
+  -d '{"instruction":"Fill form: name=John Doe, email=john@example.com"}' -v
+```
+
+### Przykład Logu
+
+```
+🎭 TRANSPARENT LLM ORCHESTRATOR mode enabled
+
+━━━ PHASE 1: Field Mapping ━━━
+   🧠 LLM Planning...
+   🎯 DECISION: email → field_A (reasoning: type='email')
+
+━━━ PHASE 2: Verification ━━━
+   🎯 DECISION: Approved
+
+━━━ PHASE 3: Filling Plan ━━━
+   🎯 DECISION: 2 steps plan
+
+━━━ PHASE 4: Execution ━━━
+   ⚡ Step 1 ✅
+   ⚡ Step 2 ✅
+
+━━━ PHASE 5: Validation ━━━
+   🎯 DECISION: Ready to submit ✅
+
+✅ Phases: 5, Decisions: 8, Success: true
+```
+
+### Dokumentacja
+
+- **Quick Start:** `QUICKSTART_TRANSPARENT.md`
+- **Full Docs:** `TRANSPARENT_ORCHESTRATION.md`
 
 ---
 
