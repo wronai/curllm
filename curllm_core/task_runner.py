@@ -405,8 +405,15 @@ async def _execute_tool(executor, page, instruction: str, tool_name: str, args: 
             except Exception:
                 pass
             return {"articles": items or []}
-        # Products (heuristics)
-        if tn == "products.heuristics":
+        # Products extraction - NEW DYNAMIC SYSTEM
+        if tn == "products.extract" or tn == "products.heuristics":
+            if tn == "products.heuristics" and run_logger:
+                try:
+                    run_logger.log_text("⚠️ products.heuristics is DEPRECATED - using products.extract with dynamic detection")
+                except Exception:
+                    pass
+            
+            # Use new dynamic extraction (redirects through product_heuristics which now uses iterative_extract)
             thr = None
             try:
                 v = args.get("threshold") if isinstance(args, dict) else None
@@ -416,7 +423,10 @@ async def _execute_tool(executor, page, instruction: str, tool_name: str, args: 
             instr = instruction or ""
             if thr is not None:
                 instr = f"{instr} under {thr}"
+            
+            # product_heuristics now redirects to iterative_extract (dynamic system)
             data = await product_heuristics(instr, page, run_logger)
+            
             if run_logger:
                 try:
                     cnt = len((data or {}).get("products") or []) if isinstance(data, dict) else 0
@@ -424,7 +434,7 @@ async def _execute_tool(executor, page, instruction: str, tool_name: str, args: 
                 except Exception:
                     pass
             try:
-                run_logger.log_kv(f"fn:tool.products.heuristics_ms", str(int((time.time() - _t_tool) * 1000)))
+                run_logger.log_kv(f"fn:tool.{tn}_ms", str(int((time.time() - _t_tool) * 1000)))
             except Exception:
                 pass
             return data or {"products": []}
@@ -994,6 +1004,31 @@ async def run_task(
         except Exception as e:
             if run_logger:
                 run_logger.log_text(f"⚠️ LLM-Guided Extractor failed: {e}")
+    
+    # Try dynamic detector first (generic, adaptive)
+    if config.iterative_extractor_enabled and ("product" in lower_instr or "produkt" in lower_instr):
+        if run_logger:
+            run_logger.log_text("🔍 Dynamic Detector enabled - adaptive pattern recognition")
+        try:
+            from .dynamic_detector import dynamic_extract
+            
+            result_data = await dynamic_extract(page, instruction, run_logger)
+            
+            if result_data and result_data.get("count", 0) > 0:
+                if run_logger:
+                    run_logger.log_text(f"✅ Dynamic Detector succeeded - found {result_data['count']} items")
+                    run_logger.log_text(f"   Container: {result_data.get('container', {}).get('selector', 'unknown')}")
+                    run_logger.log_text(f"   Confidence: {result_data.get('container', {}).get('confidence', 0):.2f}")
+                result["data"] = result_data
+                await page.close()
+                return result
+            else:
+                reason = result_data.get("reason", "No items found") if result_data else "Detection failed"
+                if run_logger:
+                    run_logger.log_text(f"⚠️ Dynamic Detector returned no data: {reason}")
+        except Exception as e:
+            if run_logger:
+                run_logger.log_text(f"⚠️ Dynamic Detector failed: {e}")
     
     # Try iterative extractor second (pure JS, fast fallback)
     if config.iterative_extractor_enabled and ("product" in lower_instr or "produkt" in lower_instr):

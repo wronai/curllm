@@ -270,6 +270,28 @@ async def extract_links_by_selectors(instruction: str, page, run_logger=None) ->
     return None
 
 async def product_heuristics(instruction: str, page, run_logger=None) -> Optional[Dict[str, Any]]:
+    """
+    DEPRECATED: Old hard-coded heuristics system.
+    Now redirects to new dynamic extraction system.
+    """
+    if run_logger:
+        run_logger.log_text("⚠️ products.heuristics is DEPRECATED - using dynamic extraction system")
+    
+    # Redirect to new dynamic system
+    from .iterative_extractor import iterative_extract
+    try:
+        result = await iterative_extract(instruction, page, None, run_logger)
+        return result
+    except Exception as e:
+        if run_logger:
+            run_logger.log_text(f"❌ Dynamic extraction failed: {e}")
+        return None
+
+async def product_heuristics_old(instruction: str, page, run_logger=None) -> Optional[Dict[str, Any]]:
+    """
+    OLD IMPLEMENTATION - kept for reference only.
+    DO NOT USE - use iterative_extract or dynamic_extract instead.
+    """
     lower_instr = (instruction or "").lower()
     if not (("product" in lower_instr or "produkt" in lower_instr) and ("under" in lower_instr or "poniżej" in lower_instr or "below" in lower_instr or re.search(r"\b(<=?|mniej niż)\b", lower_instr))):
         return None

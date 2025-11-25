@@ -917,6 +917,154 @@ function collectFormFields() {
     return out;
 }
 
+function clearFormFields() {
+    const cont = document.getElementById('form-fields-container');
+    if (!cont) return;
+    cont.innerHTML = '';
+}
+
+function addFormFieldRowWith(name, value) {
+    const cont = document.getElementById('form-fields-container');
+    if (!cont) return;
+    const row = document.createElement('div');
+    row.className = 'grid grid-cols-1 md:grid-cols-2 gap-2';
+    row.setAttribute('data-row','form-field');
+    row.innerHTML = `
+        <input type="text" class="px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="field" value="${escapeHtml(name || '')}">
+        <input type="text" class="px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="value" value="${escapeHtml(value || '')}">
+    `;
+    cont.appendChild(row);
+}
+
+function setFormFields(pairs) {
+    clearFormFields();
+    if (Array.isArray(pairs)) {
+        pairs.forEach(p => addFormFieldRowWith(p.name, p.value));
+    }
+    if (!pairs || pairs.length === 0) {
+        addFormFieldRow();
+    }
+    updateCurllmFormsPreview();
+}
+
+function fillSampleFormData() {
+    const urlEl = document.getElementById('forms-url-input');
+    if (urlEl && !urlEl.value) urlEl.value = 'https://example.com/contact';
+    const sample = [
+        { name: 'name', value: 'Jan Kowalski' },
+        { name: 'email', value: 'jan@example.com' },
+        { name: 'phone', value: '+48 123 456 789' },
+        { name: 'message', value: 'Testowa wiadomość' }
+    ];
+    setFormFields(sample);
+    showNotification('Wypełniono przykładowe dane', 'success');
+}
+
+function parseCSV(text) {
+    if (!text) return [];
+    // Normalize newlines and remove BOM
+    text = String(text).replace(/^\uFEFF/, '');
+    const rows = [];
+    let row = [];
+    let cur = '';
+    let inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (inQuotes) {
+            if (ch === '"') {
+                // Escaped quote
+                if (i + 1 < text.length && text[i + 1] === '"') {
+                    cur += '"';
+                    i++;
+                } else {
+                    inQuotes = false;
+                }
+            } else {
+                cur += ch;
+            }
+        } else {
+            if (ch === '"') {
+                inQuotes = true;
+            } else if (ch === ',') {
+                row.push(cur);
+                cur = '';
+            } else if (ch === '\n') {
+                row.push(cur);
+                rows.push(row);
+                row = [];
+                cur = '';
+            } else if (ch === '\r') {
+                // ignore, handle on next \n
+            } else {
+                cur += ch;
+            }
+        }
+    }
+    // flush last cell
+    row.push(cur);
+    rows.push(row);
+    // trim trailing empty rows
+    return rows.filter(r => r.length && r.some(c => (c || '').trim() !== ''));
+}
+
+function importFormCSV(csvText) {
+    const rows = parseCSV(csvText);
+    if (!rows || rows.length === 0) { showNotification('Pusty plik CSV', 'error'); return; }
+    let header = rows[0].map(c => (c || '').trim().toLowerCase());
+    const isHeader = header.includes('name') && header.includes('value')
+                  || header.includes('field') && header.includes('value')
+                  || header.includes('key') && header.includes('value');
+    const dataRows = isHeader ? rows.slice(1) : rows;
+    const pairs = [];
+    dataRows.forEach(r => {
+        if (!r || r.length === 0) return;
+        const name = (r[0] || '').trim();
+        const value = (r[1] || '').trim();
+        if (name) pairs.push({ name, value });
+    });
+    if (pairs.length === 0) { showNotification('Nie znaleziono poprawnych par w CSV', 'error'); return; }
+    setFormFields(pairs);
+    showNotification(`Zaimportowano ${pairs.length} pól z CSV`, 'success');
+}
+
+function importFormCSVFromFile() {
+    const input = document.getElementById('forms-csv-file');
+    if (!input || !input.files || !input.files[0]) { showNotification('Wybierz plik CSV', 'error'); return; }
+    const file = input.files[0];
+    const reader = new FileReader();
+    reader.onload = () => {
+        try {
+            importFormCSV(reader.result);
+        } catch (e) {
+            console.error('CSV import error:', e);
+            showNotification('Błąd importu CSV', 'error');
+        }
+    };
+    reader.onerror = () => {
+        showNotification('Nie można odczytać pliku', 'error');
+    };
+    reader.readAsText(file);
+}
+
+function downloadSampleCSVForms() {
+    const csv = [
+        'name,value',
+        'name,Jan Kowalski',
+        'email,jan@example.com',
+        'phone,+48 123 456 789',
+        'message,Testowa wiadomość'
+    ].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'form_fields_sample.csv';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 0);
+    showNotification('Pobrano przykładowy CSV', 'success');
+}
+
 function buildFormInstruction(fields) {
     if (!fields || fields.length === 0) return 'Fill the form on this page and submit it.';
     const parts = fields.map(f => `${f.name}="${f.value.replace(/"/g,'\\"')}"`);

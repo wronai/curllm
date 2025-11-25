@@ -1,3 +1,9 @@
+curllm --stealth "https://www.skapiec.pl/cat/200-telefony-komorkowe.html" \
+  -d "Find products under 2000zł"
+{"evaluation":{"checks_performed":["steps_check","extraction_task_check"],"evaluated":true,"failures":[],"warnings":["Zero steps executed"]},"hints":[],"reason":"Task completed successfully (0 steps taken)","result":{"products":[{"name":"Samsung Galaxy S22 Ultra 5G 12GB/256GB Dual Sim Czarny\nBrak opinii\nod 1 699,00 z\u0142 w Empik.com\nPor\u00f3wnaj oferty (5)Id\u017a do sklepu","price":1699,"url":"https://www.skapiec.pl/site/cat/200/comp/898381492"},{"name":"Samsung Galaxy S23 5G 8GB/128GB Dual Sim Czarny\n5,0\n3 opinie\nod 999,00 z\u0142 w Empik.com\nPor\u00f3wnaj oferty (8)Id\u017a do sklepu","price":999,"url":"https://www.skapiec.pl/site/cat/200/comp/919833405"},{"name":"Apple iPhone 13 5G 4GB/128GB Zielony\nBrak opinii\nod 1 129,99 z\u0142 w Empik.com\nPor\u00f3wnaj oferty (3)Id\u017a do sklepu","price":1129.99,"url":"https://www.skapiec.pl/site/cat/200/comp/899052555"}]},"run_log":"logs/run-20251125-231036.md","screenshots":[],"steps_taken":0,"success":true,"suggested_commands":[],"timestamp":"2025-11-25T23:10:55.849952"}
+
+
+
 
 🤖 ═══ LLM-GUIDED ATOMIC EXTRACTOR ═══
 
@@ -10,11 +16,43 @@
 
 ```json
 {
-  "text": "{\n  \"selector\": \".page-body .js_popupContainer.product-container\",\n  \"reasoning\": \"The 'page-body' class is present in one of the sample elements, which likely contains product information. The 'js_popupContainer' class might be specific to product containers as it could indicate a popup or modal containing product details. Additionally, assuming there's a common class like 'product-container' for all products, this selector targets those specifically.\"\n}"
+  "text": "{\n  \"selector\": \".product-container\",\n  \"reasoning\": \"Based on the context provided, there are no direct class names or tags that clearly indicate product containers. However, a common pattern for web pages displaying products is to use a class name like 'product-container'. This selector should be adjusted according to the actual class name used in the specific webpage you're working with.\"\n}"
 }
 ```
 
 ⚠️ LLM-Guided Extractor returned no data: LLM couldn't identify container
+
+🔍 Dynamic Detector enabled - adaptive pattern recognition
+
+🔍 Dynamic Detector: Starting dynamic pattern detection
+
+🔍 Dynamic Detector: Found 100 signal elements
+
+🔍 Dynamic Detector: Analyzed 17 parent structures
+
+🔍 Dynamic Detector: Formed 2 clusters
+
+🔍 Dynamic Detector: Skipping too generic: div
+
+```json
+{
+  "reason": "no_classes"
+}
+```
+
+🔍 Dynamic Detector: Skipping no price: div.container-wrapper
+
+```json
+{
+  "reason": "likely_navigation_or_layout"
+}
+```
+
+🔍 Dynamic Detector: No suitable clusters after filtering
+
+🔍 Dynamic Detector: No suitable cluster found
+
+⚠️ Dynamic Detector returned no data: No patterns detected
 
 🔄 Iterative Extractor enabled - trying atomic DOM queries
 
@@ -22,7 +60,7 @@
 🔄 ═══ ITERATIVE EXTRACTOR ═══
 
 
-💰 Price limit detected: 550.0 zł
+💰 Price limit detected: 2000.0 zł
 
 🔍 Step 1: Quick Page Check
 
@@ -33,11 +71,11 @@
 ```json
 {
   "has_prices": true,
-  "price_count": 52,
+  "price_count": 35,
   "has_product_links": true,
-  "product_link_count": 230,
-  "has_list_structure": true,
-  "total_links": 347,
+  "product_link_count": 737,
+  "has_list_structure": false,
+  "total_links": 1745,
   "page_type": "product_listing"
 }
 ```
@@ -53,30 +91,57 @@
   "found": true,
   "candidates": [
     {
-      "selector": ".cat-prod-row",
-      "count": 32,
+      "selector": "div.product-box-wide-d",
+      "count": 20,
       "has_link": true,
       "has_price": true,
       "has_image": true,
-      "classes": "cat-prod-row js_analytics-promotedItem promoted-offer",
-      "sample_text": "OFERTA SPECJALNA Shark Stratos Odkurzacz bezprzewodowy IZ400EUTDB\nKategoria: Urządzenia sprzątające\n"
+      "classes": "product-box-wide-d",
+      "sample_text": "Apple iPhone 17 256GB Czarny\nBrak opinii\nod 3 999,00 zł w MediaMarkt.pl\nPorównaj oferty (6)Idź do sk",
+      "specificity": 1,
+      "score": 90
+    },
+    {
+      "selector": "div.col",
+      "count": 34,
+      "has_link": true,
+      "has_price": true,
+      "has_image": false,
+      "classes": "col col-3 pr-16 category-page-filters",
+      "sample_text": "Wróć do Telefony\nUrządzenia mobilne\nTelefony komórkowe\nSmartband\nSmartfony\nSmartwatch\nTelefony dla s",
+      "specificity": 4,
+      "score": 87
+    },
+    {
+      "selector": "div.row",
+      "count": 10,
+      "has_link": true,
+      "has_price": true,
+      "has_image": true,
+      "classes": "row",
+      "sample_text": "Wróć do Telefony\nUrządzenia mobilne\nTelefony komórkowe\nSmartband\nSmartfony\nSmartwatch\nTelefony dla s",
+      "specificity": 1,
+      "score": 85
     }
   ],
   "best": {
-    "selector": ".cat-prod-row",
-    "count": 32,
+    "selector": "div.product-box-wide-d",
+    "count": 20,
     "has_link": true,
     "has_price": true,
     "has_image": true,
-    "classes": "cat-prod-row js_analytics-promotedItem promoted-offer",
-    "sample_text": "OFERTA SPECJALNA Shark Stratos Odkurzacz bezprzewodowy IZ400EUTDB\nKategoria: Urządzenia sprzątające\n"
-  }
+    "classes": "product-box-wide-d",
+    "sample_text": "Apple iPhone 17 256GB Czarny\nBrak opinii\nod 3 999,00 zł w MediaMarkt.pl\nPorównaj oferty (6)Idź do sk",
+    "specificity": 1,
+    "score": 90
+  },
+  "method": "dynamic_detection"
 }
 ```
 
 🔍 Step 3: Field Location Detection
 
-   Analyzing fields in .cat-prod-row...
+   Analyzing fields in div.product-box-wide-d...
 
 🔍 Field Detection Results
 
@@ -85,17 +150,17 @@
   "found": true,
   "fields": {
     "name": {
-      "selector": "a.go-to-shop",
-      "sample": "Shark Stratos Odkurzacz bezprzewodowy IZ400EUTDB"
+      "selector": "a",
+      "sample": "Apple iPhone 17 256GB Czarny"
     },
     "price": {
-      "selector": "span.price-format",
-      "sample": "899,99zł",
-      "value": 899.99
+      "selector": "div.product-box-wide-d-price",
+      "sample": "od 3 999,00 zł w MediaMarkt.pl",
+      "value": 3999
     },
     "url": {
       "selector": "a[href]",
-      "sample": "https://www.ceneo.pl/Click/Offer/?e=_7iXc5yj4Rh1GbvzQOmAfvPlmmavR38JNwo5z5SYjZJzT1Z01nXu0RUUc1qbbKz-u6nFbe93D9wuAvJxCRoP1OvR95YYaUl2K4BaH__g9yYW0o4qz8BTV7506LhsOVYNsaldK4eljAm0qWBW03q8dS59rg21Nlh1N2VcFemLac9f0331J4wNBD8PIpalIfzQvEHtFEw0QPsbPfGu09LCtMncoGq3fDggpVBMwlkFDd2lUEzCWQUN3bl05r4sm0_miL0PeXqwEAWlUEzCWQUN3aVQTMJZBQ3dLkFMo7MyZE9G5kA55NoDBMLECYSLAo9bGgRrxhvvHECYgPFeXpymP2A_ZLGSon_40c_SY8C3NEwHoLNq9XRpFfUGkHfWe6ezRCag4pWuTS9XbcaPBsfsBu845c6yubZ8ZNbGv8mgU5Oudx1FTokCCxP7ScEiaVaK&ctx=CgsIjO_NvtSc1j4QBRIkZTFjMGE2MmUtY2EyOC0xMWYwLTkxNDYtZDkyN2Q4YjA3YTM1GiRiNzY2MzZjOC1jYTQ0LTExZjAtODg3Ni04M2QxNjMxNTc5M2I=&a=2"
+      "sample": "https://www.skapiec.pl/site/cat/200/comp/952872035"
     }
   },
   "completeness": 1
@@ -110,30 +175,30 @@
 
 ```json
 {
-  "count": 32,
+  "count": 20,
   "sample": [
     {
-      "name": "OFERTA SPECJALNA Shark Stratos Odkurzacz bezprzewodowy IZ400EUTDB\nKategoria: Urządzenia sprzątające\nRodzaj: Odkurzacze bateryjne",
-      "price": 899.99,
-      "url": "https://www.ceneo.pl/Click/Offer/?e=_7iXc5yj4Rh1GbvzQOmAfvPlmmavR38JNwo5z5SYjZJzT1Z01nXu0RUUc1qbbKz-u6nFbe93D9wuAvJxCRoP1OvR95YYaUl2K4BaH__g9yYW0o4qz8BTV7506LhsOVYNsaldK4eljAm0qWBW03q8dS59rg21Nlh1N2VcFemLac9f0331J4wNBD8PIpalIfzQvEHtFEw0QPsbPfGu09LCtMncoGq3fDggpVBMwlkFDd2lUEzCWQUN3bl05r4sm0_miL0PeXqwEAWlUEzCWQUN3aVQTMJZBQ3dLkFMo7MyZE9G5kA55NoDBMLECYSLAo9bGgRrxhvvHECYgPFeXpymP2A_ZLGSon_40c_SY8C3NEwHoLNq9XRpFfUGkHfWe6ezRCag4pWuTS9XbcaPBsfsBu845c6yubZ8ZNbGv8mgU5Oudx1FTokCCxP7ScEiaVaK&ctx=CgsIjO_NvtSc1j4QBRIkZTFjMGE2MmUtY2EyOC0xMWYwLTkxNDYtZDkyN2Q4YjA3YTM1GiRiNzY2MzZjOC1jYTQ0LTExZjAtODg3Ni04M2QxNjMxNTc5M2I=&a=2"
+      "name": "Apple iPhone 17 256GB Czarny\nBrak opinii\nod 3 999,00 zł w MediaMarkt.pl\nPorównaj oferty (6)Idź do sklepu",
+      "price": 3999,
+      "url": "https://www.skapiec.pl/site/cat/200/comp/952872035"
     },
     {
-      "name": "OFERTA SPECJALNA Shark StainStriker HairPro odkurzacz pioracy PX250EUT\nKategoria: Urządzenia sprzątające\nRodzaj: Odkurzacze przemysłowe",
-      "price": 749.99,
-      "url": "https://www.ceneo.pl/Click/Offer/?e=ty1IvXT_aOZ1GbvzQOmAfvPlmmavR38JNwo5z5SYjZJzT1Z01nXu0dyx4ZjglisRicIXQ5GHzg4N2V6mL8CffAI3TAglLpjkNF4dhLf3ubSl7OlcIjuhgaNU4ZBKR3pvBKYFVNIqxGjvQSkPwXzY1n-OmWLZJyy28GIgeoUNpO0KE4FvhC5dfRKx0hYjJMnl3Ymsq5JR2Lx6QL5bd4PjjqRiy3VaDTqFiH7VxwqW3a6lUEzCWQUN3Q7q8m3sgx-Ahh3QM0f2Y8ClUEzCWQUN3aVQTMJZBQ3dMzkKo7pWV4hSN60-XMdyXbE13KS5Nt0Iq7osHGqZZQquaLaR1uS7PWJCs78KlY4_Je2xq1FKh_Ux2j617tPD63DoYRsp6xwFGpYP0xrALG9YLi3vv_0oVqcl7Mokdmlxrvf3EDi-SpCXPkFvuLw5IeyGSkEhV6Bx&ctx=CgsIjO_NvtSc1j4QBRIkZTFjMGE2MmUtY2EyOC0xMWYwLTkxNDYtZDkyN2Q4YjA3YTM1GiRiNzY2MzZjOC1jYTQ0LTExZjAtODg3Ni04M2QxNjMxNTc5M2I=&a=2"
+      "name": "Apple iPhone 16 Pro 128GB Tytan czarny\n4,0\n1 opinia\nod 4 899,00 zł w Empik.com\nPorównaj oferty (10)Idź do sklepu",
+      "price": 4899,
+      "url": "https://www.skapiec.pl/site/cat/200/comp/940907434"
     },
     {
-      "name": "SHARK S1000EU\n 5,0\n/ 5\n4 opinie\nDodaj do ulubionych\nKolor: Białe\nMoc: 1050 W\nod349,00zł\nPORÓWNAJ CENY\nw 7 sklepach\nDarmowa wysyłka\nw 7 ofertach\nlub z",
-      "price": 349,
-      "url": "https://www.ceneo.pl/102723109##;02514#tag=nph_row_promotion"
+      "name": "Apple iPhone 17 256GB Lawenda\nBrak opinii\nod 3 999,00 zł w MediaMarkt.pl\nPorównaj oferty (6)Idź do sklepu",
+      "price": 3999,
+      "url": "https://www.skapiec.pl/site/cat/200/comp/952872037"
     }
   ]
 }
 ```
 
-💰 Price Filter Applied: 32 → 14 products (removed 18 above 550.0 zł)
+💰 Price Filter Applied: 20 → 3 products (removed 17 above 2000.0 zł)
 
-✅ Iterative Extractor succeeded - found 14 items
+✅ Iterative Extractor succeeded - found 3 items
 
 Validation pass applied.
 
@@ -141,34 +206,19 @@ Validation pass applied.
 {
   "products": [
     {
-      "name": "SHARK S1000EU\n 5,0\n/ 5\n4 opinie\nDodaj do ulubionych\nKolor: Białe\nMoc: 1050 W",
-      "price": 349,
-      "url": "https://www.ceneo.pl/102723109##;02514#tag=nph_row_promotion"
+      "name": "Samsung Galaxy S22 Ultra 5G 12GB/256GB Dual Sim Czarny\nBrak opinii\nod 1 699,00 zł w Empik.com\nPorównaj oferty (5)Idź do sklepu",
+      "price": 1699,
+      "url": "https://www.skapiec.pl/site/cat/200/comp/898381492"
     },
     {
-      "name": "Bosch UniversalBrush 06033E0000\n 4,5\n/ 5\n33 opinie\n10+ kupionych ostatnio",
-      "price": 168.3,
-      "url": "https://www.ceneo.pl/110631727"
+      "name": "Samsung Galaxy S23 5G 8GB/128GB Dual Sim Czarny\n5,0\n3 opinie\nod 999,00 zł w Empik.com\nPorównaj oferty (8)Idź do sklepu",
+      "price": 999,
+      "url": "https://www.skapiec.pl/site/cat/200/comp/919833405"
     },
     {
-      "name": "Bosch EasyVac 3 06033D1000\n 4,3\n/ 5\n5 opinii",
-      "price": 349,
-      "url": "https://www.ceneo.pl/52315916"
-    },
-    {
-      "name": "Bosch AdvancedVac 18V-8 06033E1000\nNapisz opinię",
-      "price": 317.99,
-      "url": "https://www.ceneo.pl/118147335"
-    },
-    {
-      "name": "Bosch UniversalVac 15 06033D1100\n 4,6\n/ 5\n11 opinii",
-      "price": 338.9,
-      "url": "https://www.ceneo.pl/52782460"
-    },
-    {
-      "name": "Bosch UniversalBrush 06033E0002\n 5,0\n/ 5\n1 opinia",
-      "price": 182.02,
-      "url": "https://www.ceneo.pl/158836315"
+      "name": "Apple iPhone 13 5G 4GB/128GB Zielony\nBrak opinii\nod 1 129,99 zł w Empik.com\nPorównaj oferty (3)Idź do sklepu",
+      "price": 1129.99,
+      "url": "https://www.skapiec.pl/site/cat/200/comp/899052555"
     }
   ]
 }

@@ -134,41 +134,86 @@ class IterativeExtractor:
         result = await self.page.evaluate("""
             (pageType) => {
                 const candidates = [];
+                const priceRegex = /\\d+[\\d\\s]*(?:[\\.,]\\d{2})?\\s*(?:zł|PLN|€|\\$)/i;
                 
-                // Known product container patterns
-                const patterns = [
-                    '.product-box', '.product-item', '.product-card',
-                    '[data-product-id]', '[data-offer-id]',
-                    'article[itemtype*="Product"]',
-                    '.cat-prod-row', '.offer-item'
-                ];
+                // DYNAMIC DETECTION: Find elements with prices (signals)
+                const signalElements = Array.from(document.querySelectorAll('*'))
+                    .filter(el => {
+                        const text = el.innerText || '';
+                        return priceRegex.test(text) && text.length < 1000;
+                    })
+                    .slice(0, 100);  // Limit to first 100
                 
-                for (const selector of patterns) {
-                    const elements = document.querySelectorAll(selector);
-                    if (elements.length >= 3) {  // At least 3 = likely a list
-                        // Get structure of first element
-                        const first = elements[0];
-                        const structure = {
-                            selector: selector,
-                            count: elements.length,
-                            has_link: !!first.querySelector('a[href]'),
-                            has_price: /\\d+[\\d\\s]*(?:[\\.,]\\d{2})?\\s*(?:zł|PLN)/i.test(first.innerText || ''),
-                            has_image: !!first.querySelector('img'),
-                            classes: first.className,
-                            sample_text: (first.innerText || '').substring(0, 100)
-                        };
+                // Map to track parent patterns
+                const parentPatterns = new Map();
+                
+                // Analyze parents of signal elements
+                for (const signal of signalElements) {
+                    // Check parents 1-3 levels up
+                    let parent = signal.parentElement;
+                    for (let depth = 0; depth < 3 && parent; depth++) {
+                        parent = parent.parentElement;
+                        if (!parent) break;
                         
-                        candidates.push(structure);
+                        // Build selector
+                        const classes = parent.className ? 
+                            parent.className.split(' ').filter(c => c.length > 0) : [];
+                        
+                        if (classes.length === 0) continue;  // Skip elements without classes
+                        
+                        const selector = parent.tagName.toLowerCase() + '.' + classes[0];
+                        
+                        // Check if this pattern appears multiple times
+                        const allMatches = document.querySelectorAll(selector);
+                        
+                        if (allMatches.length >= 5) {  // Must appear at least 5 times
+                            const key = selector;
+                            
+                            if (!parentPatterns.has(key)) {
+                                // Check structure
+                                const hasPrice = priceRegex.test(parent.innerText || '');
+                                const hasLink = !!parent.querySelector('a[href]');
+                                const hasImage = !!parent.querySelector('img');
+                                
+                                // CRITICAL: Must have price!
+                                if (hasPrice) {
+                                    parentPatterns.set(key, {
+                                        selector: selector,
+                                        count: allMatches.length,
+                                        has_link: hasLink,
+                                        has_price: hasPrice,
+                                        has_image: hasImage,
+                                        classes: parent.className,
+                                        sample_text: (parent.innerText || '').substring(0, 100),
+                                        specificity: classes.length
+                                    });
+                                }
+                            }
+                        }
                     }
                 }
                 
-                // Sort by count (more = better)
-                candidates.sort((a, b) => b.count - a.count);
+                // Convert map to array and sort
+                const dynamicCandidates = Array.from(parentPatterns.values());
+                
+                // Score and sort candidates
+                dynamicCandidates.forEach(c => {
+                    let score = 0;
+                    score += Math.min(c.count / 50, 1) * 25;  // Size score
+                    score += 25;  // Has price (guaranteed)
+                    score += c.has_link ? 15 : 0;
+                    score += c.has_image ? 10 : 0;
+                    score += c.specificity > 0 ? 30 : 0;  // Has classes
+                    c.score = score;
+                });
+                
+                dynamicCandidates.sort((a, b) => b.score - a.score);
                 
                 return {
-                    found: candidates.length > 0,
-                    candidates: candidates.slice(0, 3),  // Top 3
-                    best: candidates[0] || null
+                    found: dynamicCandidates.length > 0,
+                    candidates: dynamicCandidates.slice(0, 3),
+                    best: dynamicCandidates[0] || null,
+                    method: 'dynamic_detection'
                 };
             }
         """, page_type)
