@@ -766,7 +766,14 @@ EOF
     
     # Show verbose output if requested (to stderr)
     if [ "$VERBOSE" = true ]; then
-        { print_verbose_env; echo -e "${BLUE}Request:${NC}"; echo "$PAYLOAD" | jq .; } 1>&2
+        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+        EXPECTED_LOG="logs/run-${TIMESTAMP}.md"
+        { 
+            print_verbose_env
+            echo -e "${BLUE}Request:${NC}"
+            echo "$PAYLOAD" | jq .
+            echo -e "${YELLOW}Expected run log:${NC} ${EXPECTED_LOG}"
+        } 1>&2
     fi
     
     # Make API request

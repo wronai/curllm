@@ -34,6 +34,7 @@ from .validation_utils import should_validate
 from .screenshots import take_screenshot as _take_screenshot_func
 from .form_fill import deterministic_form_fill as _deterministic_form_fill_func, parse_form_pairs as _parse_form_pairs_func
 from .llm_field_filler import llm_guided_field_fill as _llm_guided_field_fill_func
+from .config_logger import log_all_config
 from .planner_progress import progress_tick as _progress_tick_func
 from .product_extract import multi_stage_product_extract as _multi_stage_product_extract_func
 from .bql_utils import parse_bql as _parse_bql_util
@@ -77,47 +78,9 @@ class CurllmExecutor:
         instruction, runtime = parse_runtime_from_instruction(instruction)
         run_logger = RunLogger(instruction=instruction, url=url)
         run_logger.log_heading(f"curllm run: {datetime.now().isoformat()}")
-        run_logger.log_kv("CURLLM_MODEL", config.ollama_model)
-        run_logger.log_kv("CURLLM_OLLAMA_HOST", config.ollama_host)
-        run_logger.log_kv("VISUAL_MODE", str(visual_mode))
-        run_logger.log_kv("STEALTH_MODE", str(stealth_mode))
-        run_logger.log_kv("USE_BQL", str(use_bql))
-        # Log LLM field filler config
-        run_logger.log_kv("CURLLM_LLM_FIELD_FILLER_ENABLED", str(config.llm_field_filler_enabled))
-        run_logger.log_kv("CURLLM_LLM_FIELD_MAX_ATTEMPTS", str(config.llm_field_max_attempts))
-        run_logger.log_kv("CURLLM_LLM_FIELD_TIMEOUT_MS", str(config.llm_field_timeout_ms))
-        # Log runtime flags with corresponding .env names
-        try:
-            env_map = {
-                "include_dom_html": "CURLLM_INCLUDE_DOM_HTML",
-                "dom_max_chars": "CURLLM_DOM_MAX_CHARS",
-                "dom_max_cap": "CURLLM_DOM_MAX_CAP",
-                "smart_click": "CURLLM_SMART_CLICK",
-                "action_timeout_ms": "CURLLM_ACTION_TIMEOUT_MS",
-                "wait_after_click_ms": "CURLLM_WAIT_AFTER_CLICK_MS",
-                "wait_after_nav_ms": "CURLLM_WAIT_AFTER_NAV_MS",
-                "no_click": "CURLLM_NO_CLICK",
-                "scroll_load": "CURLLM_SCROLL_LOAD",
-                "fastpath": "CURLLM_FASTPATH",
-                "refine_instruction": "CURLLM_REFINE_INSTRUCTION",
-                "use_external_slider_solver": "CURLLM_USE_EXTERNAL_SLIDER_SOLVER",
-                "stall_limit": "CURLLM_STALL_LIMIT",
-                "planner_growth_per_step": "CURLLM_PLANNER_GROWTH_PER_STEP",
-                "planner_max_cap": "CURLLM_PLANNER_MAX_CAP",
-                "planner_base_chars": "CURLLM_PLANNER_BASE_CHARS",
-                "store_results": "CURLLM_STORE_RESULTS",
-                "result_key": "CURLLM_RESULT_KEY",
-                "diff_mode": "CURLLM_DIFF_MODE",
-                "diff_fields": "CURLLM_DIFF_FIELDS",
-                "keep_history": "CURLLM_KEEP_HISTORY",
-                "include_prev_results": "CURLLM_INCLUDE_PREV_RESULTS",
-                "runtime_preset": "CURLLM_RUNTIME_PRESET",
-            }
-            for k, envk in env_map.items():
-                if k in runtime:
-                    run_logger.log_kv(envk, str(runtime.get(k)))
-        except Exception:
-            pass
+        
+        # Log all configuration using centralized config_logger
+        log_all_config(run_logger, visual_mode, stealth_mode, use_bql, runtime)
         # Auto-enable DOM snapshot if task looks like extraction and user didn't force it
         try:
             low = (instruction or "").lower()

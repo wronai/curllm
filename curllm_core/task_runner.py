@@ -497,7 +497,7 @@ async def _execute_tool(executor, page, instruction: str, tool_name: str, args: 
         return {"error": str(e)}
 
 
-async def _planner_cycle(executor, instruction: str, page_context: Dict[str, Any], step: int, run_logger, runtime: Dict[str, Any], page, tool_history: list[Dict[str, Any]]):
+async def _planner_cycle(executor, instruction: str, page_context: Dict[str, Any], step: int, run_logger, runtime: Dict[str, Any], page, tool_history: list[Dict[str, Any]], domain_dir: Optional[str] = None):
     _t_gen = time.time()
     
     # Try hierarchical planner first (only for form-filling tasks)
@@ -897,7 +897,7 @@ async def run_task(
                 pass
 
         # Planner step
-        done, data = await _planner_cycle(executor, instruction, page_context, step, run_logger, runtime, page, tool_history)
+        done, data = await _planner_cycle(executor, instruction, page_context, step, run_logger, runtime, page, tool_history, domain_dir)
         if done:
             result["data"] = data
             break
