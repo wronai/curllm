@@ -71,6 +71,7 @@ def get_all_config_variables() -> Dict[str, Any]:
         "CURLLM_ITERATIVE_EXTRACTOR_MAX_ITEMS": config.iterative_extractor_max_items,
         "CURLLM_PROGRESSIVE_CONTEXT": config.progressive_context_enabled,
         "CURLLM_PROGRESSIVE_CONTEXT_INITIAL_SIZE": config.progressive_context_initial_size,
+        "CURLLM_LLM_GUIDED_EXTRACTOR": config.llm_guided_extractor_enabled,
     }
     
     return config_map
@@ -180,6 +181,7 @@ def log_all_config(run_logger, visual_mode: bool, stealth_mode: bool, use_bql: b
         "CURLLM_ITERATIVE_EXTRACTOR_MAX_ITEMS",
         "CURLLM_PROGRESSIVE_CONTEXT",
         "CURLLM_PROGRESSIVE_CONTEXT_INITIAL_SIZE",
+        "CURLLM_LLM_GUIDED_EXTRACTOR",
     ]
     
     for key in core_keys:
