@@ -59,6 +59,18 @@ def get_all_config_variables() -> Dict[str, Any]:
         "CURLLM_LLM_FIELD_FILLER_ENABLED": config.llm_field_filler_enabled,
         "CURLLM_LLM_FIELD_MAX_ATTEMPTS": config.llm_field_max_attempts,
         "CURLLM_LLM_FIELD_TIMEOUT_MS": config.llm_field_timeout_ms,
+        
+        # Extraction orchestrators
+        "CURLLM_EXTRACTION_ORCHESTRATOR": config.extraction_orchestrator_enabled,
+        "CURLLM_EXTRACTION_ORCHESTRATOR_TIMEOUT": config.extraction_orchestrator_timeout,
+        "CURLLM_BQL_EXTRACTION_ORCHESTRATOR": config.bql_extraction_orchestrator_enabled,
+        "CURLLM_BQL_EXTRACTION_ORCHESTRATOR_TIMEOUT": config.bql_extraction_orchestrator_timeout,
+        "CURLLM_SEMANTIC_QUERY": config.semantic_query_enabled,
+        "CURLLM_SEMANTIC_QUERY_TIMEOUT": config.semantic_query_timeout,
+        "CURLLM_ITERATIVE_EXTRACTOR": config.iterative_extractor_enabled,
+        "CURLLM_ITERATIVE_EXTRACTOR_MAX_ITEMS": config.iterative_extractor_max_items,
+        "CURLLM_PROGRESSIVE_CONTEXT": config.progressive_context_enabled,
+        "CURLLM_PROGRESSIVE_CONTEXT_INITIAL_SIZE": config.progressive_context_initial_size,
     }
     
     return config_map
@@ -158,6 +170,16 @@ def log_all_config(run_logger, visual_mode: bool, stealth_mode: bool, use_bql: b
         "CURLLM_VISION_MODEL",
         "CURLLM_VISION_CONFIDENCE_THRESHOLD",
         "CURLLM_VISION_DETECT_HONEYPOTS",
+        "CURLLM_EXTRACTION_ORCHESTRATOR",
+        "CURLLM_EXTRACTION_ORCHESTRATOR_TIMEOUT",
+        "CURLLM_BQL_EXTRACTION_ORCHESTRATOR",
+        "CURLLM_BQL_EXTRACTION_ORCHESTRATOR_TIMEOUT",
+        "CURLLM_SEMANTIC_QUERY",
+        "CURLLM_SEMANTIC_QUERY_TIMEOUT",
+        "CURLLM_ITERATIVE_EXTRACTOR",
+        "CURLLM_ITERATIVE_EXTRACTOR_MAX_ITEMS",
+        "CURLLM_PROGRESSIVE_CONTEXT",
+        "CURLLM_PROGRESSIVE_CONTEXT_INITIAL_SIZE",
     ]
     
     for key in core_keys:

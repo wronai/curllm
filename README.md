@@ -533,6 +533,18 @@ Notes:
 
 #### Find all products under 150zł and extract names, prices and urls
 command:
+```aiignore
+curllm --stealth "https://ceneo.pl"-d "Find all products under 150zł and extract names, prices and urls"
+  
+curllm --visual --stealth -H "Accept-Language: pl-PL,pl;q=0.9" "https://ceneo.pl" -d '{
+  "instruction":"Find all products under 150zł and extract names, prices and urls"  
+}'
+
+curllm --stealth "https://www.ceneo.pl/Urzadzenia_sprzatajace;discount.htm" -d "Find all products under 150zł and extract names, prices and urls"
+
+curllm --visual --stealth "https://www.ceneo.pl/Urzadzenia_sprzatajace;ptags:OfertySpecjalne.htm" -d "Set price filter max 150 zł, apply it, scroll to load items, then extract product names, prices and urls"
+
+```
 ```bash
 curllm --visual -H "Accept-Language: pl-PL,pl;q=0.9" "https://ceneo.pl" -d '{
   "instruction":"Find all products under 150zł and extract names, prices and urls",

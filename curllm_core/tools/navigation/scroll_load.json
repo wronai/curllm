@@ -1,0 +1,94 @@
+{
+  "name": "scroll_load",
+  "version": "1.0.0",
+  "description": "Scroll page to trigger infinite scroll / lazy loading of dynamic content",
+  "category": "navigation",
+  "triggers": [
+    "scroll.*load",
+    "load.*more",
+    "infinite.*scroll",
+    "scroll.*down",
+    "przewiń.*aby.*załadować"
+  ],
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "times": {
+        "type": "number",
+        "description": "Number of times to scroll",
+        "default": 3,
+        "examples": [3, 5, 8, 10]
+      },
+      "wait_ms": {
+        "type": "number",
+        "description": "Milliseconds to wait between each scroll",
+        "default": 600,
+        "examples": [500, 600, 1000]
+      },
+      "direction": {
+        "type": "string",
+        "description": "Scroll direction: 'down' or 'up'",
+        "default": "down",
+        "enum": ["down", "up"]
+      },
+      "wait_for_selector": {
+        "type": "string",
+        "description": "Optional CSS selector to wait for after each scroll",
+        "default": null,
+        "examples": [".product-item", ".lazy-loaded"]
+      }
+    },
+    "required": ["times"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "success": {
+        "type": "boolean",
+        "description": "Whether any scrolls were performed successfully"
+      },
+      "scrolls_performed": {
+        "type": "number",
+        "description": "Number of scrolls successfully executed"
+      },
+      "final_scroll_y": {
+        "type": "number",
+        "description": "Final vertical scroll position in pixels"
+      },
+      "direction": {
+        "type": "string",
+        "description": "Direction scrolled"
+      }
+    }
+  },
+  "examples": [
+    {
+      "instruction": "Scroll down 8 times to load more products",
+      "parameters": {
+        "times": 8,
+        "wait_ms": 600,
+        "direction": "down"
+      },
+      "expected_output": {
+        "success": true,
+        "scrolls_performed": 8,
+        "final_scroll_y": 4200,
+        "direction": "down"
+      }
+    },
+    {
+      "instruction": "Load more items by scrolling",
+      "parameters": {
+        "times": 5,
+        "wait_ms": 800
+      }
+    }
+  ],
+  "dependencies": ["playwright", "page"],
+  "timeout_ms": 30000,
+  "notes": [
+    "Waits longer on first scroll to allow initial content to load",
+    "Can optionally wait for specific selector after each scroll",
+    "Useful for infinite scroll patterns common in e-commerce"
+  ]
+}

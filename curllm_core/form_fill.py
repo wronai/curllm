@@ -691,7 +691,11 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None, domai
                             else:
                                 screenshot_path = f"screenshots/debug_before_submit_{timestamp}.png"
                             await page.screenshot(path=screenshot_path)
-                            run_logger.log_text(f"📸 Screenshot before submit (attempt {attempts}): {screenshot_path}")
+                            # Log as markdown image for proper rendering
+                            try:
+                                run_logger.log_image(screenshot_path, alt=f"Screenshot before submit (attempt {attempts})")
+                            except Exception:
+                                run_logger.log_text(f"📸 Screenshot before submit (attempt {attempts}): {screenshot_path}")
                         except Exception as e:
                             if run_logger:
                                 run_logger.log_text(f"   ⚠️  Could not take screenshot: {e}")

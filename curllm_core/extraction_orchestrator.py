@@ -19,12 +19,13 @@ class ExtractionOrchestrator:
         
     async def orchestrate(self, page_context: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
-        Execute 5-phase extraction orchestration:
+        Execute 6-phase extraction orchestration:
         1. DETECTION - Detect extraction type (products, links, articles, etc.)
         2. STRATEGY - Plan extraction strategy (direct, navigate+extract, scroll+extract)
         3. NAVIGATION - Navigate to target pages if needed
-        4. EXTRACTION - Execute extraction using tools
-        5. VALIDATION - Verify extracted data
+        4. FORM FILLING - Apply filters (price, category, etc.) if needed
+        5. EXTRACTION - Execute extraction using tools
+        6. VALIDATION - Verify extracted data
         """
         try:
             self._log_header("🎭 TRANSPARENT EXTRACTION ORCHESTRATOR")
@@ -47,12 +48,19 @@ class ExtractionOrchestrator:
                 # Refresh page context after navigation
                 page_context = await self._get_page_context()
             
-            # Phase 4: Extraction
+            # Phase 4: Form Filling (apply filters if needed)
+            if strategy.get("requires_form_fill"):
+                form_result = await self._phase_form_filling(strategy, page_context)
+                if form_result:
+                    # Refresh page context after form submission
+                    page_context = await self._get_page_context()
+            
+            # Phase 5: Extraction
             extraction = await self._phase_extraction(page_context, strategy)
             if not extraction:
                 return None
             
-            # Phase 5: Validation
+            # Phase 6: Validation
             validation = await self._phase_validation(extraction, strategy)
             
             self._log_summary(validation)
@@ -154,9 +162,76 @@ class ExtractionOrchestrator:
         self.phases_log.append({"phase": "navigation", "actions": nav_actions})
         return {"success": True}
     
+    async def _phase_form_filling(self, strategy: Dict[str, Any], page_context: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Phase 4: Fill forms with filters (price, category, etc.)"""
+        self._log_phase(4, "Form Filling")
+        
+        form_actions = strategy.get("form_actions", [])
+        if not form_actions:
+            return None
+        
+        for action in form_actions:
+            field_name = action.get("field_name")
+            value = action.get("value")
+            action_type = action.get("action", "fill")  # fill, click, select
+            
+            try:
+                if action_type == "fill":
+                    # Try multiple selector strategies
+                    selectors = [
+                        f"input[name*='{field_name}' i]",
+                        f"input[id*='{field_name}' i]",
+                        f"input[placeholder*='{field_name}' i]",
+                        f"input[type='text']",
+                        f"input[type='number']"
+                    ]
+                    filled = False
+                    for selector in selectors:
+                        try:
+                            elements = await self.page.query_selector_all(selector)
+                            if elements:
+                                await elements[0].fill(str(value))
+                                filled = True
+                                self._log_decision("Form Filling", {"action": "fill", "selector": selector, "value": value, "status": "success"})
+                                break
+                        except Exception:
+                            continue
+                    
+                    if not filled:
+                        self._log_error("Form Filling", f"Could not find field: {field_name}")
+                
+                elif action_type == "submit":
+                    # Try to submit form
+                    try:
+                        # Look for submit button
+                        submit_selectors = [
+                            "button[type='submit']",
+                            "input[type='submit']",
+                            "button:has-text('Zastosuj')",
+                            "button:has-text('Filtruj')",
+                            "button:has-text('Apply')",
+                            "button:has-text('Filter')"
+                        ]
+                        for selector in submit_selectors:
+                            try:
+                                await self.page.click(selector, timeout=5000)
+                                await self.page.wait_for_timeout(3000)  # Wait for results to load
+                                self._log_decision("Form Filling", {"action": "submit", "selector": selector, "status": "success"})
+                                break
+                            except Exception:
+                                continue
+                    except Exception as e:
+                        self._log_error("Form Filling", f"Submit failed: {e}")
+                
+            except Exception as e:
+                self._log_error("Form Filling", f"Form action failed: {e}")
+        
+        self.phases_log.append({"phase": "form_filling", "actions": form_actions})
+        return {"success": True}
+    
     async def _phase_extraction(self, page_context: Dict[str, Any], strategy: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Phase 4: Execute extraction"""
-        self._log_phase(4, "Extraction")
+        """Phase 5: Execute extraction"""
+        self._log_phase(5, "Extraction")
         
         extraction_tool = strategy.get("extraction_tool")
         tool_args = strategy.get("tool_args", {})
@@ -203,8 +278,8 @@ class ExtractionOrchestrator:
             return None
     
     async def _phase_validation(self, extraction: Dict[str, Any], strategy: Dict[str, Any]) -> Dict[str, Any]:
-        """Phase 5: Validate extracted data"""
-        self._log_phase(5, "Validation")
+        """Phase 6: Validate extracted data"""
+        self._log_phase(6, "Validation")
         
         prompt = self._build_validation_prompt(extraction, strategy)
         response = await self._llm_invoke(prompt)
@@ -221,47 +296,48 @@ class ExtractionOrchestrator:
     # ========== Prompt Builders ==========
     
     def _build_detection_prompt(self, page_context: Dict[str, Any]) -> str:
-        """Build prompt for detection phase"""
+        """Build prompt for detection phase - optimized with minimal context"""
         url = page_context.get("url", "")
-        title = page_context.get("title", "")
+        title = page_context.get("title", "")[:100]  # Limit title length
         
-        return f"""You are analyzing a webpage to determine what data to extract.
+        # Extract key signals from instruction
+        lower_instr = self.instruction.lower()
+        has_products = any(k in lower_instr for k in ["product", "produkt", "price", "cena"])
+        has_links = "link" in lower_instr
+        has_articles = any(k in lower_instr for k in ["article", "artykuł", "title", "tytuł"])
+        
+        return f"""Analyze extraction task.
 
 Instruction: {self.instruction}
 URL: {url}
 Title: {title}
+Signals: products={has_products}, links={has_links}, articles={has_articles}
 
-Analyze the instruction and determine:
-1. What type of data to extract (products, links, articles, tables, etc.)
-2. What criteria/filters to apply (price limits, categories, keywords, etc.)
-
-Respond with JSON only:
+Respond JSON:
 {{
-  "extraction_type": "products|links|articles|tables|text",
-  "criteria": {{
-    "price_limit": 150,
-    "keywords": ["example"],
-    "category": "electronics"
-  }},
-  "reasoning": "Brief explanation"
+  "extraction_type": "products|links|articles",
+  "criteria": {{"price_limit": 150}},
+  "reasoning": "brief"
 }}
 
 JSON:"""
     
     def _build_strategy_prompt(self, page_context: Dict[str, Any], detection: Dict[str, Any]) -> str:
-        """Build prompt for strategy phase"""
+        """Build prompt for strategy phase - optimized with minimal context"""
         url = page_context.get("url", "")
-        links = (page_context.get("links") or [])[:30]
-        headings = (page_context.get("headings") or [])[:5]
+        # Limit to top 10 most relevant links
+        links = (page_context.get("links") or [])[:10]
+        headings = (page_context.get("headings") or [])[:3]
         
-        # Build available links summary - safe extraction
+        # Build available links summary - compact format
         links_text_lines = []
-        for link in links[:15]:
+        for i, link in enumerate(links[:8]):  # Top 8 only
             if isinstance(link, dict):
-                text = str(link.get('text', ''))[:60]
+                text = str(link.get('text', ''))[:40]  # Shorter text
                 href = str(link.get('href', ''))
-                links_text_lines.append(f"  - {text} -> {href}")
-        links_text = "\n".join(links_text_lines) if links_text_lines else "  (no links found)"
+                if href:  # Only include if href exists
+                    links_text_lines.append(f"{i+1}. {text} -> {href}")
+        links_text = "\n".join(links_text_lines) if links_text_lines else "(none)"
         
         # Safe extraction of price limit
         price_limit = 150
@@ -272,66 +348,57 @@ JSON:"""
         except:
             pass
         
-        return f"""You are planning an extraction strategy for product extraction.
+        # Check if instruction mentions price filtering or limits
+        lower_task = self.instruction.lower()
+        needs_price_filter = any(keyword in lower_task for keyword in [
+            "set price", "ustaw cen", "apply filter", "zastosuj filtr", "price filter", "filtr cen",
+            "under", "poniżej", "below", "maksymalnie", "max", "do"  # Price limit keywords
+        ]) and any(k in lower_task for k in ["price", "cena", "zł", "z\u0142"])
+        
+        return f"""Plan extraction strategy.
 
-Detection Result:
-{json.dumps(detection, indent=2)}
+Task: {self.instruction}
+URL: {url}
+Type: {detection.get('extraction_type')}
+Price limit: {price_limit}zł
+Need filter: {needs_price_filter}
 
-Current Page:
-- URL: {url}
-- Headings: {json.dumps(headings)}
-
-Available Links (top 15):
+Links:
 {links_text}
 
-CRITICAL RULES:
-1. For navigation actions, you MUST use EXACT "href" from the links above, NOT generic selectors
-2. Choose a category link that is likely to contain cheap products (under {price_limit}zł)
-3. If the page is a homepage with categories, navigate to ONE specific category first
-4. For "click" action, use: {{"type": "click", "href": "exact_url_from_above"}}
+RULES:
+1. Use EXACT href from links (not selectors)
+2. If "set price filter" in task: set requires_form_fill=true
+3. Scroll 6-8 times to load products
 
-Examples of good navigation actions:
-- {{"type": "click", "href": "https://www.ceneo.pl/Elektronika", "reason": "Navigate to electronics category"}}
-- {{"type": "scroll", "times": 3, "reason": "Load more products"}}
-
-Respond with JSON only:
+JSON response:
 {{
-  "requires_navigation": true,
-  "navigation_actions": [
-    {{"type": "click", "href": "EXACT_URL_FROM_LINKS_ABOVE", "reason": "Navigate to low-price category"}},
-    {{"type": "scroll", "times": 3, "reason": "Load more products"}}
-  ],
+  "requires_navigation": false,
+  "navigation_actions": [{{"type": "scroll", "times": 8}}],
+  "requires_form_fill": {str(needs_price_filter).lower()},
+  "form_actions": [{{"field_name": "price_to", "value": {price_limit}, "action": "fill"}}, {{"action": "submit"}}],
   "extraction_tool": "products.heuristics",
-  "tool_args": {{"threshold": {price_limit}}},
-  "reasoning": "Brief explanation"
+  "tool_args": {{"threshold": {price_limit}}}
 }}
 
 JSON:"""
     
     def _build_validation_prompt(self, extraction: Dict[str, Any], strategy: Dict[str, Any]) -> str:
-        """Build prompt for validation phase"""
+        """Build prompt for validation phase - optimized"""
         count = len(extraction.get("products") or extraction.get("links") or extraction.get("articles") or [])
+        sample = str(extraction)[:300] if extraction else "empty"
         
-        return f"""You are validating extraction results.
+        return f"""Validate extraction.
 
-Strategy:
-{json.dumps(strategy, indent=2)}
+Task: {self.instruction}
+Extracted: {count} items
+Sample: {sample}
 
-Extraction Result:
-- Items extracted: {count}
-- Sample: {json.dumps(extraction, indent=2)[:500]}
-
-Validate:
-1. Does the result match the instruction?
-2. Is the data quality acceptable?
-3. Should we approve or retry?
-
-Respond with JSON only:
+JSON:
 {{
-  "approved": true,
-  "quality_score": 0.85,
-  "issues": ["Missing prices in 2 items"],
-  "reasoning": "Brief explanation"
+  "approved": {str(count > 0).lower()},
+  "quality_score": 0.8,
+  "reasoning": "brief"
 }}
 
 JSON:"""

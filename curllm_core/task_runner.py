@@ -972,7 +972,53 @@ async def run_task(
     except Exception:
         prev_ctx = None
 
-    # Try BQL extraction orchestrator first (highest priority)
+    # Try LLM-guided extractor first (LLM makes atomic decisions)
+    if config.llm_guided_extractor_enabled and ("product" in lower_instr or "produkt" in lower_instr):
+        if run_logger:
+            run_logger.log_text("🤖 LLM-Guided Extractor enabled - LLM makes decisions at each atomic step")
+        try:
+            from .llm_guided_extractor import llm_guided_extract
+            
+            result_data = await llm_guided_extract(instruction, page, executor.llm, run_logger)
+            
+            if result_data and result_data.get("count", 0) > 0:
+                if run_logger:
+                    run_logger.log_text(f"✅ LLM-Guided Extractor succeeded - found {result_data['count']} items")
+                result["data"] = result_data
+                await page.close()
+                return result
+            else:
+                reason = result_data.get("reason", "No items found") if result_data else "Extraction failed"
+                if run_logger:
+                    run_logger.log_text(f"⚠️ LLM-Guided Extractor returned no data: {reason}")
+        except Exception as e:
+            if run_logger:
+                run_logger.log_text(f"⚠️ LLM-Guided Extractor failed: {e}")
+    
+    # Try iterative extractor second (pure JS, fast fallback)
+    if config.iterative_extractor_enabled and ("product" in lower_instr or "produkt" in lower_instr):
+        if run_logger:
+            run_logger.log_text("🔄 Iterative Extractor enabled - trying atomic DOM queries")
+        try:
+            from .iterative_extractor import iterative_extract
+            
+            result_data = await iterative_extract(instruction, page, executor.llm, run_logger)
+            
+            if result_data and result_data.get("count", 0) > 0:
+                if run_logger:
+                    run_logger.log_text(f"✅ Iterative Extractor succeeded - found {result_data['count']} items")
+                result["data"] = result_data
+                await page.close()
+                return result
+            else:
+                reason = result_data.get("reason", "No items found") if result_data else "Extraction failed"
+                if run_logger:
+                    run_logger.log_text(f"⚠️ Iterative Extractor returned no data: {reason}")
+        except Exception as e:
+            if run_logger:
+                run_logger.log_text(f"⚠️ Iterative Extractor failed: {e}")
+    
+    # Try BQL extraction orchestrator (second priority)
     if config.bql_extraction_orchestrator_enabled and ("product" in lower_instr or "produkt" in lower_instr or "extract" in lower_instr):
         if run_logger:
             run_logger.log_text("🔍 BQL Extraction Orchestrator enabled - trying BQL-based extraction")
@@ -982,6 +1028,12 @@ async def run_task(
             import asyncio
             
             page_context = await extract_page_context(page, dom_max_chars=30000, include_dom=False)
+            
+            if not page_context:
+                if run_logger:
+                    run_logger.log_text("⚠️ Failed to extract page context, skipping BQL orchestrator")
+                raise ValueError("Page context extraction failed")
+            
             orchestrator = BQLExtractionOrchestrator(executor.llm, instruction, page, run_logger)
             
             data_ms = await asyncio.wait_for(
@@ -1012,6 +1064,12 @@ async def run_task(
             import asyncio
             
             page_context = await extract_page_context(page, dom_max_chars=20000, include_dom=False)
+            
+            if not page_context:
+                if run_logger:
+                    run_logger.log_text("⚠️ Failed to extract page context, skipping extraction orchestrator")
+                raise ValueError("Page context extraction failed")
+            
             orchestrator = ExtractionOrchestrator(executor.llm, instruction, page, run_logger)
             
             data_ms = await asyncio.wait_for(
@@ -1136,8 +1194,31 @@ async def run_task(
             except Exception:
                 pass
 
+        # Apply progressive context if enabled
+        if config.progressive_context_enabled:
+            from .progressive_context import build_progressive_context, get_context_stats
+            
+            progressive_ctx = build_progressive_context(
+                page_context=page_context,
+                step=step,
+                instruction=instruction
+            )
+            
+            ctx_stats = get_context_stats(progressive_ctx)
+            if run_logger:
+                run_logger.log_text(
+                    f"📊 Progressive Context: step={step}, size={ctx_stats['size_chars']} chars "
+                    f"(links:{ctx_stats['link_count']}, headings:{ctx_stats['heading_count']}, "
+                    f"forms:{ctx_stats['form_count']}, has_dom:{ctx_stats['has_dom']})"
+                )
+            
+            # Use progressive context for LLM
+            page_context_for_planner = progressive_ctx
+        else:
+            page_context_for_planner = page_context
+
         # Planner step
-        done, data = await _planner_cycle(executor, instruction, page_context, step, run_logger, runtime, page, tool_history, domain_dir, retry_manager)
+        done, data = await _planner_cycle(executor, instruction, page_context_for_planner, step, run_logger, runtime, page, tool_history, domain_dir, retry_manager)
         if done:
             result["data"] = data
             break

@@ -284,10 +284,11 @@ async def product_heuristics(instruction: str, page, run_logger=None) -> Optiona
     if thr is None:
         thr = 150
 
-    for _ in range(3):
+    # Scroll more to load dynamic content (increased from 3 to 6)
+    for _ in range(6):
         try:
             await page.evaluate("window.scrollBy(0, window.innerHeight);")
-            await page.wait_for_timeout(500)
+            await page.wait_for_timeout(600)
         except Exception:
             pass
 
@@ -360,8 +361,9 @@ async def product_heuristics(instruction: str, page, run_logger=None) -> Optiona
               const pathOk = /\d{4,}/.test(u.pathname);
               if (!(hostOk && pathOk)) { debugStats.urlFiltered++; continue; }
             } catch (e) { debugStats.urlFiltered++; continue; }
-            // Skip redirects, tracking, navigation endpoints, and special URLs
-            if (/redirect\.ceneo\.pl|GotoBoxUrl|from\?site=|lp,\d+|\/search|\/ssl-|\/wydarzenia|;n\d+;|discount\.htm/i.test(url)) { debugStats.redirectFiltered++; continue; }
+            // Skip redirects, tracking, navigation endpoints (but allow product pages)
+            // Note: Removed discount.htm, ptags, szukaj filters - these can be valid product listing pages
+            if (/redirect\.ceneo\.pl|GotoBoxUrl|from\?site=|lp,\d+|\/ssl-|\/wydarzenia/i.test(url)) { debugStats.redirectFiltered++; continue; }
             const key = url;
             if (!products.has(key)) {
               products.set(key, { name, price, url });

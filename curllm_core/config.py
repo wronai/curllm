@@ -48,6 +48,21 @@ class Config:
     # BQL-based extraction orchestrator (LLM generates BQL queries from DOM analysis)
     bql_extraction_orchestrator_enabled: bool = os.getenv("CURLLM_BQL_EXTRACTION_ORCHESTRATOR", "false").lower() in ["true", "1", "yes"]
     bql_extraction_orchestrator_timeout: int = int(os.getenv("CURLLM_BQL_EXTRACTION_ORCHESTRATOR_TIMEOUT", "120"))
+    
+    # Semantic Query Engine (Natural Language → Structured Query → Atomic Functions)
+    semantic_query_enabled: bool = os.getenv("CURLLM_SEMANTIC_QUERY", "false").lower() in ["true", "1", "yes"]
+    semantic_query_timeout: int = int(os.getenv("CURLLM_SEMANTIC_QUERY_TIMEOUT", "120"))
+    
+    # Iterative Extractor (Small atomic DOM queries instead of full DOM tree)
+    iterative_extractor_enabled: bool = os.getenv("CURLLM_ITERATIVE_EXTRACTOR", "true").lower() in ["true", "1", "yes"]
+    iterative_extractor_max_items: int = int(os.getenv("CURLLM_ITERATIVE_EXTRACTOR_MAX_ITEMS", "50"))
+    
+    # Progressive Context (Start small, expand only when needed)
+    progressive_context_enabled: bool = os.getenv("CURLLM_PROGRESSIVE_CONTEXT", "true").lower() in ["true", "1", "yes"]
+    progressive_context_initial_size: int = int(os.getenv("CURLLM_PROGRESSIVE_CONTEXT_INITIAL_SIZE", "5000"))
+    
+    # LLM-Guided Extractor (LLM makes decisions at each atomic step)
+    llm_guided_extractor_enabled: bool = os.getenv("CURLLM_LLM_GUIDED_EXTRACTOR", "true").lower() in ["true", "1", "yes"]
 
     def __post_init__(self):
         self.screenshot_dir.mkdir(parents=True, exist_ok=True)

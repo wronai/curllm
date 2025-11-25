@@ -1,0 +1,98 @@
+{
+  "name": "products_ceneo",
+  "version": "1.0.0",
+  "description": "Specialized tool for extracting product listings from Ceneo.pl (Polish e-commerce aggregator) with price filtering and URL validation",
+  "category": "extraction",
+  "triggers": [
+    "product.*ceneo",
+    "ceneo.*product",
+    "polish.*ecommerce.*product",
+    "produkt.*ceneo"
+  ],
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "max_price": {
+        "type": "number",
+        "description": "Maximum price threshold in PLN (Polish Zloty)",
+        "default": 999999,
+        "examples": [150, 200, 500]
+      },
+      "min_price": {
+        "type": "number",
+        "description": "Minimum price threshold in PLN",
+        "default": 0,
+        "examples": [0, 50, 100]
+      },
+      "max_results": {
+        "type": "number",
+        "description": "Maximum number of products to extract",
+        "default": 50,
+        "examples": [10, 50, 100]
+      }
+    },
+    "required": ["max_price"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "products": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Product name/title"
+            },
+            "price": {
+              "type": "number",
+              "description": "Product price in PLN"
+            },
+            "url": {
+              "type": "string",
+              "format": "uri",
+              "description": "Direct link to product page on Ceneo.pl"
+            }
+          },
+          "required": ["name", "price", "url"]
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "instruction": "Find all products under 150zł on Ceneo",
+      "parameters": {
+        "max_price": 150,
+        "min_price": 0,
+        "max_results": 50
+      },
+      "expected_output": {
+        "products": [
+          {
+            "name": "Odkurzacz ręczny ABC XYZ",
+            "price": 149.99,
+            "url": "https://www.ceneo.pl/12345678"
+          }
+        ]
+      }
+    },
+    {
+      "instruction": "Extract Ceneo products between 100-200 PLN",
+      "parameters": {
+        "max_price": 200,
+        "min_price": 100,
+        "max_results": 30
+      }
+    }
+  ],
+  "dependencies": ["playwright", "page"],
+  "timeout_ms": 30000,
+  "notes": [
+    "Optimized for Ceneo.pl DOM structure and price formatting (PLN, zł)",
+    "Validates product URLs to ensure they point to actual product pages",
+    "Filters out navigation links, ads, and category pages",
+    "Handles Polish characters and currency formatting"
+  ]
+}

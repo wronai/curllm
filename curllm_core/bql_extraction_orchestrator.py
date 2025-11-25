@@ -159,77 +159,76 @@ class BQLExtractionOrchestrator:
     # ========== Prompt Builders ==========
     
     def _build_dom_analysis_prompt(self, page_context: Dict[str, Any]) -> str:
-        """Build prompt for DOM analysis phase"""
-        if not page_context:
-            raise ValueError("page_context is None or empty")
+        """Build prompt for DOM analysis phase - optimized with minimal context"""
+        if not page_context or not isinstance(page_context, dict):
+            raise ValueError("page_context is None or invalid")
         
         url = page_context.get("url", "")
         title = page_context.get("title", "")
-        links = (page_context.get("links") or [])[:20]
-        headings = (page_context.get("headings") or [])[:10]
+        if title:
+            title = title[:80]  # Limit title
         
-        # Build links summary
+        links = page_context.get("links")
+        if not isinstance(links, list):
+            links = []
+        links = links[:8]  # Top 8 only
+        
+        headings = page_context.get("headings")
+        if not isinstance(headings, list):
+            headings = []
+        headings = headings[:5]
+        
+        # Build compact links summary
         links_text = "\n".join([
-            f"  - {link.get('text', '')[:50]} -> {link.get('href', '')}"
-            for link in links[:15]
-            if isinstance(link, dict)
-        ]) if links else "  (no links)"
+            f"{i+1}. {link.get('text', '')[:35]} -> {link.get('href', '')[:60]}"
+            for i, link in enumerate(links[:6])
+            if isinstance(link, dict) and link.get('href')
+        ]) if links else "(none)"
         
         if self._is_product_task():
-            task_intro = "You are analyzing DOM structure to identify product listing patterns."
-            specifics = (
-                "1. Product container patterns (CSS selectors, class names, tags)\n"
-                "2. Price location patterns (where prices appear in product containers)\n"
-                "3. Product name/title patterns\n"
-                "4. Product URL patterns\n"
-            )
+            task_intro = "Analyze DOM for products."
+            specifics = "Find: container, price, name, link selectors"
             schema = (
                 "{\n"
-                "  \"product_container_selector\": \".product-card|.product-item|article.product\",\n"
-                "  \"product_link_selector\": \"a.product-link|a[href*='/product/']|h2 a\",\n"
-                "  \"price_selector\": \".price|.product-price|span.price\",\n"
-                "  \"name_selector\": \".product-name|h3.title|.product-title\",\n"
-                "  \"pattern_confidence\": 0.8,\n"
-                "  \"reasoning\": \"Explain briefly\"\n"
+                "  \"container\": \".product-card|article\",\n"
+                "  \"link\": \"a[href]\",\n"
+                "  \"price\": \".price|span.price\",\n"
+                "  \"name\": \".name|h3\",\n"
+                "  \"confidence\": 0.8\n"
                 "}"
             )
         else:
-            task_intro = "You are analyzing DOM structure to identify article/title listing patterns."
-            specifics = (
-                "1. Article container patterns (CSS selectors, class names, tags)\n"
-                "2. Title location patterns (where titles/links appear)\n"
-                "3. Link/url selector for the title anchor\n"
-            )
+            task_intro = "Analyze DOM for articles."
+            specifics = "Find: container, title, link selectors"
             schema = (
                 "{\n"
-                "  \"article_container_selector\": \"tr.athing|.story|article\",\n"
-                "  \"title_selector\": \"a.titlelink|a.storylink|h3 a\",\n"
-                "  \"link_selector\": \"a.titlelink|a.storylink|h3 a\",\n"
-                "  \"pattern_confidence\": 0.8,\n"
-                "  \"reasoning\": \"Explain briefly\"\n"
+                "  \"container\": \"tr.athing|.story\",\n"
+                "  \"title\": \"a.titlelink|h3 a\",\n"
+                "  \"link\": \"a[href]\",\n"
+                "  \"confidence\": 0.8\n"
                 "}"
             )
+        # Safe headings extraction
+        top_headings = []
+        if headings and isinstance(headings, list):
+            for h in headings[:3]:
+                if isinstance(h, dict):
+                    top_headings.append(h.get('text', '')[:30])
+        
         return f"""{task_intro}
 
-Instruction: {self.instruction}
+Task: {self.instruction}
 URL: {url}
 Title: {title}
 
-Headings (structure):
-{json.dumps(headings, indent=2)}
+Top headings: {top_headings}
 
-Links (sample):
+Links:
 {links_text}
 
-TASK: Analyze the page structure and identify:
 {specifics}
 
-Look for repeating patterns indicating listings:
-- Multiple similar elements with same classes
-- For products: zł/PLN/price/cena indicators
-- Structured data (lists, grids, cards)
-
-Respond with JSON only:
+JSON:
 {schema}
 
 JSON:"""
@@ -253,59 +252,53 @@ JSON:"""
                 pass
         
         if self._is_product_task():
-            task_desc = "You are generating a BQL (Browser Query Language) query for PRODUCT extraction."
+            task_desc = "Generate BQL for products."
             bql_ref = (
-                "page.select(\"CSS_CONTAINER\")\n"
+                "page.select(\"CONTAINER\")\n"
                 "  .map(item => ({\n"
-                "    name: item.select(\"NAME_SELECTOR\").text(),\n"
-                "    price: item.select(\"PRICE_SELECTOR\").text(),\n"
-                "    url: item.select(\"LINK_SELECTOR\").attr(\"href\")\n"
+                "    name: item.select(\"NAME\").text(),\n"
+                "    price: item.select(\"PRICE\").text(),\n"
+                "    url: item.select(\"LINK\").attr(\"href\")\n"
                 "  }))\n"
-                f"  .filter(item => parseFloat((item.price||'').replace(/[^0-9.,]/g,'').replace(',', '.')) <= {price_limit})\n"
+                f"  .filter(p => parseFloat((p.price||'').replace(/\\D/g,'')) <= {price_limit})\n"
             )
-            guidance = (
-                "Use selectors from DOM analysis: product_container_selector/name_selector/price_selector/product_link_selector.\n"
-                "Return products as an array with fields: name, price (string ok), url."
-            )
+            guidance = "Use DOM analysis selectors. Return: name, price, url."
         else:
-            task_desc = "You are generating a BQL (Browser Query Language) query for ARTICLE/TITLE extraction."
+            task_desc = "Generate BQL for articles."
             bql_ref = (
-                "page.select(\"CSS_CONTAINER\")\n"
+                "page.select(\"CONTAINER\")\n"
                 "  .map(item => ({\n"
-                "    title: item.select(\"TITLE_SELECTOR\").text(),\n"
-                "    url: item.select(\"LINK_SELECTOR\").attr(\"href\")\n"
+                "    title: item.select(\"TITLE\").text(),\n"
+                "    url: item.select(\"LINK\").attr(\"href\")\n"
                 "  }))\n"
             )
-            guidance = (
-                "Use selectors from DOM analysis: article_container_selector/title_selector/link_selector.\n"
-                "Return articles as an array with fields: title, url."
-            )
+            guidance = "Use DOM analysis selectors. Return: title, url."
+        
+        # Compact DOM analysis representation
+        compact_analysis = {
+            "container": dom_analysis.get("product_container_selector") or dom_analysis.get("article_container_selector") or dom_analysis.get("container"),
+            "name": dom_analysis.get("product_name_selector") or dom_analysis.get("name_selector") or dom_analysis.get("name"),
+            "price": dom_analysis.get("price_selector") or dom_analysis.get("price"),
+            "link": dom_analysis.get("product_link_selector") or dom_analysis.get("link_selector") or dom_analysis.get("link"),
+            "title": dom_analysis.get("title_selector") or dom_analysis.get("title")
+        }
         
         return f"""{task_desc}
 
-Instruction: {self.instruction}
-URL: {url}
-Price Limit (if applicable): {price_limit}
+Task: {self.instruction}
+Price: <={price_limit}zł
 
-DOM Analysis Result:
-{json.dumps(dom_analysis, indent=2)}
+Selectors: {compact_analysis}
 
-BQL SYNTAX REFERENCE:
-```
+Syntax:
 {bql_ref}
-```
-
-TASK: Generate a BQL query that:\n\
-1. Selects containers using patterns from DOM analysis\n\
-2. Extracts the required fields\n\
-3. {('Filters products by price limit (' + str(price_limit) + 'zł) and ' if self._is_product_task() else '')}returns an array
 
 {guidance}
 
-Respond with JSON only:
+JSON:
 {{
   "bql_query": "...",
-  "reasoning": "Brief explanation of the query logic"
+  "reasoning": "brief"
 }}
 
 JSON:"""

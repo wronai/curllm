@@ -19,7 +19,8 @@ help:
 	@echo "  make benchmark       - Run performance benchmarks"
 	@echo "  make clean           - Clean temporary files"
 	@echo "  make clean-cache     - Deep clean: remove all Python cache"
-	@echo "  make reinstall       - Force reinstall curllm package"
+	@echo "  make reinstall       - Fast reinstall (editable mode only)"
+	@echo "  make reinstall-full  - Full reinstall with all dependencies (slow)"
 	@echo ""
 	@echo "Docker targets:"
 	@echo "  make docker-build - Build Docker images"
@@ -67,7 +68,14 @@ start: clean-cache reinstall install-browsers
 stop:
 	@chmod +x scripts/stop.sh 2>/dev/null || true
 	@bash scripts/stop.sh
-	@$(MAKE) clean-cache
+	@echo "🧹 Cleaning Python cache..."
+	@find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	@find . -type f -name "*.pyc" -delete 2>/dev/null || true
+	@find . -type f -name "*.pyo" -delete 2>/dev/null || true
+	@find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
+	@rm -rf .pytest_cache 2>/dev/null || true
+	@rm -rf build dist 2>/dev/null || true
+	@echo "✅ Cache cleaned!"
 
 restart: stop start
 
@@ -186,7 +194,18 @@ clean-cache:
 	@echo "✅ Cache cleaned!"
 
 reinstall:
-	@echo "🔄 Reinstalling curllm package..."
+	@echo "🔄 Reinstalling curllm package (fast - editable mode only)..."
+	@if [ -d "venv" ]; then \
+		./venv/bin/pip install -e . -q 2>/dev/null || ./venv/bin/pip install -e .; \
+	elif [ -n "$$VIRTUAL_ENV" ]; then \
+		pip install -e . -q 2>/dev/null || pip install -e .; \
+	else \
+		python3 -m pip install -e . --break-system-packages -q 2>/dev/null || python3 -m pip install -e . --break-system-packages; \
+	fi
+	@echo "✅ Package reinstalled!"
+
+reinstall-full:
+	@echo "🔄 Full reinstall with all dependencies (slow - downloads from internet)..."
 	@if [ -d "venv" ]; then \
 		./venv/bin/pip install -e . --force-reinstall --no-cache-dir -q 2>/dev/null || ./venv/bin/pip install -e . --force-reinstall --no-cache-dir; \
 	elif [ -n "$$VIRTUAL_ENV" ]; then \
@@ -194,7 +213,7 @@ reinstall:
 	else \
 		python3 -m pip install -e . --force-reinstall --no-cache-dir --break-system-packages -q 2>/dev/null || python3 -m pip install -e . --force-reinstall --no-cache-dir --break-system-packages; \
 	fi
-	@echo "✅ Package reinstalled!"
+	@echo "✅ Full reinstall complete!"
 
 logs:
 	@echo "=== Ollama Logs ==="

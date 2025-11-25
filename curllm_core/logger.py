@@ -5,13 +5,16 @@ from pathlib import Path
 
 class RunLogger:
     """Markdown run logger for step-by-step diagnostics"""
-    def __init__(self, instruction: str, url: str | None):
+    def __init__(self, instruction: str, url: str | None, command_line: str | None = None):
         ts = datetime.now().strftime('%Y%m%d-%H%M%S')
         self.dir = Path('./logs')
         self.dir.mkdir(parents=True, exist_ok=True)
         self.path = self.dir / f'run-{ts}.md'
         with open(self.path, 'w', encoding='utf-8') as f:
             f.write(f"# curllm Run Log ({ts})\n\n")
+            # Add command line at the top for easy copy-paste
+            if command_line:
+                f.write(f"```bash\n{command_line}\n```\n\n")
             if url:
                 f.write(f"- URL: {url}\n")
             if instruction:

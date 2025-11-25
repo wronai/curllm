@@ -76,7 +76,27 @@ class CurllmExecutor:
     ) -> Dict[str, Any]:
         # Parse optional runtime params embedded in JSON instruction
         instruction, runtime = parse_runtime_from_instruction(instruction)
-        run_logger = RunLogger(instruction=instruction, url=url)
+        
+        # Reconstruct bash command for logging
+        cmd_parts = ["curllm"]
+        if visual_mode:
+            cmd_parts.append("--visual")
+        if stealth_mode:
+            cmd_parts.append("--stealth")
+        if use_bql:
+            cmd_parts.append("--bql")
+        if headers:
+            for key, val in headers.items():
+                cmd_parts.append(f'-H "{key}: {val}"')
+        if url:
+            cmd_parts.append(f'"{url}"')
+        if instruction:
+            # Escape quotes in instruction
+            escaped_instr = instruction.replace('"', '\\"')
+            cmd_parts.append(f'-d "{escaped_instr}"')
+        command_line = " ".join(cmd_parts)
+        
+        run_logger = RunLogger(instruction=instruction, url=url, command_line=command_line)
         run_logger.log_heading(f"curllm run: {datetime.now().isoformat()}")
         
         # Log all configuration using centralized config_logger

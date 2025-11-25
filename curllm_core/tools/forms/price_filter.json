@@ -1,0 +1,99 @@
+{
+  "name": "price_filter",
+  "version": "1.0.0",
+  "description": "Set price range filters (min/max) on e-commerce sites and submit the filter form",
+  "category": "forms",
+  "triggers": [
+    "set.*price.*filter",
+    "apply.*price.*filter",
+    "filter.*price",
+    "price.*range",
+    "ustaw.*filtr.*cen",
+    "zastosuj.*filtr.*cen"
+  ],
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "max": {
+        "type": "number",
+        "description": "Maximum price value to set",
+        "examples": [150, 200, 500]
+      },
+      "min": {
+        "type": "number",
+        "description": "Minimum price value to set (optional)",
+        "default": null,
+        "examples": [0, 50, 100]
+      },
+      "submit": {
+        "type": "boolean",
+        "description": "Whether to submit/apply the filter after setting values",
+        "default": true
+      },
+      "wait_after_submit_ms": {
+        "type": "number",
+        "description": "Milliseconds to wait after submitting filter",
+        "default": 3000,
+        "examples": [2000, 3000, 5000]
+      }
+    },
+    "required": ["max"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "success": {
+        "type": "boolean",
+        "description": "Whether any fields were successfully filled"
+      },
+      "filled_fields": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "List of fields that were filled (e.g., 'max=150')"
+      },
+      "submitted": {
+        "type": "boolean",
+        "description": "Whether the filter was submitted"
+      },
+      "url_changed": {
+        "type": "boolean",
+        "description": "Whether the page URL changed after submission"
+      },
+      "new_url": {
+        "type": "string",
+        "description": "New URL if changed, otherwise original URL"
+      }
+    }
+  },
+  "examples": [
+    {
+      "instruction": "Set price filter max 150 zł and apply it",
+      "parameters": {
+        "max": 150,
+        "submit": true
+      },
+      "expected_output": {
+        "success": true,
+        "filled_fields": ["max=150"],
+        "submitted": true,
+        "url_changed": true,
+        "new_url": "https://example.com/search?price_to=150"
+      }
+    },
+    {
+      "instruction": "Filter products between 100-200 PLN",
+      "parameters": {
+        "min": 100,
+        "max": 200,
+        "submit": true
+      }
+    }
+  ],
+  "dependencies": ["playwright", "page"],
+  "timeout_ms": 10000,
+  "notes": [
+    "Tries multiple selector patterns to find price input fields",
+    "Supports both English and Polish form fields",
+    "Waits for page to update after applying filter"
+  ]
+}
