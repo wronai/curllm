@@ -83,6 +83,10 @@ class ExtractionOrchestrator:
         """Phase 2: Plan extraction strategy"""
         self._log_phase(2, "Strategy")
         
+        if detection is None:
+            self._log_error("Strategy", "Detection is None - cannot proceed")
+            return None
+        
         prompt = self._build_strategy_prompt(page_context, detection)
         response = await self._llm_invoke(prompt)
         
@@ -103,20 +107,46 @@ class ExtractionOrchestrator:
         for action in nav_actions:
             action_type = action.get("type")
             if action_type == "click":
+                # Support both href (URL) and selector
+                href = action.get("href")
                 selector = action.get("selector")
+                
                 try:
-                    await self.page.click(selector, timeout=22000)
-                    await self.page.wait_for_timeout(2000)
-                    self._log_decision("Navigation", {"action": "click", "selector": selector, "status": "success"})
+                    if href:
+                        # Navigate directly to URL (handle encoding issues)
+                        import urllib.parse
+                        # Parse and re-encode URL to handle Polish characters properly
+                        parsed = urllib.parse.urlparse(href)
+                        # Re-encode path component
+                        encoded_path = urllib.parse.quote(parsed.path.encode('utf-8'), safe='/:')
+                        clean_url = f"{parsed.scheme}://{parsed.netloc}{encoded_path}"
+                        if parsed.query:
+                            clean_url += f"?{parsed.query}"
+                        if parsed.fragment:
+                            clean_url += f"#{parsed.fragment}"
+                        
+                        await self.page.goto(clean_url, wait_until="domcontentloaded", timeout=30000)
+                        await self.page.wait_for_timeout(3000)  # Wait for dynamic content
+                        self._log_decision("Navigation", {"action": "goto", "href": clean_url, "status": "success"})
+                    elif selector:
+                        # Click on selector
+                        await self.page.click(selector, timeout=22000)
+                        await self.page.wait_for_timeout(2000)
+                        self._log_decision("Navigation", {"action": "click", "selector": selector, "status": "success"})
+                    else:
+                        self._log_error("Navigation", "Click action requires 'href' or 'selector'")
+                        return None
                 except Exception as e:
-                    self._log_error("Navigation", f"Click failed: {e}")
+                    self._log_error("Navigation", f"Navigation failed: {e}")
                     return None
             elif action_type == "scroll":
                 times = action.get("times", 3)
                 try:
-                    for _ in range(times):
+                    for i in range(times):
                         await self.page.evaluate("window.scrollBy(0, window.innerHeight);")
-                        await self.page.wait_for_timeout(500)
+                        # Longer wait for first scroll to let content load
+                        wait_time = 1500 if i == 0 else 800
+                        await self.page.wait_for_timeout(wait_time)
                     self._log_decision("Navigation", {"action": "scroll", "times": times, "status": "success"})
                 except Exception as e:
                     self._log_error("Navigation", f"Scroll failed: {e}")
@@ -131,26 +161,41 @@ class ExtractionOrchestrator:
         extraction_tool = strategy.get("extraction_tool")
         tool_args = strategy.get("tool_args", {})
         
-        from .extraction import product_heuristics, extract_links, extract_articles
+        from .extraction import product_heuristics, extract_links_by_selectors, extract_articles_eval
         
         result = None
+        count = 0
         try:
             if extraction_tool == "products.heuristics":
                 result = await product_heuristics(self.instruction, self.page, self.run_logger)
+                if result:
+                    count = len(result.get("products", []))
             elif extraction_tool == "extract.links":
-                selector = tool_args.get("selector")
-                href_includes = tool_args.get("href_includes")
-                result = await extract_links(self.page, selector=selector, href_includes=href_includes)
+                # Use direct page evaluation for links
+                links = await self.page.evaluate("""
+                    () => {
+                        const links = Array.from(document.querySelectorAll('a[href]'));
+                        return links.slice(0, 50).map(a => ({
+                            text: a.innerText.trim(),
+                            href: a.href
+                        }));
+                    }
+                """)
+                if links:
+                    result = {"links": links}
+                    count = len(links)
             elif extraction_tool == "articles.extract":
-                result = await extract_articles(self.page, self.run_logger)
+                articles = await extract_articles_eval(self.page)
+                if articles:
+                    result = {"articles": articles}
+                    count = len(articles)
             
-            if result:
-                count = len(result.get("products") or result.get("links") or result.get("articles") or [])
+            if result and count > 0:
                 self._log_decision("Extraction", {"tool": extraction_tool, "count": count, "status": "success"})
             else:
                 self._log_decision("Extraction", {"tool": extraction_tool, "count": 0, "status": "empty"})
             
-            self.phases_log.append({"phase": "extraction", "tool": extraction_tool, "result_count": count if result else 0})
+            self.phases_log.append({"phase": "extraction", "tool": extraction_tool, "result_count": count})
             return result
             
         except Exception as e:
@@ -206,10 +251,28 @@ JSON:"""
     def _build_strategy_prompt(self, page_context: Dict[str, Any], detection: Dict[str, Any]) -> str:
         """Build prompt for strategy phase"""
         url = page_context.get("url", "")
-        links_sample = (page_context.get("links") or [])[:10]
+        links = (page_context.get("links") or [])[:30]
         headings = (page_context.get("headings") or [])[:5]
         
-        return f"""You are planning an extraction strategy.
+        # Build available links summary - safe extraction
+        links_text_lines = []
+        for link in links[:15]:
+            if isinstance(link, dict):
+                text = str(link.get('text', ''))[:60]
+                href = str(link.get('href', ''))
+                links_text_lines.append(f"  - {text} -> {href}")
+        links_text = "\n".join(links_text_lines) if links_text_lines else "  (no links found)"
+        
+        # Safe extraction of price limit
+        price_limit = 150
+        try:
+            criteria = detection.get('criteria')
+            if isinstance(criteria, dict):
+                price_limit = int(criteria.get('price_limit', 150))
+        except:
+            pass
+        
+        return f"""You are planning an extraction strategy for product extraction.
 
 Detection Result:
 {json.dumps(detection, indent=2)}
@@ -217,23 +280,29 @@ Detection Result:
 Current Page:
 - URL: {url}
 - Headings: {json.dumps(headings)}
-- Links (sample): {json.dumps(links_sample)}
 
-Plan the extraction strategy:
+Available Links (top 15):
+{links_text}
 
-1. Can we extract directly from this page? Or do we need to navigate?
-2. If navigation needed, what action (click category, search, scroll)?
-3. Which extraction tool to use?
+CRITICAL RULES:
+1. For navigation actions, you MUST use EXACT "href" from the links above, NOT generic selectors
+2. Choose a category link that is likely to contain cheap products (under {price_limit}zł)
+3. If the page is a homepage with categories, navigate to ONE specific category first
+4. For "click" action, use: {{"type": "click", "href": "exact_url_from_above"}}
+
+Examples of good navigation actions:
+- {{"type": "click", "href": "https://www.ceneo.pl/Elektronika", "reason": "Navigate to electronics category"}}
+- {{"type": "scroll", "times": 3, "reason": "Load more products"}}
 
 Respond with JSON only:
 {{
   "requires_navigation": true,
   "navigation_actions": [
-    {{"type": "click", "selector": ".category-link", "reason": "Navigate to product category"}},
+    {{"type": "click", "href": "EXACT_URL_FROM_LINKS_ABOVE", "reason": "Navigate to low-price category"}},
     {{"type": "scroll", "times": 3, "reason": "Load more products"}}
   ],
   "extraction_tool": "products.heuristics",
-  "tool_args": {{"threshold": 150}},
+  "tool_args": {{"threshold": {price_limit}}},
   "reasoning": "Brief explanation"
 }}
 
@@ -284,7 +353,7 @@ JSON:"""
     async def _get_page_context(self) -> Dict[str, Any]:
         """Get current page context"""
         from .page_context import extract_page_context
-        return await extract_page_context(self.page, max_chars=20000, include_dom_html=False)
+        return await extract_page_context(self.page, dom_max_chars=20000, include_dom=False)
     
     def _log_header(self, message: str):
         """Log orchestrator header"""

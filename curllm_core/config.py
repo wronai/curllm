@@ -40,6 +40,10 @@ class Config:
     llm_field_filler_enabled: bool = os.getenv("CURLLM_LLM_FIELD_FILLER_ENABLED", "false").lower() in ["true", "1", "yes"]
     llm_field_max_attempts: int = int(os.getenv("CURLLM_LLM_FIELD_MAX_ATTEMPTS", "2"))
     llm_field_timeout_ms: int = int(os.getenv("CURLLM_LLM_FIELD_TIMEOUT_MS", "5000"))
+    
+    # LLM-based extraction orchestrator (similar to form orchestrator)
+    extraction_orchestrator_enabled: bool = os.getenv("CURLLM_EXTRACTION_ORCHESTRATOR", "false").lower() in ["true", "1", "yes"]
+    extraction_orchestrator_timeout: int = int(os.getenv("CURLLM_EXTRACTION_ORCHESTRATOR_TIMEOUT", "120"))
 
     def __post_init__(self):
         self.screenshot_dir.mkdir(parents=True, exist_ok=True)

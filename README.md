@@ -77,6 +77,27 @@ The `curllm-doctor` command verifies all dependencies and configuration.
 
 **[→ CLI Commands Documentation](CLI_COMMANDS_USAGE.md)**
 
+### 🌐 Web Client (NEW!)
+
+For users who prefer a graphical interface, curllm now includes a modern web client:
+
+```bash
+# Start the web interface
+curllm-web
+
+# Open browser at http://localhost:5000
+```
+
+**Features:**
+- 🎨 Modern, responsive UI with Tailwind CSS
+- 📝 Pre-configured prompts with custom editing
+- 📤 File upload support (CSV, XLS, JSON, etc.)
+- 📊 Real-time log viewer with embedded screenshots
+- ⚙️ Visual mode, stealth, and CAPTCHA options
+- 💾 Prompt management (save/edit/delete custom prompts)
+
+**[→ Web Client Documentation](WEB_CLIENT_README.md)**
+
 ### Development Installation
 
 ```shell

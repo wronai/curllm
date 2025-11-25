@@ -86,6 +86,40 @@ async def try_fastpaths(instruction: str, page, run_logger, result: Dict[str, An
 async def try_product_extraction(executor, instruction: str, page, run_logger, result: Dict[str, Any], lower_instr: str) -> Optional[Dict[str, Any]]:
     if "product" not in lower_instr and "produkt" not in lower_instr:
         return None
+    
+    # Try orchestrator first if enabled
+    if config.extraction_orchestrator_enabled:
+        if run_logger:
+            run_logger.log_text("🎭 Extraction Orchestrator enabled - trying orchestrated extraction")
+        try:
+            from .extraction_orchestrator import ExtractionOrchestrator
+            from .page_context import extract_page_context
+            
+            page_context = await extract_page_context(page, dom_max_chars=20000, include_dom=False)
+            orchestrator = ExtractionOrchestrator(executor.llm, instruction, page, run_logger)
+            
+            import asyncio
+            data_ms = await asyncio.wait_for(
+                orchestrator.orchestrate(page_context),
+                timeout=config.extraction_orchestrator_timeout
+            )
+            
+            if data_ms is not None:
+                if run_logger:
+                    run_logger.log_text("✅ Orchestrator succeeded")
+                result["data"] = data_ms
+                return result
+            else:
+                if run_logger:
+                    run_logger.log_text("⚠️ Orchestrator returned no data, falling back to multi-stage")
+        except asyncio.TimeoutError:
+            if run_logger:
+                run_logger.log_text("⚠️ Orchestrator timeout, falling back to multi-stage")
+        except Exception as e:
+            if run_logger:
+                run_logger.log_text(f"⚠️ Orchestrator failed: {e}, falling back to multi-stage")
+    
+    # Fallback to original multi-stage extraction
     ms = await executor._multi_stage_product_extract(instruction, page, run_logger)
     if ms is None:
         return None

@@ -42,11 +42,12 @@ Issues = "https://github.com/wronai/curllm/issues"
 [project.scripts]
 curllm-setup = "curllm_core.cli.setup:main"
 curllm-doctor = "curllm_core.cli.doctor:main"
+curllm-web = "curllm_web:main"
 
 [tool.setuptools]
 # Install non-Python CLI script and top-level modules
 script-files = ["curllm"]
-py-modules = ["curllm_server", "bql_parser"]
+py-modules = ["curllm_server", "bql_parser", "curllm_web"]
 
 [tool.setuptools.packages.find]
 include = ["curllm_core*"]
