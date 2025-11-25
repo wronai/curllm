@@ -1,12 +1,12 @@
 ![curllm.png](docs/curllm.png)
-# curllm - Browser Automation with Local LLM
+# curllm = curl + LLM - Shell Browser Automation with Local LLM
 
 **[📚 Full Documentation](docs/INDEX.md)** | **[🚀 Quick Start](#-quick-start)** | **[📖 Examples](docs/EXAMPLES.md)** | **[⚙️ Installation](docs/Installation.md)**
 
 ---
 
 <div align="center">
-  <h3>🤖 Intelligent Browser Automation using 8GB GPU-Compatible Local LLMs</h3>
+  <h3>🤖 Intelligent Browser Automation using 8GB GPU-Compatible Local LLMs (qwen2.5:14b) </h3>
   <p>
     <strong>curllm</strong> combines the power of local LLMs with browser automation for intelligent web scraping, 
     form filling, and workflow automation - all running on your local machine with complete privacy.
