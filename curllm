@@ -747,10 +747,15 @@ main() {
         fi
     fi
 
+    # Calculate timestamp for log path
+    TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+    EXPECTED_LOG="logs/run-${TIMESTAMP}.md"
+    
     PAYLOAD=$(cat <<EOF
 {
     "method": "$METHOD",
     "url": "$URL",
+    "log": "$EXPECTED_LOG",
     "data": $DATA_JSON,
     "visual_mode": $VISUAL_MODE,
     "stealth_mode": $STEALTH_MODE,
@@ -766,8 +771,6 @@ EOF
     
     # Show verbose output if requested (to stderr)
     if [ "$VERBOSE" = true ]; then
-        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-        EXPECTED_LOG="logs/run-${TIMESTAMP}.md"
         { 
             print_verbose_env
             echo -e "${BLUE}Request:${NC}"
