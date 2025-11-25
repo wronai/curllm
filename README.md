@@ -79,24 +79,51 @@ The `curllm-doctor` command verifies all dependencies and configuration.
 
 ### 🌐 Web Client (NEW!)
 
-For users who prefer a graphical interface, curllm now includes a modern web client:
+For users who prefer a graphical interface, curllm now includes a modern web client with **process management**:
 
 ```bash
-# Start the web interface
-curllm-web
+# Start server in background
+curllm-web start
 
-# Open browser at http://localhost:5000
+# Check status
+curllm-web status
+
+# Stop server
+curllm-web stop
+
+# Restart server
+curllm-web restart
+
+# Or run in foreground (traditional way)
+curllm-web
 ```
 
-**Features:**
-- 🎨 Modern, responsive UI with Tailwind CSS
-- 📝 Pre-configured prompts with custom editing
-- 📤 File upload support (CSV, XLS, JSON, etc.)
-- 📊 Real-time log viewer with embedded screenshots
-- ⚙️ Visual mode, stealth, and CAPTCHA options
-- 💾 Prompt management (save/edit/delete custom prompts)
+Open browser at **http://localhost:5000**
 
-**[→ Web Client Documentation](WEB_CLIENT_README.md)**
+**Features:**
+- 🎨 **Modern, responsive UI** with Tailwind CSS
+- 📝 **19 pre-configured prompts** with custom editing
+- 📤 **File upload support** (CSV, XLS, JSON, etc.)
+- 📊 **Real-time log viewer** with embedded screenshots
+- ⚙️ **Advanced options** - Visual mode, stealth, CAPTCHA
+- 💾 **Prompt management** - Save/edit/delete custom prompts
+- 🔄 **Process management** - Start/stop/restart/status commands
+- 📈 **Status monitoring** - PID, memory usage, port status
+
+**Quick Start:**
+```bash
+# One-step launch (starts both API and Web)
+./start-web-full.sh
+
+# Or manually:
+python curllm_server.py &    # Terminal 1: API server
+curllm-web start             # Terminal 2: Web client
+```
+
+**Documentation:**
+- **[→ Web Client Guide](WEB_CLIENT_README.md)** - Full documentation
+- **[→ Quick Start](QUICKSTART_WEB.md)** - Step-by-step guide
+- **[→ Process Management](PROCESS_MANAGEMENT.md)** - Commands reference
 
 ### Development Installation
 

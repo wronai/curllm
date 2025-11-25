@@ -96,11 +96,10 @@ AUTOMATION OPTIONS:
     --xls|--excel          Export response data to an Excel-compatible .xls (HTML table)
     
 SERVICE OPTIONS:
-    --start-services       Start required services (Ollama, API server)
-    --stop-services        Stop all services
-    --status               Check service status
-    --status-services      Check service status (alias of --status)
-    --install              Install dependencies
+    --start-services, --start    Start required services (Ollama, API server)
+    --stop-services, --stop      Stop all services
+    --status, --status-services  Check service status
+    --install                    Install dependencies
     
 EXAMPLES:
     # Simple web extraction
@@ -231,29 +230,32 @@ start_services() {
     echo ${PORT} > /tmp/curllm_api_port
     echo ${OPORT} > /tmp/ollama_port
     dbg "Persisted /tmp/curllm_api_port=${PORT}, /tmp/ollama_port=${OPORT}"
-    # Persist selected ports and hosts to .env for future runs
+    # Persist selected ports and hosts to .env ONLY if not already set
     if [ ! -f .env ]; then touch .env; fi
-    if grep -q '^CURLLM_API_PORT=' .env; then
-        sed -i "s/^CURLLM_API_PORT=.*/CURLLM_API_PORT=${PORT}/" .env
-    else
+    if ! grep -q '^CURLLM_API_PORT=' .env; then
         echo "CURLLM_API_PORT=${PORT}" >> .env
-    fi
-    if grep -q '^CURLLM_OLLAMA_PORT=' .env; then
-        sed -i "s/^CURLLM_OLLAMA_PORT=.*/CURLLM_OLLAMA_PORT=${OPORT}/" .env
+        dbg "Added CURLLM_API_PORT=${PORT} to .env"
     else
+        dbg "CURLLM_API_PORT already set in .env, keeping existing value"
+    fi
+    if ! grep -q '^CURLLM_OLLAMA_PORT=' .env; then
         echo "CURLLM_OLLAMA_PORT=${OPORT}" >> .env
-    fi
-    if grep -q '^CURLLM_API_HOST=' .env; then
-        sed -i "s#^CURLLM_API_HOST=.*#CURLLM_API_HOST=http://localhost:${PORT}#" .env
+        dbg "Added CURLLM_OLLAMA_PORT=${OPORT} to .env"
     else
+        dbg "CURLLM_OLLAMA_PORT already set in .env, keeping existing value"
+    fi
+    if ! grep -q '^CURLLM_API_HOST=' .env; then
         echo "CURLLM_API_HOST=http://localhost:${PORT}" >> .env
-    fi
-    if grep -q '^CURLLM_OLLAMA_HOST=' .env; then
-        sed -i "s#^CURLLM_OLLAMA_HOST=.*#CURLLM_OLLAMA_HOST=http://localhost:${OPORT}#" .env
+        dbg "Added CURLLM_API_HOST to .env"
     else
-        echo "CURLLM_OLLAMA_HOST=http://localhost:${OPORT}" >> .env
+        dbg "CURLLM_API_HOST already set in .env, keeping existing value"
     fi
-    dbg "Updated .env (API ${PORT}, OLLAMA ${OPORT})"
+    if ! grep -q '^CURLLM_OLLAMA_HOST=' .env; then
+        echo "CURLLM_OLLAMA_HOST=http://localhost:${OPORT}" >> .env
+        dbg "Added CURLLM_OLLAMA_HOST to .env"
+    else
+        dbg "CURLLM_OLLAMA_HOST already set in .env, keeping existing value"
+    fi
 
     # Prepare workspace directories to avoid permission issues (with fallbacks and suppressed stderr)
     WS_DEFAULT="${CURLLM_WORKSPACE:-$PWD/workspace}"
@@ -291,9 +293,19 @@ start_services() {
             if [ -n "$p" ] && curl -s "http://localhost:${p}/api/tags" > /dev/null 2>&1; then
                 OPORT="$p"
                 echo ${OPORT} > /tmp/ollama_port
-                if grep -q '^CURLLM_OLLAMA_PORT=' .env; then sed -i "s/^CURLLM_OLLAMA_PORT=.*/CURLLM_OLLAMA_PORT=${OPORT}/" .env; else echo "CURLLM_OLLAMA_PORT=${OPORT}" >> .env; fi
-                if grep -q '^CURLLM_OLLAMA_HOST=' .env; then sed -i "s#^CURLLM_OLLAMA_HOST=.*#CURLLM_OLLAMA_HOST=http://localhost:${OPORT}#" .env; else echo "CURLLM_OLLAMA_HOST=http://localhost:${OPORT}" >> .env; fi
-                dbg "Detected existing Ollama at port ${OPORT}. .env updated."
+                if ! grep -q '^CURLLM_OLLAMA_PORT=' .env; then
+                    echo "CURLLM_OLLAMA_PORT=${OPORT}" >> .env
+                    dbg "Added CURLLM_OLLAMA_PORT=${OPORT} to .env"
+                else
+                    dbg "CURLLM_OLLAMA_PORT already set in .env, keeping existing value"
+                fi
+                if ! grep -q '^CURLLM_OLLAMA_HOST=' .env; then
+                    echo "CURLLM_OLLAMA_HOST=http://localhost:${OPORT}" >> .env
+                    dbg "Added CURLLM_OLLAMA_HOST to .env"
+                else
+                    dbg "CURLLM_OLLAMA_HOST already set in .env, keeping existing value"
+                fi
+                dbg "Detected existing Ollama at port ${OPORT}"
                 break
             fi
         done
@@ -673,13 +685,11 @@ while [[ $# -gt 0 ]]; do
             PROXY_ARG="$2"; shift 2;;
         --session)
             SESSION_ID="$2"; shift 2;;
-        --start-services)
+        --start-services|--start)
             start_services; exit 0;;
-        --stop-services)
+        --stop-services|--stop)
             stop_services; exit 0;;
-        --status)
-            check_status; exit 0;;
-        --status-services)
+        --status|--status-services)
             check_status; exit 0;;
         --install)
             install_dependencies; exit 0;;

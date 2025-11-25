@@ -28,40 +28,59 @@ class BQLExtractionOrchestrator:
             self._log_header("🔍 BQL EXTRACTION ORCHESTRATOR")
             
             # Phase 1: DOM Analysis
-            dom_analysis = await self._phase_dom_analysis(page_context)
-            if not dom_analysis:
+            try:
+                dom_analysis = await self._phase_dom_analysis(page_context)
+                if not dom_analysis:
+                    return None
+            except Exception as e:
+                if self.run_logger:
+                    self.run_logger.log_text(f"❌ Phase 1 failed: {type(e).__name__}: {e}")
                 return None
                 
             # Phase 2: BQL Generation
-            bql_query = await self._phase_bql_generation(page_context, dom_analysis)
-            if not bql_query:
+            try:
+                bql_query = await self._phase_bql_generation(page_context, dom_analysis)
+                if not bql_query:
+                    return None
+            except Exception as e:
+                if self.run_logger:
+                    self.run_logger.log_text(f"❌ Phase 2 failed: {type(e).__name__}: {e}")
                 return None
             
             # Phase 3: Execution & Validation
-            result = await self._phase_execution(bql_query)
-            
-            self._log_summary(result)
-            return result
+            try:
+                result = await self._phase_execution(bql_query)
+                self._log_summary(result)
+                return result
+            except Exception as e:
+                if self.run_logger:
+                    self.run_logger.log_text(f"❌ Phase 3 failed: {type(e).__name__}: {e}")
+                return None
             
         except Exception as e:
             if self.run_logger:
-                self.run_logger.log_text(f"❌ BQL orchestrator failed: {e}")
+                self.run_logger.log_text(f"❌ BQL orchestrator failed: {type(e).__name__}: {e}")
             return None
     
     async def _phase_dom_analysis(self, page_context: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Phase 1: LLM analyzes DOM structure to identify extraction patterns"""
         self._log_phase(1, "DOM Analysis")
         
-        prompt = self._build_dom_analysis_prompt(page_context)
-        response = await self._llm_invoke(prompt)
-        
         try:
+            prompt = self._build_dom_analysis_prompt(page_context)
+            response = await self._llm_invoke(prompt)
+            
             analysis = json.loads(response)
             self._log_decision("DOM Analysis", analysis)
             self.phases_log.append({"phase": "dom_analysis", "result": analysis})
             return analysis
+        except json.JSONDecodeError as e:
+            self._log_error("DOM Analysis", f"JSON decode error: {e}")
+            if self.run_logger:
+                self.run_logger.log_text(f"   LLM Response: {response[:500]}")
+            return None
         except Exception as e:
-            self._log_error("DOM Analysis", str(e))
+            self._log_error("DOM Analysis", f"{type(e).__name__}: {e}")
             return None
     
     async def _phase_bql_generation(self, page_context: Dict[str, Any], dom_analysis: Dict[str, Any]) -> Optional[str]:
@@ -134,6 +153,9 @@ class BQLExtractionOrchestrator:
     
     def _build_dom_analysis_prompt(self, page_context: Dict[str, Any]) -> str:
         """Build prompt for DOM analysis phase"""
+        if not page_context:
+            raise ValueError("page_context is None or empty")
+        
         url = page_context.get("url", "")
         title = page_context.get("title", "")
         links = (page_context.get("links") or [])[:20]
