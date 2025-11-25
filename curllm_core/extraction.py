@@ -326,13 +326,16 @@ async def product_heuristics(instruction: str, page, run_logger=None) -> Optiona
               const textLength = text.length;
               return hasPrice && hasLink && textLength > 20 && textLength < 500;
             });
+          console.log('[HEURISTICS DEBUG] possibleContainers found:', possibleContainers.length);
           const products = new Map();
+          let debugStats = {total: 0, priceFiltered: 0, noLink: 0, noName: 0, urlFiltered: 0, redirectFiltered: 0};
           for (const el of possibleContainers) {
+            debugStats.total++;
             const text = el.innerText || '';
             const price = asNumber(text);
-            if (price === null || price > thr || price < 1) continue;
+            if (price === null || price > thr || price < 1) { debugStats.priceFiltered++; continue; }
             const link = el.querySelector('a[href]');
-            if (!link) continue;
+            if (!link) { debugStats.noLink++; continue; }
             const url = link.href;
             const nameFromLink = (link.innerText || '').trim();
             let name = nameFromLink;
@@ -345,7 +348,7 @@ async def product_heuristics(instruction: str, page, run_logger=None) -> Optiona
                 line.length > 5 && line.length < 140
               ) || nameFromLink;
             }
-            if (!name || !url) continue;
+            if (!name || !url) { debugStats.noName++; continue; }
             const isPdf = /\.pdf(\?|$)/i.test(url);
             if (isPdf || url.includes('custom_document')) continue;
             // Only accept Ceneo product pages (ceneo.pl/<productId> or ceneo.pl/<category>/<productId>)
@@ -355,15 +358,16 @@ async def product_heuristics(instruction: str, page, run_logger=None) -> Optiona
               // Product URLs: /12345678 or /Category/12345678 or /Category_Name/12345678
               // Must have at least 6 consecutive digits in path (product ID)
               const pathOk = /\/\d{6,}(?:[\/#?]|$)/.test(u.pathname);
-              if (!(hostOk && pathOk)) continue;
-            } catch (e) { continue; }
+              if (!(hostOk && pathOk)) { debugStats.urlFiltered++; continue; }
+            } catch (e) { debugStats.urlFiltered++; continue; }
             // Skip redirects, tracking, navigation endpoints, and special URLs
-            if (/redirect\.ceneo\.pl|GotoBoxUrl|from\?site=|lp,\d+|\/search|\/ssl-|\/wydarzenia|;n\d+;|discount\.htm|\.htm|\.html/i.test(url)) continue;
+            if (/redirect\.ceneo\.pl|GotoBoxUrl|from\?site=|lp,\d+|\/search|\/ssl-|\/wydarzenia|;n\d+;|discount\.htm|\.htm|\.html/i.test(url)) { debugStats.redirectFiltered++; continue; }
             const key = url;
             if (!products.has(key)) {
               products.set(key, { name, price, url });
             }
           }
+          console.log('[HEURISTICS DEBUG] Stats:', debugStats, 'Found:', products.size);
           return Array.from(products.values()).slice(0, 50);
         }
         """,
