@@ -219,7 +219,22 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None, domai
               
               // STEP 2: Find and mark fields within the best form
               
-              // NAME FIELD: Check for split fields (First + Last) first
+              // EMAIL FIELD FIRST (highest priority - type="email" is most reliable)
+              // This prevents email fields from being misidentified as name fields
+              const emailEl = findField(['email','e-mail','mail','adres'], 'email', targetForm);
+              if (emailEl && !marked.has(emailEl)) {
+                res.email = mark(emailEl, 'email');
+                res._debug_email = { id: emailEl.id, name: emailEl.name, type: emailEl.type };
+              }
+              
+              // MESSAGE FIELD (second priority - textarea is distinctive)
+              const msgEl = findField(['message','wiadomo','treść','tresc','content','komentarz'], 'textarea', targetForm);
+              if (msgEl && !marked.has(msgEl)) {
+                res.message = mark(msgEl, 'message');
+                res._debug_message = { id: msgEl.id, name: msgEl.name, type: msgEl.tagName };
+              }
+              
+              // NAME FIELD: Check for split fields (First + Last) only after email/message marked
               const firstNameEl = findField(['first','firstname','first name','imi','imię'], 'input', targetForm);
               const lastNameEl = findField(['last','lastname','last name','nazwisko','nazw'], 'input', targetForm);
               
@@ -233,11 +248,6 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None, domai
                 const nameEl = findField(['name','fullname','full name','imi','imię','nazw'], 'input', targetForm);
                 if (nameEl && !marked.has(nameEl)) res.name = mark(nameEl, 'name');
               }
-              
-              const emailEl = findField(['email','e-mail','mail','adres'], 'email', targetForm);
-              if (emailEl && !marked.has(emailEl)) res.email = mark(emailEl, 'email');
-              const msgEl = findField(['message','wiadomo','treść','tresc','content','komentarz'], 'textarea', targetForm);
-              if (msgEl && !marked.has(msgEl)) res.message = mark(msgEl, 'message');
               
               // Find OPTIONAL fields (NO fallback - only if exact match)
               // For subject: only mark if found by keyword, NOT by fallback
@@ -391,6 +401,13 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None, domai
                 run_logger.log_text(f"      - Consent score: {debug_consent.get('consentScore', 0)}")
             
             run_logger.log_text(f"   Canonical values: {canonical}")
+            
+            # Debug: Show email and message field detection
+            if selectors.get("_debug_email"):
+                run_logger.log_text(f"   🔍 Email field detected: {selectors['_debug_email']}")
+            if selectors.get("_debug_message"):
+                run_logger.log_text(f"   🔍 Message field detected: {selectors['_debug_message']}")
+            
             # Filter out internal keys like _formId
             display_selectors = {k: v for k, v in selectors.items() if not k.startswith('_')}
             run_logger.log_text(f"   Found selectors: {list(display_selectors.keys())}")

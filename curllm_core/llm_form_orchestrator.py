@@ -153,14 +153,17 @@ def get_available_operations() -> List[Dict[str, Any]]:
 
 def create_llm_prompt(
     instruction: str,
-    fields_info: Dict[str, Any],
+    llm_context: Dict[str, Any],
     operations: List[Dict[str, Any]],
     user_data: Dict[str, str]
 ) -> str:
     """
     Tworzy prompt dla LLM do zaplanowania wypełnienia formularza.
     """
-    prompt = f"""You are a form-filling orchestrator. Your task is to create a plan to fill a web form based on the user's instruction and detected form fields.
+    form_type = llm_context.get('form_type', 'Unknown')
+    fields = llm_context.get('fields', [])
+    
+    prompt = f"""You are a form-filling orchestrator. Your task is to create a plan to fill a web form.
 
 USER INSTRUCTION:
 {instruction}
@@ -168,41 +171,58 @@ USER INSTRUCTION:
 USER DATA EXTRACTED:
 {json.dumps(user_data, indent=2)}
 
-DETECTED FORM FIELDS:
-{json.dumps(fields_info["detected_fields"], indent=2)}
+FORM TYPE: {form_type}
+TOTAL FIELDS: {len(fields)}
 
-FIELD RELATIONSHIPS (if any):
-{json.dumps(fields_info.get("field_relationships", []), indent=2)}
+DETECTED FIELDS:
+{json.dumps(fields, indent=2)}
 
 AVAILABLE OPERATIONS:
 {json.dumps(operations, indent=2)}
 
-TASK:
-Create a step-by-step plan to fill this form. Return your plan as a JSON array of operations.
+ANALYSIS GUIDELINES:
 
-RULES:
-1. Use "split_name" operation if you detect split name fields (name_first + name_last)
-2. Always check consent checkboxes if present and required
-3. Fill all required fields before submitting
-4. Use "fill_text" for standard text inputs and textareas
-5. Always end with "click_submit" operation
-6. If a field is not available, skip it (don't include in plan)
+1. NAME FIELDS:
+   - If you see hints=['first_name'] and hints=['last_name'] → Use split_name operation
+   - If label contains "First" and another has "Last" → Split the full name
+   - If only one name field → Fill with full name as-is
 
-EXAMPLE RESPONSE FORMAT:
+2. EMAIL FIELD:
+   - Match by: type='email', hints=['email'], label contains 'email'/'e-mail'/'mail'
+
+3. MESSAGE/COMMENT:
+   - Match by: type='textarea', hints=['message'], label contains 'message'/'comment'
+
+4. CHECKBOXES:
+   - Consent/GDPR: type='checkbox', hints=['consent'], required=true
+   - Always check required checkboxes
+
+5. FIELD MATCHING STRATEGY:
+   - Priority 1: hints array (most reliable)
+   - Priority 2: label text
+   - Priority 3: field id/name
+
+IMPORTANT RULES:
+- Use ACTUAL field IDs from detected fields (don't invent IDs)
+- If split name detected, split "John Doe" → first="John", last="Doe"
+- Fill ALL required fields
+- Check all consent checkboxes
+- Return ONLY JSON, no explanatory text outside JSON
+
+RESPONSE FORMAT:
 ```json
 {{
   "plan": [
-    {{"operation": "split_name", "full_name": "John Doe", "first_field_id": "name_first", "last_field_id": "name_last"}},
-    {{"operation": "fill_text", "field_id": "email", "value": "john@example.com"}},
-    {{"operation": "fill_text", "field_id": "message", "value": "Hello test"}},
-    {{"operation": "check_checkbox", "field_id": "consent"}},
-    {{"operation": "click_submit", "field_id": "submit"}}
-  ],
-  "reasoning": "Brief explanation of the plan"
+    {{"operation": "fill_text", "field_id": "wpforms-260-field_0", "value": "John", "reasoning": "First name field detected by hints"}},
+    {{"operation": "fill_text", "field_id": "wpforms-260-field_0-last", "value": "Doe", "reasoning": "Last name field"}},
+    {{"operation": "fill_text", "field_id": "wpforms-260-field_1", "value": "john@example.com", "reasoning": "Email field (type=email)"}},
+    {{"operation": "fill_text", "field_id": "wpforms-260-field_2", "value": "Hello test", "reasoning": "Message textarea"}},
+    {{"operation": "check_checkbox", "field_id": "wpforms-260-field_3_1", "reasoning": "Required consent checkbox"}}
+  ]
 }}
 ```
 
-Generate the plan now:"""
+Generate the plan NOW (JSON only):"""
     
     return prompt
 
@@ -371,29 +391,75 @@ async def llm_orchestrated_form_fill(
     """
     # Import here to avoid circular dependency
     from .form_fill import parse_form_pairs
+    from .form_detector import detect_all_form_fields, create_llm_context
     
-    # 1. Parse user data from instruction
-    user_data = parse_form_pairs(instruction)
+    try:
+        # 1. Parse user data from instruction
+        user_data = parse_form_pairs(instruction)
+        
+        if run_logger:
+            run_logger.log_text("🤖 LLM Form Orchestrator - Starting")
+            run_logger.log_text(f"   User data: {user_data}")
+        
+        # 2. Detect all form fields
+        detection_result = await detect_all_form_fields(page)
+        
+        if detection_result.get('error'):
+            if run_logger:
+                run_logger.log_text(f"   ❌ Error: {detection_result['error']}")
+            return None
+        
+        fields_count = detection_result.get('total_fields', 0)
+        form_type = detection_result.get('form_metadata', {}).get('form_type', 'Unknown')
+        
+        if run_logger:
+            run_logger.log_text(f"   📊 Detected: {fields_count} fields, Form type: {form_type}")
+        
+        # 3. Create context for LLM
+        llm_context = create_llm_context(detection_result, user_data)
+        
+        # 4. Get available operations
+        operations = get_available_operations()
+        
+        # 5. Create prompt for LLM
+        prompt = create_llm_prompt(instruction, llm_context, operations, user_data)
+        
+        if run_logger:
+            run_logger.log_text("   🧠 Asking LLM for filling plan...")
+        
+        # 6. Ask LLM for plan
+        llm_response = await llm.generate(prompt, max_tokens=1500, temperature=0.1)
+        
+        if run_logger:
+            run_logger.log_text(f"   ✅ LLM responded ({len(llm_response)} chars)")
+        
+        # 7. Parse LLM response
+        plan = parse_llm_plan(llm_response)
+        
+        if not plan:
+            if run_logger:
+                run_logger.log_text("   ⚠️  Could not parse LLM plan, falling back")
+            return None
+        
+        if run_logger:
+            run_logger.log_text(f"   📋 Plan has {len(plan)} operations")
+        
+        # 8. Build selectors map from detected fields
+        selectors = {}
+        for field in detection_result.get('detected_fields', []):
+            if field.get('id'):
+                field_id = field['id']
+                selectors[field_id] = f"#{field_id}"
+        
+        # 9. Execute plan
+        result = await execute_form_plan(plan, page, selectors, run_logger)
+        
+        return result
     
-    if run_logger:
-        run_logger.log_text("🤖 LLM Form Orchestrator - Starting")
-        run_logger.log_text(f"   User data: {user_data}")
-    
-    # 2. Detect form fields (using existing JavaScript code)
-    # This would use the same page.evaluate() from form_fill.py
-    # For now, we'll integrate with existing deterministic_form_fill
-    
-    # 3. Get available operations
-    operations = get_available_operations()
-    
-    # 4. Create prompt for LLM
-    # Note: This requires integration with existing form detection
-    # For MVP, we can create a simplified version
-    
-    if run_logger:
-        run_logger.log_text("   ℹ️  LLM orchestration is in BETA - falling back to hybrid mode")
-    
-    return None  # Will be implemented in integration
+    except Exception as e:
+        if run_logger:
+            run_logger.log_text(f"   ❌ LLM Orchestrator error: {str(e)}")
+        return None
 
 
 def parse_llm_plan(llm_response: str) -> Optional[List[Dict[str, Any]]]:

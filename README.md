@@ -113,6 +113,70 @@ Installing curllm dependencies...
 | Auto-zakończenie | ✅ | Kończy po 1 wysłaniu |
 | Checkbox zgody | ✅⚠️ | Auto-fix powinien zaznaczyć jeśli wymagany |
 | Optymalizacja tokenów | ✅ | Działa (~60% oszczędności) |
+| **🤖 LLM Orchestrator** | ✅ | **NOWE** - LLM decyduje jak wypełnić formularz |
+| **🔧 Email field detection** | ✅ | **FIXED** - type="email" ma najwyższy priorytet |
+
+---
+
+## 🤖 LLM Form Orchestrator (NOWA FUNKCJA!)
+
+### Koncepcja
+
+Zamiast hardcodować logikę wypełniania, **LLM podejmuje decyzje**:
+
+```
+1. Wykryj pola formularza (JavaScript) → [lista pól]
+2. Udostępnij operacje (fill, split, check) → [dostępne akcje]
+3. LLM planuje wypełnienie → [plan operacji]
+4. System wykonuje plan → ✅ Wypełnione
+```
+
+### Quick Start
+
+```bash
+# 1. Restart serwera
+make stop && make clean && make start
+
+# 2. Włącz LLM Orchestrator
+echo "CURLLM_LLM_ORCHESTRATOR=true" >> .env
+
+# 3. Test!
+curllm --visual --stealth \
+  "https://softreck.com/contact/" \
+  -d '{"instruction":"Fill form: name=John Doe, email=john@example.com"}' -v
+```
+
+### Zalety
+
+| Funkcja | Deterministyczny | LLM Orchestrator |
+|---------|-----------------|------------------|
+| Elastyczność | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+| Split name fields | ❌ Trzeba hardcodować | ✅ Automatycznie |
+| Title/Suffix fields | ❌ Nie wspierane | ✅ LLM wymyśla strategię |
+| Debug reasoning | ❌ Brak | ✅ LLM wyjaśnia DLACZEGO |
+| Maintenance | ❌ Dużo kodu | ✅ Minimalna |
+
+### Tryb Hybrydowy (Rekomendowany!)
+
+```bash
+CURLLM_LLM_ORCHESTRATOR=true  # LLM próbuje pierwszy
+```
+
+Jeśli LLM zawiedzie → **automatyczny fallback** do deterministycznego!
+
+```
+🤖 LLM Orchestrator mode enabled
+⚠️  LLM Orchestrator failed: timeout, falling back
+🔧 Using deterministic form fill (fallback)
+✅ Form submitted
+```
+
+### Dokumentacja
+
+- **Quick Start:** `QUICKSTART_LLM_ORCHESTRATOR.md`
+- **Pełna dokumentacja:** `LLM_FORM_ORCHESTRATOR.md`
+- **Integracja:** `INTEGRATION_EXAMPLE.md`
+- **Test:** `TEST_LLM_ORCHESTRATOR.md`
 
 
 ### 1. Installation

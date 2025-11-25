@@ -448,6 +448,10 @@ async def _execute_tool(executor, page, instruction: str, tool_name: str, args: 
         # Form fill
         if tn == "form.fill":
             try:
+                # Check if LLM orchestrator should be used
+                use_llm_orchestrator = runtime.get("llm_form_orchestrator", False) or \
+                                      runtime.get("llm_orchestrator", False)
+                
                 # Merge values: instruction has priority over tool args
                 merged_args = {}
                 if isinstance(args, dict) and args:
@@ -475,7 +479,45 @@ async def _execute_tool(executor, page, instruction: str, tool_name: str, args: 
                         await page.evaluate("(data) => { window.__curllm_canonical = Object.assign({}, window.__curllm_canonical||{}, data); }", merged_args)
                     except Exception:
                         pass
-                det = await executor._deterministic_form_fill(instruction, page, run_logger, domain_dir)
+                
+                det = None
+                
+                # TRY LLM ORCHESTRATOR MODE FIRST (if enabled and LLM available)
+                if use_llm_orchestrator and hasattr(executor, 'llm') and executor.llm:
+                    try:
+                        if run_logger:
+                            run_logger.log_text("🤖 LLM Orchestrator mode enabled")
+                        
+                        from curllm_core.llm_form_orchestrator import llm_orchestrated_form_fill
+                        det = await llm_orchestrated_form_fill(
+                            instruction, page, executor.llm, run_logger, domain_dir
+                        )
+                        
+                        if det and det.get("executed"):
+                            if run_logger:
+                                run_logger.log_text("✅ LLM Orchestrator succeeded")
+                            # Convert to standard format
+                            det_standard = {
+                                "submitted": det.get("submitted", False),
+                                "filled": {op.get("field_id"): True for op in det.get("executed", [])},
+                                "errors": det.get("errors")
+                            }
+                            det = det_standard
+                        else:
+                            if run_logger:
+                                run_logger.log_text("⚠️  LLM Orchestrator returned no result, falling back to deterministic")
+                            det = None
+                    except Exception as llm_err:
+                        if run_logger:
+                            run_logger.log_text(f"⚠️  LLM Orchestrator failed: {str(llm_err)}, falling back to deterministic")
+                        det = None
+                
+                # FALLBACK: DETERMINISTIC MODE
+                if det is None:
+                    if run_logger and use_llm_orchestrator:
+                        run_logger.log_text("🔧 Using deterministic form fill (fallback)")
+                    det = await executor._deterministic_form_fill(instruction, page, run_logger, domain_dir)
+                
                 if run_logger and isinstance(det, dict):
                     try:
                         run_logger.log_code("json", json.dumps({
