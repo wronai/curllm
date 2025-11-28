@@ -24,6 +24,7 @@ from .helpers import (
     describe_component,
     list_available_components
 )
+from .yaml_runner import YAMLFlowRunner, run_yaml_flow, validate_yaml_flow
 
 # Auto-register built-in components
 from .components import curllm, web, file, transform
@@ -65,4 +66,9 @@ __all__ = [
     "batch_process",
     "describe_component",
     "list_available_components",
+    
+    # YAML Runner
+    "YAMLFlowRunner",
+    "run_yaml_flow",
+    "validate_yaml_flow",
 ]
