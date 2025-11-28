@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
+"""
+DEPRECATED: Use curllm_core.streamware.components.captcha instead.
+
+This file is kept for backward compatibility.
+"""
 import asyncio
 from typing import Optional
+
 
 class CaptchaSolver:
     """CAPTCHA solving integration"""

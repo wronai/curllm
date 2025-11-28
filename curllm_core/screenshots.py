@@ -1,3 +1,9 @@
+"""
+Screenshot utilities.
+
+Core capture functions are in curllm_core.streamware.components.screenshot
+This file adds organization/cleanup utilities.
+"""
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Optional
@@ -7,6 +13,17 @@ import logging
 from .config import config
 
 logger = logging.getLogger(__name__)
+
+
+# Lazy re-exports to avoid circular imports
+def capture_page(*args, **kwargs):
+    from curllm_core.streamware.components.screenshot import capture_page as _cap
+    return _cap(*args, **kwargs)
+
+
+def capture_element(*args, **kwargs):
+    from curllm_core.streamware.components.screenshot import capture_element as _cap
+    return _cap(*args, **kwargs)
 
 
 def get_run_screenshot_dir(domain: str, run_id: str) -> Path:

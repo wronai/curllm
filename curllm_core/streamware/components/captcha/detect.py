@@ -85,17 +85,51 @@ async def detect_captcha(page) -> Dict[str, Any]:
                 const iframes = document.querySelectorAll('iframe');
                 for (const iframe of iframes) {
                     const src = (iframe.src || '').toLowerCase();
-                    if (src.includes('recaptcha')) {
+                    const title = (iframe.title || '').toLowerCase();
+                    const name = (iframe.name || '').toLowerCase();
+                    
+                    if (src.includes('recaptcha') || src.includes('google.com/recaptcha')) {
                         result.found = true;
                         result.type = 'recaptcha';
                         break;
-                    } else if (src.includes('hcaptcha')) {
+                    } else if (src.includes('hcaptcha') || src.includes('newassets.hcaptcha.com') || 
+                               title.includes('hcaptcha') || name.includes('hcaptcha')) {
                         result.found = true;
                         result.type = 'hcaptcha';
                         break;
                     } else if (src.includes('turnstile') || src.includes('cloudflare')) {
                         result.found = true;
                         result.type = 'turnstile';
+                        break;
+                    }
+                }
+            }
+            
+            // Check for hCaptcha widget containers (often have h-captcha class)
+            if (!result.found) {
+                const hcaptchaWidget = document.querySelector('.h-captcha, [data-hcaptcha-widget-id], div[data-hcaptcha]');
+                if (hcaptchaWidget) {
+                    result.found = true;
+                    result.type = 'hcaptcha';
+                    result.sitekey = hcaptchaWidget.getAttribute('data-sitekey');
+                }
+            }
+            
+            // Check for hidden captcha response fields (indicates captcha is present)
+            if (!result.found) {
+                const responseFields = document.querySelectorAll(
+                    '[name="h-captcha-response"], [name="g-recaptcha-response"], ' +
+                    'textarea[name*="captcha-response"]'
+                );
+                for (const field of responseFields) {
+                    const name = (field.name || '').toLowerCase();
+                    if (name.includes('h-captcha')) {
+                        result.found = true;
+                        result.type = 'hcaptcha';
+                        break;
+                    } else if (name.includes('g-recaptcha') || name.includes('recaptcha')) {
+                        result.found = true;
+                        result.type = 'recaptcha';
                         break;
                     }
                 }

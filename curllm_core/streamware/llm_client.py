@@ -126,17 +126,34 @@ class StreamwareLLM:
                 "selector": f.get("selector", "")
             })
         
+        # Handle "name" -> First/Last split
+        expanded_data = dict(user_data)
+        if "name" in user_data and " " in user_data["name"]:
+            parts = user_data["name"].split(" ", 1)
+            expanded_data["first_name"] = parts[0]
+            expanded_data["last_name"] = parts[1] if len(parts) > 1 else ""
+            # Remove 'name' since we split it - prevents confusing LLM
+            del expanded_data["name"]
+        
+        # Only show keys that user provided (no field names)
+        data_keys = list(expanded_data.keys())
+        
         prompt = f"""Map user data to form fields. Output ONLY JSON array.
 
 Fields: {json.dumps(field_descs, ensure_ascii=False)}
 
-Data: {json.dumps(user_data, ensure_ascii=False)}
+Available data keys: {data_keys}
+Data values: {json.dumps(expanded_data, ensure_ascii=False)}
 
 Rules:
-- email data → field with type="email"
-- message/text data → field with tag="textarea"  
-- phone data → field with type="tel" or name contains "phone"
-- Match by field type first, then by name similarity
+- email → field with type="email"
+- message → field with tag="textarea"
+- phone → field with type="tel" or name contains "phone"
+- first_name → field with name containing "first" 
+- last_name → field with name containing "last"
+- NEVER map name/first_name/last_name to textarea
+
+IMPORTANT: data_key MUST be one of: {data_keys}
 
 Output format:
 [{{"field_index": 0, "data_key": "email"}}, ...]
@@ -330,24 +347,38 @@ JSON:"""
         if match:
             generated = json.loads(match.group())
             
-            # Map field names directly - no hardcoded type logic
+            # Map to simple semantic keys for LLM mapping
             result = {}
             for field in missing_fields:
                 field_name = field['name']
+                field_type = field.get('type', '').lower()
                 
                 # Try to find value in generated data
                 value = generated.get(field_name)
                 if not value:
                     # Try common variations
                     for key in generated:
-                        if key.lower() in field_name or field_name in key.lower():
+                        if key.lower() in field_name.lower() or field_name.lower() in key.lower():
                             value = generated[key]
                             break
                 
                 if value:
-                    # Use field_name directly - no hardcoded type mappings
-                    # LLM already knows the field context from the prompt
-                    result[field_name] = value
+                    # Use SIMPLE semantic key (not raw HTML field name)
+                    # This makes LLM mapping easier
+                    if 'first' in field_name.lower():
+                        result['first_name'] = value
+                    elif 'last' in field_name.lower():
+                        result['last_name'] = value
+                    elif field_type == 'email':
+                        result['email'] = value
+                    elif field_type == 'tel' or 'phone' in field_name.lower():
+                        result['phone'] = value
+                    elif field.get('tag') == 'textarea':
+                        result['message'] = value
+                    else:
+                        # Keep simple field names as-is
+                        simple_name = field_name.split('[')[-1].rstrip(']') if '[' in field_name else field_name
+                        result[simple_name] = value
             
             if logger:
                 _log(f"🤖 Generated {len(result)} field value(s)")

@@ -195,6 +195,14 @@ async def orchestrate_form_fill(
     if not user_data:
         result["errors"].append("No data found in instruction")
         return result
+    
+    # Auto-split "name" into first_name/last_name for forms with separate fields
+    if "name" in user_data and " " in user_data["name"]:
+        parts = user_data["name"].split(" ", 1)
+        user_data["first_name"] = parts[0]
+        user_data["last_name"] = parts[1] if len(parts) > 1 else ""
+        log(f"**Split name:** `{user_data['name']}` → first: `{user_data['first_name']}`, last: `{user_data['last_name']}`")
+    
     log(f"**Parsed data:** `{list(user_data.keys())}`")
     
     # Step 2: Detect form
@@ -255,16 +263,30 @@ async def orchestrate_form_fill(
         
         # Check if we have data for this field
         has_data = False
+        field_name_lower = field_name.lower()
+        
         for data_key, data_value in user_data.items():
-            if data_value and data_value.strip():  # Has non-empty value
-                # Check if data_key matches field
-                if data_key.lower() in field_name or field_name in data_key.lower():
+            if data_value and str(data_value).strip():  # Has non-empty value
+                data_key_lower = data_key.lower()
+                
+                # Direct match
+                if data_key_lower in field_name_lower or field_name_lower in data_key_lower:
                     has_data = True
                     break
+                
+                # Type-based matching
                 if data_key == 'email' and field_type == 'email':
                     has_data = True
                     break
                 if data_key == 'message' and (rf['tag'] == 'textarea' or field_type == 'textarea'):
+                    has_data = True
+                    break
+                
+                # First/Last name matching
+                if data_key == 'first_name' and 'first' in field_name_lower:
+                    has_data = True
+                    break
+                if data_key == 'last_name' and 'last' in field_name_lower:
                     has_data = True
                     break
         
@@ -361,6 +383,52 @@ async def orchestrate_form_fill(
             log(f"**Status:** {cb_result.get('total', 0)} checkbox(es) already checked")
     except Exception as cb_err:
         log(f"⚠️ **Error:** {cb_err}")
+    
+    # Step 4c: Detect and handle CAPTCHA
+    log("\n## 🔐 Step 4c: CAPTCHA Detection\n")
+    log_dsl("captcha.detect", {"page": "current"})
+    
+    try:
+        from curllm_core.streamware.components.captcha import detect_captcha
+        captcha_info = await detect_captcha(page)
+        
+        if captcha_info.get("found"):
+            captcha_type = captcha_info.get("type", "unknown")
+            log(f"**CAPTCHA detected:** `{captcha_type}`")
+            log(f"- Sitekey: `{captcha_info.get('sitekey', 'N/A')}`")
+            log(f"- Selector: `{captcha_info.get('selector', 'N/A')}`")
+            
+            # Take screenshot of CAPTCHA
+            from datetime import datetime
+            from pathlib import Path
+            captcha_screenshot = f"screenshots/captcha_{datetime.now().timestamp():.0f}.png"
+            Path("screenshots").mkdir(exist_ok=True)
+            await page.screenshot(path=captcha_screenshot)
+            log(f"**CAPTCHA screenshot:** `{captcha_screenshot}`")
+            result["captcha"] = {
+                "found": True,
+                "type": str(captcha_type),
+                "screenshot": captcha_screenshot
+            }
+            
+            # Try to solve if we have API key
+            import os
+            if os.getenv("CAPTCHA_API_KEY"):
+                log("> Attempting CAPTCHA solve with 2captcha...")
+                from curllm_core.streamware.components.captcha import solve_captcha
+                solve_result = await solve_captcha(page, captcha_info)
+                if solve_result.get("success"):
+                    log("✅ **CAPTCHA solved!**")
+                else:
+                    log(f"⚠️ **CAPTCHA solve failed:** {solve_result.get('error', 'unknown')}")
+                    result["warnings"].append(f"CAPTCHA not solved: {solve_result.get('error')}")
+            else:
+                log("⚠️ **No CAPTCHA_API_KEY** - cannot auto-solve")
+                result["warnings"].append("CAPTCHA detected but no API key for auto-solve")
+        else:
+            log("**No CAPTCHA detected** ✓")
+    except Exception as captcha_err:
+        log(f"⚠️ **CAPTCHA detection error:** {captcha_err}")
     
     # Step 5: Submit form
     log("\n## 📤 Step 5: Submit Form\n")
