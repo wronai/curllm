@@ -14,6 +14,16 @@ import json
 from typing import Dict, Any, Optional
 
 
+def _is_form_task(instruction: str) -> bool:
+    """Check if the instruction is a form-related task"""
+    instruction_lower = instruction.lower()
+    form_keywords = [
+        "fill", "form", "submit", "login", "register", "signup", "sign up",
+        "contact", "email", "name=", "formularz", "wypełnij", "logowanie"
+    ]
+    return any(kw in instruction_lower for kw in form_keywords)
+
+
 def build_progressive_context(
     page_context: Dict[str, Any],
     step: int,
@@ -37,6 +47,9 @@ def build_progressive_context(
         "url": page_context.get("url", ""),
     }
     
+    # Check if this is a form task - if so, ALWAYS include forms data
+    is_form_task = _is_form_task(instruction)
+    
     # Step 1-2: Minimal context (title, url, top links/headings)
     if step <= 2:
         headings = page_context.get("headings", [])
@@ -44,6 +57,23 @@ def build_progressive_context(
         
         minimal["headings"] = headings[:5] if headings else []
         minimal["links"] = links[:10] if links else []
+        
+        # For form tasks, include forms even in step 1-2
+        if is_form_task:
+            forms = page_context.get("forms", [])
+            if forms:
+                minimal["forms"] = forms[:3]  # Include up to 3 forms with full details
+            # Also include interactive elements that could be form fields
+            interactive = page_context.get("interactive", [])
+            if interactive:
+                # Filter to form-related elements
+                form_elements = [
+                    el for el in interactive 
+                    if el.get("tag") in ["input", "textarea", "select", "button", "form"]
+                    or "form" in str(el.get("attrs", {}).get("class", "")).lower()
+                ]
+                if form_elements:
+                    minimal["interactive"] = form_elements[:30]
         
         # Add hint about what's available
         minimal["_hint"] = "Minimal context. More details available if needed."
