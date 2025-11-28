@@ -205,9 +205,9 @@ class TestFlowBuilder:
             
             assert result['success'] is True
             
-            # Verify file content
+            # Verify file content (jsonpath extracted the items array)
             read_data = flow(f"file://read?path={temp_path}").run()
-            assert read_data == data
+            assert read_data == [1, 2, 3, 4, 5]
             
         finally:
             if os.path.exists(temp_path):
@@ -221,7 +221,8 @@ class TestFlowBuilder:
             "transform://jsonpath?query=$.value"
         ).with_data(data).run()
         
-        assert result == data
+        # jsonpath extracts the value field, so result is 42
+        assert result == 42
 
 
 class TestPatterns:

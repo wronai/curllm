@@ -31,7 +31,8 @@ class StreamwareURI:
             self.scheme = parsed.scheme
             self.netloc = parsed.netloc
             self.path = parsed.path.lstrip('/')
-            self.operation = self.path or None
+            # Operation can be netloc (curllm://browse?...) or path (curllm:///browse?...)
+            self.operation = self.netloc or self.path or None
             
             # Parse query parameters
             self.params = {}

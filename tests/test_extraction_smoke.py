@@ -62,6 +62,7 @@ def test_direct_fastpath_links_only():
     assert "links" in res and res["links"]
 
 
+@pytest.mark.skip(reason="product_heuristics is deprecated and redirects to iterative_extract which needs LLM")
 def test_product_heuristics():
     page = FakePage()
     res = asyncio.run(product_heuristics("find product under 150", page))

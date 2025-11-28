@@ -1,0 +1,45 @@
+services:
+  # Test web server with sample pages
+  test-webserver:
+    image: nginx:alpine
+    volumes:
+      - ./tests/test_pages:/usr/share/nginx/html:ro
+    # No host port mapping - tests access via internal Docker network
+    expose:
+      - "80"
+    networks:
+      - test-network
+
+  # Mock Ollama server for testing
+  mock-ollama:
+    image: python:3.11-slim
+    command: sh -c "pip install --quiet flask && python /app/mock_ollama_server.py"
+    volumes:
+      - ./tests/mocks:/app:ro
+    networks:
+      - test-network
+    environment:
+      - MOCK_MODE=true
+
+  # CurLLM test runner
+  curllm-test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    depends_on:
+      - test-webserver
+      - mock-ollama
+    volumes:
+      - ./test_results:/app/test_results
+      - ./screenshots:/app/screenshots
+    networks:
+      - test-network
+    environment:
+      - CURLLM_OLLAMA_HOST=http://mock-ollama:11434
+      - CURLLM_TEST_BASE_URL=http://test-webserver
+      - CURLLM_HEADLESS=true
+      - PYTEST_ADDOPTS=--html=/app/test_results/report.html --self-contained-html -v
+
+networks:
+  test-network:
+    driver: bridge

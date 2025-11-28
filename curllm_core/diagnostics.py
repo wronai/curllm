@@ -3,6 +3,38 @@ import ssl
 from typing import Any, Dict
 from urllib.parse import urlparse
 import requests
+import logging
+import os
+
+
+_LOGGER_CACHE: Dict[str, logging.Logger] = {}
+
+
+def get_logger(name: str) -> logging.Logger:
+    """Return a configured logger.
+
+    Respects CURLLM_DEBUG env var to set DEBUG/INFO level.
+    Ensures we don't duplicate handlers across multiple imports.
+    """
+    lg = _LOGGER_CACHE.get(name)
+    if lg:
+        return lg
+    lg = logging.getLogger(name)
+    # Configure only if not configured yet
+    if not lg.handlers:
+        level = logging.DEBUG if str(os.getenv("CURLLM_DEBUG", "false")).lower() == "true" else logging.INFO
+        lg.setLevel(level)
+        handler = logging.StreamHandler()
+        handler.setLevel(level)
+        fmt = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        handler.setFormatter(fmt)
+        lg.addHandler(handler)
+        try:
+            lg.propagate = False
+        except Exception:
+            pass
+    _LOGGER_CACHE[name] = lg
+    return lg
 
 
 def diagnose_url_issue(url: str) -> Dict[str, Any]:

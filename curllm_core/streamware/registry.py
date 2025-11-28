@@ -116,6 +116,16 @@ def list_schemes() -> List[str]:
     return list(_REGISTRY.keys())
 
 
+def list_available_components() -> List[str]:
+    """
+    List all available component schemes (alias for list_schemes)
+    
+    Returns:
+        List of scheme names
+    """
+    return list_schemes()
+
+
 def unregister(scheme: str) -> bool:
     """
     Unregister a component

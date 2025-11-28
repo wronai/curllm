@@ -5,7 +5,7 @@ File I/O components
 import json
 import os
 from pathlib import Path
-from typing import Any, Optional, Iterator
+from typing import Any, Dict, Optional, Iterator
 from ..core import Component, StreamComponent
 from ..uri import StreamwareURI
 from ..registry import register
