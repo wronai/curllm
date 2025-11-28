@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
-curllm_core.bql - Browser Query Language Parser and Executor (internal)
-This is a packaged copy of the original bql_parser.py for reuse.
-"""
+curllm_core.bql - Browser Query Language Parser and Executor
 
+Note: New code should use curllm_core.streamware.components.bql
+"""
 import json
 import re
 from dataclasses import dataclass
 from typing import Dict, List, Any, Optional, Union
 from enum import Enum
+
 
 class QueryType(Enum):
     PAGE = "page"

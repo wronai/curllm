@@ -39,6 +39,13 @@ from . import navigation
 from . import captcha
 from . import screenshot
 from . import dom
+from . import bql
+from . import llm
+from . import vision
+from . import browser
+from . import page
+from . import data
+from . import config as config_component
 
 __all__ = [
     # Core components
@@ -66,4 +73,11 @@ __all__ = [
     "captcha",
     "screenshot",
     "dom",
+    "bql",
+    "llm",
+    "vision",
+    "browser",
+    "page",
+    "data",
+    "config_component",
 ]

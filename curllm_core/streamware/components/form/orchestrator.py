@@ -149,6 +149,7 @@ async def orchestrate_form_fill(
         "filled": {},
         "submitted": False,
         "errors": [],
+        "warnings": [],
         "steps": []
     }
     
@@ -411,20 +412,36 @@ async def orchestrate_form_fill(
                 "screenshot": captcha_screenshot
             }
             
-            # Try to solve if we have API key
+            # Try to solve with visual LLM first (no API key needed)
             import os
-            if os.getenv("CAPTCHA_API_KEY"):
-                log("> Attempting CAPTCHA solve with 2captcha...")
-                from curllm_core.streamware.components.captcha import solve_captcha
-                solve_result = await solve_captcha(page, captcha_info)
+            log("> 🤖 Attempting CAPTCHA solve with visual LLM...")
+            try:
+                from curllm_core.streamware.components.captcha import solve_captcha_visual
+                solve_result = await solve_captcha_visual(page, captcha_info, captcha_screenshot)
+                
                 if solve_result.get("success"):
-                    log("✅ **CAPTCHA solved!**")
+                    log("✅ **CAPTCHA solved with visual LLM!**")
+                    log(f"- Actions: {solve_result.get('actions_taken', [])}")
+                    result["captcha"]["solved"] = True
                 else:
-                    log(f"⚠️ **CAPTCHA solve failed:** {solve_result.get('error', 'unknown')}")
-                    result["warnings"].append(f"CAPTCHA not solved: {solve_result.get('error')}")
-            else:
-                log("⚠️ **No CAPTCHA_API_KEY** - cannot auto-solve")
-                result["warnings"].append("CAPTCHA detected but no API key for auto-solve")
+                    log(f"⚠️ **Visual LLM solve incomplete:** {solve_result.get('error', 'unknown')}")
+                    log(f"- Analysis: {solve_result.get('llm_analysis', '')[:200]}")
+                    
+                    # Fallback to 2captcha if API key available
+                    if os.getenv("CAPTCHA_API_KEY"):
+                        log("> Fallback: Attempting solve with 2captcha API...")
+                        from curllm_core.streamware.components.captcha import solve_captcha
+                        api_result = await solve_captcha(page, captcha_info)
+                        if api_result.get("success"):
+                            log("✅ **CAPTCHA solved with 2captcha!**")
+                            result["captcha"]["solved"] = True
+                        else:
+                            result["warnings"].append(f"CAPTCHA not solved: {api_result.get('error')}")
+                    else:
+                        result["warnings"].append("CAPTCHA requires manual solving or vision model")
+            except Exception as solve_err:
+                log(f"⚠️ **CAPTCHA solve error:** {solve_err}")
+                result["warnings"].append(f"CAPTCHA solve failed: {solve_err}")
         else:
             log("**No CAPTCHA detected** ✓")
     except Exception as captcha_err:
