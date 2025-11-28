@@ -29,10 +29,18 @@ class DOMAnalyzeComponent(Component):
         """Analyze DOM data"""
         analysis_type = self.uri.get_param('type', 'forms')
         
-        if not isinstance(data, dict) or 'page_context' not in data:
-            raise ComponentError("Input must contain 'page_context'")
-            
-        page_context = data['page_context']
+        if not isinstance(data, dict):
+            raise ComponentError("Input must be a dictionary")
+        
+        # Accept either {'page_context': {...}} or the page_context directly
+        # This allows chaining with dom-snapshot which returns data directly
+        if 'page_context' in data:
+            page_context = data['page_context']
+        elif 'forms' in data or 'title' in data or 'url' in data:
+            # Data looks like a page context itself
+            page_context = data
+        else:
+            raise ComponentError("Input must contain 'page_context' or be a page context dict")
         
         if analysis_type == 'forms':
             return self._analyze_forms(page_context)

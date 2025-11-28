@@ -63,6 +63,107 @@ class RunLogger:
             # Fallback to plain text if relative resolution fails
             self.log_text(f"Screenshot: {image_path}")
 
+    def log_table(self, headers: list[str], rows: list[list[str]], title: str = ""):
+        """
+        Log a Markdown table.
+        
+        Args:
+            headers: List of column headers
+            rows: List of rows, each row is a list of cell values
+            title: Optional title above the table
+        """
+        if title:
+            self._write(f"### {title}\n\n")
+        
+        if not headers or not rows:
+            return
+        
+        # Calculate column widths for alignment
+        col_widths = [len(h) for h in headers]
+        for row in rows:
+            for i, cell in enumerate(row):
+                if i < len(col_widths):
+                    col_widths[i] = max(col_widths[i], len(str(cell)))
+        
+        # Header row
+        header_line = "| " + " | ".join(h.ljust(col_widths[i]) for i, h in enumerate(headers)) + " |"
+        self._write(header_line + "\n")
+        
+        # Separator row
+        sep_line = "|" + "|".join("-" * (w + 2) for w in col_widths) + "|"
+        self._write(sep_line + "\n")
+        
+        # Data rows
+        for row in rows:
+            # Pad row if shorter than headers
+            padded_row = list(row) + [""] * (len(headers) - len(row))
+            row_line = "| " + " | ".join(str(c).ljust(col_widths[i]) for i, c in enumerate(padded_row[:len(headers)])) + " |"
+            self._write(row_line + "\n")
+        
+        self._write("\n")
+
+    def log_form_summary(self, form_data: dict):
+        """
+        Log a formatted summary table for form filling operations.
+        
+        Args:
+            form_data: Dictionary with form field information
+                Expected keys: 'fields', 'values', 'selectors', 'validation', 'result'
+        """
+        # Form Fields Table
+        fields = form_data.get('fields', {})
+        values = form_data.get('values', {})
+        validation = form_data.get('validation', {})
+        
+        if fields or values:
+            headers = ["Field", "Value", "Selector", "Status"]
+            rows = []
+            
+            all_fields = set(fields.keys()) | set(values.keys()) | set(validation.keys())
+            for field in sorted(all_fields):
+                value = values.get(field, "")
+                selector = fields.get(field, "")
+                val_info = validation.get(field, {})
+                
+                # Determine status
+                if val_info.get('found'):
+                    if val_info.get('checked') is not None:
+                        status = "✅ CHECKED" if val_info.get('isChecked') else "❌ UNCHECKED"
+                    elif val_info.get('isEmpty'):
+                        status = "❌ EMPTY"
+                    else:
+                        status = "✅ FILLED"
+                elif value:
+                    status = "⏳ PENDING"
+                else:
+                    status = "⏭️ SKIPPED"
+                
+                # Add required marker
+                if val_info.get('required'):
+                    status += " [REQ]"
+                
+                # Truncate long values
+                display_value = str(value)[:30] + ("..." if len(str(value)) > 30 else "")
+                display_selector = str(selector)[:40] + ("..." if len(str(selector)) > 40 else "")
+                
+                rows.append([field, display_value, display_selector, status])
+            
+            self.log_table(headers, rows, "📝 Form Fields Summary")
+        
+        # Result summary
+        result = form_data.get('result', {})
+        if result:
+            submitted = result.get('submitted', False)
+            errors = result.get('errors')
+            
+            status_emoji = "✅" if submitted else "❌"
+            status_text = "SUBMITTED" if submitted else "NOT SUBMITTED"
+            
+            self._write(f"**Result:** {status_emoji} {status_text}\n")
+            if errors:
+                self._write(f"**Errors:** {errors}\n")
+            self._write("\n")
+
     # --- Helpers ---
     def _slugify(self, text: str) -> str:
         s = text.strip().lower()

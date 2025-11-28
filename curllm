@@ -100,6 +100,8 @@ SERVICE OPTIONS:
     --stop-services, --stop      Stop all services
     --status, --status-services  Check service status
     --install                    Install dependencies
+    --test, --test-docker        Run tests in Docker (full integration tests)
+    --test-unit                  Run unit tests locally (fast, no browser)
     
 EXAMPLES:
     # Simple web extraction
@@ -446,6 +448,112 @@ check_status() {
     fi
 }
 
+# Function to run tests in Docker
+run_tests_docker() {
+    echo -e "${BLUE}Running curllm tests in Docker...${NC}"
+    
+    # Find script directory to locate docker-compose.test.yml
+    SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+    SCRIPT_DIR="$( dirname "${SCRIPT_PATH}" )"
+    
+    # Check for docker-compose.test.yml
+    COMPOSE_FILE=""
+    for path in "$SCRIPT_DIR/docker-compose.test.yml" "$PWD/docker-compose.test.yml"; do
+        if [ -f "$path" ]; then
+            COMPOSE_FILE="$path"
+            break
+        fi
+    done
+    
+    if [ -z "$COMPOSE_FILE" ]; then
+        echo -e "${RED}Error: docker-compose.test.yml not found${NC}"
+        echo "Make sure you're in the curllm directory or the script is properly installed"
+        exit 1
+    fi
+    
+    echo -e "${YELLOW}Using: $COMPOSE_FILE${NC}"
+    
+    # Check if Docker is available
+    if ! command -v docker > /dev/null 2>&1; then
+        echo -e "${RED}Error: Docker is not installed${NC}"
+        echo "Install Docker: https://docs.docker.com/get-docker/"
+        exit 1
+    fi
+    
+    # Check if docker-compose is available
+    COMPOSE_CMD=""
+    if command -v docker-compose > /dev/null 2>&1; then
+        COMPOSE_CMD="docker-compose"
+    elif docker compose version > /dev/null 2>&1; then
+        COMPOSE_CMD="docker compose"
+    else
+        echo -e "${RED}Error: docker-compose is not installed${NC}"
+        exit 1
+    fi
+    
+    # Build and run tests
+    echo -e "${BLUE}Building test environment...${NC}"
+    $COMPOSE_CMD -f "$COMPOSE_FILE" build
+    
+    echo -e "${BLUE}Running tests...${NC}"
+    $COMPOSE_CMD -f "$COMPOSE_FILE" up --abort-on-container-exit
+    TEST_EXIT_CODE=$?
+    
+    # Cleanup
+    echo -e "${BLUE}Cleaning up...${NC}"
+    $COMPOSE_CMD -f "$COMPOSE_FILE" down
+    
+    # Report results
+    if [ $TEST_EXIT_CODE -eq 0 ]; then
+        echo -e "${GREEN}✓ All tests passed!${NC}"
+    else
+        echo -e "${RED}✗ Some tests failed (exit code: $TEST_EXIT_CODE)${NC}"
+    fi
+    
+    # Check for test report
+    REPORT_DIR="$SCRIPT_DIR/test_results"
+    if [ -f "$REPORT_DIR/report.html" ]; then
+        echo -e "${BLUE}Test report available at:${NC} $REPORT_DIR/report.html"
+    fi
+    
+    exit $TEST_EXIT_CODE
+}
+
+# Function to run unit tests locally
+run_tests_unit() {
+    echo -e "${BLUE}Running unit tests locally...${NC}"
+    
+    # Find script directory
+    SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+    SCRIPT_DIR="$( dirname "${SCRIPT_PATH}" )"
+    
+    # Check for tests directory
+    TESTS_DIR=""
+    for path in "$SCRIPT_DIR/tests" "$PWD/tests"; do
+        if [ -d "$path" ]; then
+            TESTS_DIR="$path"
+            break
+        fi
+    done
+    
+    if [ -z "$TESTS_DIR" ]; then
+        echo -e "${RED}Error: tests directory not found${NC}"
+        exit 1
+    fi
+    
+    # Check for pytest
+    if ! python3 -m pytest --version > /dev/null 2>&1; then
+        echo -e "${RED}Error: pytest is not installed${NC}"
+        echo "Install with: pip install pytest"
+        exit 1
+    fi
+    
+    # Run unit tests (excluding integration tests that need browsers)
+    cd "$SCRIPT_DIR" || cd "$PWD"
+    PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/ --ignore=tests/integration -v
+    exit $?
+}
+
 # Function to install dependencies
 install_dependencies() {
     echo -e "${BLUE}Installing curllm dependencies...${NC}"
@@ -693,6 +801,10 @@ while [[ $# -gt 0 ]]; do
             check_status; exit 0;;
         --install)
             install_dependencies; exit 0;;
+        --test|--test-docker)
+            run_tests_docker; exit 0;;
+        --test-unit)
+            run_tests_unit; exit 0;;
         --html)
             EXPORT_HTML=true; shift;;
         --xml)

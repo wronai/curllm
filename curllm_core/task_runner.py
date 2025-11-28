@@ -602,9 +602,32 @@ async def _execute_tool(executor, page, instruction: str, tool_name: str, args: 
                             run_logger.log_text(f"⚠️  LLM Orchestrator failed: {str(llm_err)}, falling back to deterministic")
                         det = None
                 
-                # FALLBACK: DETERMINISTIC MODE
+                # TRY STREAMWARE ORCHESTRATOR (atomic components)
+                use_streamware = runtime.get("streamware_form", True)  # Default enabled
+                if det is None and use_streamware:
+                    try:
+                        if run_logger:
+                            run_logger.log_text("🧩 Using Streamware atomic form orchestrator")
+                        
+                        from curllm_core.streamware.components.form import form_fill_tool
+                        streamware_result = await form_fill_tool(page, merged_args, run_logger)
+                        
+                        if streamware_result and streamware_result.get("form_fill", {}).get("submitted"):
+                            det = streamware_result.get("form_fill")
+                            if run_logger:
+                                run_logger.log_text("✅ Streamware orchestrator succeeded")
+                        else:
+                            if run_logger:
+                                run_logger.log_text("⚠️  Streamware orchestrator did not submit, trying fallback")
+                            det = None
+                    except Exception as sw_err:
+                        if run_logger:
+                            run_logger.log_text(f"⚠️  Streamware failed: {sw_err}, trying fallback")
+                        det = None
+                
+                # FALLBACK: DETERMINISTIC MODE (legacy)
                 if det is None:
-                    if run_logger and use_llm_orchestrator:
+                    if run_logger:
                         run_logger.log_text("🔧 Using deterministic form fill (fallback)")
                     det = await executor._deterministic_form_fill(instruction, page, run_logger, domain_dir)
                 
@@ -700,17 +723,22 @@ async def _planner_cycle(executor, instruction: str, page_context: Dict[str, Any
         run_logger.log_kv("fn:generate_action_ms", str(int((time.time() - _t_gen) * 1000)))
     except Exception:
         pass
-    # FALLBACK: Fix LLM mistake - type="fill" should be type="tool" + tool_name="form.fill"
-    if action.get("type") == "fill" and "tool_name" not in action:
-        # LLM returned wrong format: {"type": "fill", "name": "...", "email": "..."}
-        # Convert to correct format: {"type": "tool", "tool_name": "form.fill", "args": {...}}
+    # FALLBACK: Fix LLM mistake - type="fill" or type="form.fill" should be type="tool" + tool_name="form.fill"
+    # Also handles hybrid case where LLM returns both type="fill" AND tool_name="form.fill"
+    should_convert_to_tool = (
+        (action.get("type") == "fill") or
+        (action.get("type") == "form.fill") or
+        (action.get("tool_name") == "form.fill" and action.get("type") != "tool")
+    )
+    
+    if should_convert_to_tool:
         if run_logger:
-            run_logger.log_text("⚠️  Auto-correcting: LLM returned type='fill' instead of type='tool' + tool_name='form.fill'")
+            run_logger.log_text(f"⚠️  Auto-correcting: LLM returned type='{action.get('type')}' - converting to type='tool' + tool_name='form.fill'")
         
-        # Extract form field values from action
-        form_args = {}
+        # Extract form field values from action or args
+        form_args = action.get("args", {}) if isinstance(action.get("args"), dict) else {}
         for key in ["name", "email", "subject", "phone", "message"]:
-            if key in action:
+            if key in action and key not in form_args:
                 form_args[key] = action[key]
         
         # Reconstruct as proper tool call
@@ -718,7 +746,7 @@ async def _planner_cycle(executor, instruction: str, page_context: Dict[str, Any
             "type": "tool",
             "tool_name": "form.fill",
             "args": form_args,
-            "reason": action.get("reason", "Filling contact form (auto-corrected from type='fill')")
+            "reason": action.get("reason", "Filling contact form (auto-corrected)")
         }
         
         if run_logger:

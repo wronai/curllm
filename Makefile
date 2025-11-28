@@ -14,7 +14,9 @@ help:
 	@echo "  make stop            - Stop services (auto: clean-cache)"
 	@echo "  make restart         - Restart services (stop + start)"
 	@echo "  make fresh-start     - Complete fresh start with full cache cleanup"
-	@echo "  make test            - Run tests"
+	@echo "  make test            - Run unit tests (fast, no browser needed)"
+	@echo "  make test-integration - Run integration tests (needs browsers)"
+	@echo "  make test-all        - Run all tests (unit + integration)"
 	@echo "  make test-linux      - Run cross-platform Linux tests (Docker)"
 	@echo "  make benchmark       - Run performance benchmarks"
 	@echo "  make clean           - Clean temporary files"
@@ -29,6 +31,8 @@ help:
 	@echo ""
 	@echo "Development:"
 	@echo "  make dev          - Start in development mode"
+	@echo "  make watch        - Watch files and auto-reload on changes"
+	@echo "  make watch-test   - Watch files and run tests on changes"
 	@echo "  make lint         - Run code linting"
 	@echo "  make format       - Format code"
 	@echo "  make examples     - Generate runnable scripts in examples/"
@@ -87,7 +91,16 @@ status:
 
 # Testing
 test:
-	@echo "Running tests..."
+	@echo "Running unit tests (excluding integration tests that require browsers)..."
+	@PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/ --ignore=tests/integration -v
+
+test-integration:
+	@echo "Running integration tests (requires Playwright browsers)..."
+	@echo "If browsers not installed, run: playwright install chromium"
+	@PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/integration/ -v
+
+test-all:
+	@echo "Running all tests (unit + integration)..."
 	@PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/ -v
 
 test-e2e-diff:
@@ -181,12 +194,19 @@ dev:
 	@CURLLM_DEBUG=true python3 curllm_server.py
 
 watch:
-	@echo "Watching for changes..."
-	@while true; do \
-		inotifywait -e modify *.py; \
-		echo "Restarting server..."; \
-		make restart; \
-	done
+	@echo "🔍 Starting development file watcher..."
+	@python3 scripts/dev_watcher.py --restart-cmd "make restart-quiet"
+
+watch-test:
+	@echo "🔍 Starting watcher with auto-tests..."
+	@python3 scripts/dev_watcher.py --test-on-change
+
+watch-quiet:
+	@python3 scripts/dev_watcher.py --quiet
+
+restart-quiet:
+	@$(MAKE) -s stop 2>/dev/null || true
+	@$(MAKE) -s start 2>/dev/null
 
 lint:
 	@echo "Running linters..."

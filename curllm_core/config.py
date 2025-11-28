@@ -63,6 +63,12 @@ class Config:
     
     # LLM-Guided Extractor (LLM makes decisions at each atomic step)
     llm_guided_extractor_enabled: bool = os.getenv("CURLLM_LLM_GUIDED_EXTRACTOR", "true").lower() in ["true", "1", "yes"]
+    
+    # Prompt format: "json" (default) or "dsl" (simplified Python-like syntax for smaller models)
+    prompt_format: str = os.getenv("CURLLM_PROMPT_FORMAT", "json").lower()
+    
+    # Atomic actions: break complex tasks into simpler sub-tasks
+    atomic_actions_enabled: bool = os.getenv("CURLLM_ATOMIC_ACTIONS", "true").lower() in ["true", "1", "yes"]
 
     def __post_init__(self):
         self.screenshot_dir.mkdir(parents=True, exist_ok=True)

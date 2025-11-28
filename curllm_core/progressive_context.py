@@ -16,12 +16,16 @@ from typing import Dict, Any, Optional
 
 def _is_form_task(instruction: str) -> bool:
     """Check if the instruction is a form-related task"""
+    if not instruction:
+        return False
     instruction_lower = instruction.lower()
     form_keywords = [
         "fill", "form", "submit", "login", "register", "signup", "sign up",
-        "contact", "email", "name=", "formularz", "wypełnij", "logowanie"
+        "contact", "email", "name=", "formularz", "wypełnij", "logowanie",
+        "wyślij", "kontakt", "rejestr"
     ]
-    return any(kw in instruction_lower for kw in form_keywords)
+    result = any(kw in instruction_lower for kw in form_keywords)
+    return result
 
 
 def build_progressive_context(
@@ -50,34 +54,47 @@ def build_progressive_context(
     # Check if this is a form task - if so, ALWAYS include forms data
     is_form_task = _is_form_task(instruction)
     
+    # For form tasks: ALWAYS include form data regardless of step
+    # This is critical - without forms, LLM cannot fill the form!
+    if is_form_task:
+        forms = page_context.get("forms", [])
+        if forms:
+            # Include full form details for form-filling tasks
+            minimal["forms"] = forms[:3]
+        
+        # Also include interactive elements that could be form fields
+        interactive = page_context.get("interactive", [])
+        if interactive:
+            # Filter to form-related elements
+            form_elements = [
+                el for el in interactive 
+                if el.get("tag") in ["input", "textarea", "select", "button", "form"]
+                or "form" in str(el.get("attrs", {}).get("class", "")).lower()
+                or "forminator" in str(el.get("attrs", {}).get("id", "")).lower()
+                or "forminator" in str(el.get("attrs", {}).get("class", "")).lower()
+            ]
+            if form_elements:
+                minimal["interactive"] = form_elements[:30]
+        
+        # Add buttons for submit detection
+        buttons = page_context.get("buttons", [])
+        if buttons:
+            minimal["buttons"] = buttons[:10]
+    
     # Step 1-2: Minimal context (title, url, top links/headings)
     if step <= 2:
         headings = page_context.get("headings", [])
         links = page_context.get("links", [])
         
         minimal["headings"] = headings[:5] if headings else []
-        minimal["links"] = links[:10] if links else []
-        
-        # For form tasks, include forms even in step 1-2
-        if is_form_task:
-            forms = page_context.get("forms", [])
-            if forms:
-                minimal["forms"] = forms[:3]  # Include up to 3 forms with full details
-            # Also include interactive elements that could be form fields
-            interactive = page_context.get("interactive", [])
-            if interactive:
-                # Filter to form-related elements
-                form_elements = [
-                    el for el in interactive 
-                    if el.get("tag") in ["input", "textarea", "select", "button", "form"]
-                    or "form" in str(el.get("attrs", {}).get("class", "")).lower()
-                ]
-                if form_elements:
-                    minimal["interactive"] = form_elements[:30]
+        # For form tasks, we don't need links - skip them to save tokens
+        if not is_form_task:
+            minimal["links"] = links[:10] if links else []
         
         # Add hint about what's available
         minimal["_hint"] = "Minimal context. More details available if needed."
         minimal["_step"] = step
+        minimal["_is_form_task"] = is_form_task  # Debug flag
         
         return minimal
     

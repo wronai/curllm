@@ -52,6 +52,11 @@ class DOMSnapshotComponent(Component):
             
             if include_computed:
                 snapshot['computed_styles'] = self._extract_computed_styles(page)
+            
+            # Preserve other keys from input (except 'page') for chaining
+            for key, value in data.items():
+                if key != 'page' and key not in snapshot:
+                    snapshot[key] = value
                 
             return snapshot
             

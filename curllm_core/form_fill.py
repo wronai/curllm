@@ -228,10 +228,22 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None, domai
               }
               
               // MESSAGE FIELD (second priority - textarea is distinctive)
-              const msgEl = findField(['message','wiadomo','treść','tresc','content','komentarz'], 'textarea', targetForm);
+              let msgEl = findField(['message','wiadomo','treść','tresc','content','komentarz','zapytanie','opis','description'], 'textarea', targetForm);
+              
+              // FALLBACK: If no message field found by keywords, use ANY visible textarea in form
+              if (!msgEl && targetForm) {
+                const fallbackTextareas = targetForm.querySelectorAll('textarea');
+                for (const ta of fallbackTextareas) {
+                  if (visible(ta) && !marked.has(ta)) {
+                    msgEl = ta;
+                    break;
+                  }
+                }
+              }
+              
               if (msgEl && !marked.has(msgEl)) {
                 res.message = mark(msgEl, 'message');
-                res._debug_message = { id: msgEl.id, name: msgEl.name, type: msgEl.tagName };
+                res._debug_message = { id: msgEl.id, name: msgEl.name, type: msgEl.tagName, fallback: !msgEl.name?.match(/message|wiadomo|treść|opis/i) };
               }
               
               // NAME FIELD: Check for split fields (First + Last) only after email/message marked
@@ -521,17 +533,24 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None, domai
         )
         
         if run_logger and isinstance(validation_results, dict):
+            # Generate table for validation results
+            headers = ["Field", "Value", "Status"]
+            rows = []
             for field, result in validation_results.items():
                 if result.get("found"):
-                    req_marker = " [REQUIRED]" if result.get("required") else ""
+                    req_marker = " [REQ]" if result.get("required") else ""
                     if result.get("checked") is not None:
-                        status = "✅ CHECKED" if result.get("isChecked") else "❌ UNCHECKED"
-                        run_logger.log_text(f"   {field}: {status}{req_marker}")
+                        status = ("✅ CHECKED" if result.get("isChecked") else "❌ UNCHECKED") + req_marker
+                        rows.append([field, "(checkbox)", status])
                     elif result.get("isEmpty"):
-                        run_logger.log_text(f"   {field}: ❌ EMPTY (failed to fill){req_marker}")
+                        status = "❌ EMPTY" + req_marker
+                        rows.append([field, "", status])
                     else:
-                        value_preview = str(result.get("value", ""))[:30]
-                        run_logger.log_text(f"   {field}: ✅ '{value_preview}'{req_marker}")
+                        value_preview = str(result.get("value", ""))[:25]
+                        status = "✅ FILLED" + req_marker
+                        rows.append([field, value_preview, status])
+            if rows:
+                run_logger.log_table(headers, rows, "🔍 Auto-validation Results")
         
         # PRE-SUBMISSION DIAGNOSIS: Check for potential blocking issues
         if run_logger:
@@ -927,6 +946,35 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None, domai
                 pass
         filled["selectors"] = selectors
         filled["values"] = canonical
+        
+        # LOG FINAL FORM SUMMARY TABLE
+        if run_logger:
+            headers = ["Field", "Provided Value", "Selector", "Filled"]
+            rows = []
+            display_selectors = {k: v for k, v in selectors.items() if not k.startswith('_')}
+            all_fields = set(canonical.keys()) | set(display_selectors.keys())
+            
+            for field in sorted(all_fields):
+                value = canonical.get(field, "")
+                selector = display_selectors.get(field, "")
+                was_filled = filled.get("filled", {}).get(field, False)
+                
+                display_value = str(value)[:25] + ("..." if len(str(value)) > 25 else "") if value else "-"
+                display_selector = str(selector)[:35] + ("..." if len(str(selector)) > 35 else "") if selector else "-"
+                filled_status = "✅" if was_filled else ("⏭️" if not value else "❌")
+                
+                rows.append([field, display_value, display_selector, filled_status])
+            
+            if rows:
+                run_logger.log_table(headers, rows, "📋 Form Fill Summary")
+            
+            # Final result line
+            submitted = filled.get("submitted", False)
+            result_emoji = "✅" if submitted else "❌"
+            run_logger.log_text(f"**Form Result:** {result_emoji} {'SUBMITTED' if submitted else 'NOT SUBMITTED'}")
+            if filled.get("errors"):
+                run_logger.log_text(f"**Errors:** {filled['errors']}")
+        
         return filled
     except Exception as e:
         if run_logger:
