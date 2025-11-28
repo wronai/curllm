@@ -5,8 +5,23 @@ import time
 from typing import Any, Dict
 
 from .logger import RunLogger
+from .config import config
 
-async def generate_action(llm: Any, instruction: str, page_context: Dict, step: int, run_logger: RunLogger | None = None, max_chars: int = 8000, growth_per_step: int = 2000, max_cap: int = 20000) -> Dict:
+async def generate_action(
+    llm: Any,
+    instruction: str,
+    page_context: Dict,
+    step: int,
+    run_logger: RunLogger | None = None,
+    max_chars: int = None,
+    growth_per_step: int = None,
+    max_cap: int = None
+) -> Dict:
+    # Use config values if not explicitly provided
+    max_chars = max_chars if max_chars is not None else config.planner_max_chars
+    growth_per_step = growth_per_step if growth_per_step is not None else config.planner_growth_per_step
+    max_cap = max_cap if max_cap is not None else config.planner_max_cap
+    
     adaptive_chars = min(max_chars + (step * growth_per_step), max_cap)
     def _prune_nulls(obj):
         if isinstance(obj, dict):

@@ -190,7 +190,11 @@ class DynamicContainerDetector:
         
         function hasPrice(element) {{
             const text = element.textContent || '';
-            return /\\d+[,.]?\\d*\\s*(?:zł|PLN|€|\\$)/.test(text);
+            // Check text-based prices
+            if (/\\d+[,.]?\\d*\\s*(?:zł|PLN|€|\\$)/.test(text)) return true;
+            // Check image-based prices (common in Polish shops)
+            const priceImgs = element.querySelectorAll('img[src*="cb_"], img[src*="cn_"], img[src*="cena"], img[src*="price"]');
+            return priceImgs.length > 0;
         }}
         
         function hasLink(element) {{
@@ -199,6 +203,24 @@ class DynamicContainerDetector:
         
         function hasImage(element) {{
             return element.querySelector('img[src]') !== null;
+        }}
+        
+        function isCartOrNavElement(element) {{
+            const text = (element.textContent || '').toLowerCase();
+            // Filter out cart, navigation, and header elements
+            const cartPatterns = ['twój pc', 'twój koszyk', 'your cart', 'shopping cart', 'zaloguj', 'login', 'menu główne'];
+            return cartPatterns.some(p => text.includes(p)) && text.length < 100;
+        }}
+        
+        function hasProductLink(element) {{
+            const links = element.querySelectorAll('a[href]');
+            for (const link of links) {{
+                const href = link.href || '';
+                // Product links usually have numeric IDs or product patterns
+                if (/[_\\/]\\d{{3,}}\\.html?$/i.test(href)) return true;
+                if (/[A-Za-z]+\\+[A-Za-z]+.*_\\d+\\.html$/i.test(href)) return true;
+            }}
+            return false;
         }}
         
         // Find elements at target depths
@@ -224,6 +246,8 @@ class DynamicContainerDetector:
                             hasPrice: hasPrice(el),
                             hasLink: hasLink(el),
                             hasImage: hasImage(el),
+                            hasProductLink: hasProductLink(el),
+                            isCart: isCartOrNavElement(el),
                             textLength: (el.textContent || '').trim().length
                         }});
                     }}
@@ -236,27 +260,47 @@ class DynamicContainerDetector:
             // Require at least 3 elements to be a candidate
             if (elements.length >= 3) {{
                 const firstEl = elements[0];
-                const hasPrice = elements.filter(e => e.hasPrice).length > 0;
-                const hasLink = elements.filter(e => e.hasLink).length > 0;
-                const hasImage = elements.filter(e => e.hasImage).length > 0;
+                const priceCount = elements.filter(e => e.hasPrice).length;
+                const linkCount = elements.filter(e => e.hasLink).length;
+                const imageCount = elements.filter(e => e.hasImage).length;
+                const productLinkCount = elements.filter(e => e.hasProductLink).length;
+                const cartElements = elements.filter(e => e.isCart).length;
                 
                 // Get sample text
                 const sampleEl = elements[0].element;
                 const sampleText = (sampleEl.textContent || '').trim().substring(0, 200);
+                
+                // Skip if mostly cart/navigation elements
+                if (cartElements > elements.length / 2) continue;
+                
+                // Calculate product score (higher = more likely to be product container)
+                let productScore = 0;
+                if (priceCount > 0) productScore += 30;
+                if (productLinkCount > 0) productScore += 40;
+                if (imageCount > 0) productScore += 20;
+                if (elements.length >= 5) productScore += 10;
+                // Penalty for cart-like elements
+                productScore -= cartElements * 20;
                 
                 candidates.push({{
                     selector: `.${{className}}`,
                     class_name: className,
                     count: elements.length,
                     depth: firstEl.depth,
-                    has_price: hasPrice,
-                    has_link: hasLink,
-                    has_image: hasImage,
+                    has_price: priceCount > 0,
+                    has_link: linkCount > 0,
+                    has_image: imageCount > 0,
+                    has_product_links: productLinkCount > 0,
+                    cart_elements: cartElements,
+                    product_score: productScore,
                     sample_text: sampleText,
                     avg_text_length: elements.reduce((sum, e) => sum + e.textLength, 0) / elements.length
                 }});
             }}
         }}
+        
+        // Sort by product score (highest first)
+        candidates.sort((a, b) => b.product_score - a.product_score);
         
         return candidates;
         }})()

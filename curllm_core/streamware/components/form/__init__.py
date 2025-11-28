@@ -23,6 +23,7 @@ from .submit import (
     evaluate_success_with_llm
 )
 from .orchestrator import orchestrate_form_fill, form_fill_tool, parse_instruction
+from .smart_orchestrator import SmartFormOrchestrator, smart_fill_form
 from .tools import (
     execute_tool,
     get_tools_prompt,
@@ -41,6 +42,8 @@ __all__ = [
     'capture_page_state', 'detect_success_data', 'evaluate_success_with_llm',
     # Orchestrator
     'orchestrate_form_fill', 'form_fill_tool', 'parse_instruction',
+    # Smart Orchestrator (LLM-driven with verification)
+    'SmartFormOrchestrator', 'smart_fill_form',
     # Tools for LLM
     'execute_tool', 'get_tools_prompt', 'generate_tool_registry',
     'FORM_ATOMIC_TOOLS', 'TOOL_FUNCTIONS'

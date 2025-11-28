@@ -1,6 +1,12 @@
 """
 Iterative Extractor - Small Atomic DOM Queries with Full Logging
 
+DEPRECATED: Use streamware.components.extraction.LLMIterativeExtractor instead.
+
+This module is kept for backward compatibility.
+New code should use:
+    from curllm_core.streamware.components.extraction import LLMIterativeExtractor, llm_extract_products
+
 Instead of sending entire DOM tree to LLM, we:
 1. Quick check: Does page have products? (fast)
 2. Structure analysis: What containers? (targeted)
@@ -13,7 +19,14 @@ Each step logs details and makes early decisions.
 import json
 from typing import Dict, List, Optional, Any
 
-# Dynamic detection and filtering systems
+# New LLM-based extraction (recommended)
+try:
+    from .streamware.components.extraction import LLMIterativeExtractor, llm_extract_products
+    LLM_EXTRACTOR_AVAILABLE = True
+except ImportError:
+    LLM_EXTRACTOR_AVAILABLE = False
+
+# Dynamic detection and filtering systems (legacy)
 try:
     from .dynamic_container_detector import DynamicContainerDetector
     from .multi_criteria_filter import MultiCriteriaFilter
@@ -77,11 +90,13 @@ class IterativeExtractor:
                     has_product_links: false,
                     product_link_count: 0,
                     has_list_structure: false,
+                    has_add_to_cart: false,
+                    has_price_images: false,
                     total_links: document.links.length,
                     page_type: 'unknown'
                 };
                 
-                // Check for price patterns (fast regex)
+                // Check for price patterns (fast regex) - TEXT prices
                 const pricePattern = /(\\d+[\\d\\s]*(?:[\\.,]\\d{2})?)\\s*(?:zł|PLN|€|\\$|USD|EUR)/i;
                 const bodyText = document.body?.innerText || '';
                 const priceMatches = bodyText.match(new RegExp(pricePattern, 'g'));
@@ -91,16 +106,61 @@ class IterativeExtractor:
                     indicators.price_count = priceMatches.length;
                 }
                 
-                // Check for product-like links (contains numbers = product IDs)
-                const productLinkPattern = /\\/\\d{4,}/;
+                // Check for IMAGE-based prices (common in Polish shops like gral.pl)
+                // Pattern: img.php?im=cb_ or similar dynamic price images
+                const priceImages = document.querySelectorAll('img[src*="cen"], img[src*="price"], img[src*="cb_"], img[src*="cn_"]');
+                if (priceImages.length > 0) {
+                    indicators.has_price_images = true;
+                    indicators.price_count = Math.max(indicators.price_count, priceImages.length);
+                    indicators.has_prices = true;
+                }
+                
+                // Check for "Cena" labels near images
+                const cenaLabels = document.querySelectorAll('*');
+                let cenaCount = 0;
+                for (const el of cenaLabels) {
+                    if (el.innerText && /cena\\s*(brutto|netto)?:?/i.test(el.innerText) && el.innerText.length < 50) {
+                        cenaCount++;
+                    }
+                }
+                if (cenaCount >= 3) {
+                    indicators.has_prices = true;
+                    indicators.price_count = Math.max(indicators.price_count, cenaCount);
+                }
+                
+                // Check for product-like links - multiple patterns
                 let productLinks = 0;
                 for (const link of document.links) {
-                    if (productLinkPattern.test(link.pathname)) {
+                    const href = link.href || '';
+                    const pathname = link.pathname || '';
+                    
+                    // Pattern 1: /12345 or _12345 (numeric product IDs)
+                    if (/[_\\/]\\d{3,}\\.html?$/i.test(pathname)) {
+                        productLinks++;
+                    }
+                    // Pattern 2: /product/ or /produkt/ in URL
+                    else if (/\\/(product|produkt|item|towar)\\//i.test(pathname)) {
+                        productLinks++;
+                    }
+                    // Pattern 3: Name+Product+Name_ID.html (gral.pl style)
+                    else if (/[A-Za-z]+\\+[A-Za-z]+.*_\\d+\\.html$/i.test(pathname)) {
                         productLinks++;
                     }
                 }
                 indicators.product_link_count = productLinks;
                 indicators.has_product_links = productLinks > 0;
+                
+                // Check for "add to cart" buttons/links
+                const cartPatterns = ['koszyk', 'cart', 'dodaj', 'add', 'kupuj', 'buy'];
+                const buttons = document.querySelectorAll('button, a, input[type="submit"]');
+                let cartButtons = 0;
+                for (const btn of buttons) {
+                    const text = (btn.innerText || btn.value || btn.title || '').toLowerCase();
+                    if (cartPatterns.some(p => text.includes(p))) {
+                        cartButtons++;
+                    }
+                }
+                indicators.has_add_to_cart = cartButtons >= 3;
                 
                 // Check for list structure (dynamic detection)
                 // Look for repeating elements with similar structure (not hard-coded selectors)
@@ -120,13 +180,43 @@ class IterativeExtractor:
                 // If any class appears 5+ times, likely a list structure
                 indicators.has_list_structure = Object.values(classCount).some(count => count >= 5);
                 
-                // Determine page type
-                if (indicators.has_prices && indicators.has_product_links) {
+                // Determine page type with smarter heuristics
+                // Check if prices are in actual product context (not just cart/header)
+                const hasRealProducts = indicators.price_count >= 3 && indicators.has_list_structure;
+                const hasProductGrid = indicators.price_count >= 5;
+                const hasShopFeatures = indicators.has_add_to_cart && indicators.has_product_links;
+                
+                // Check for cart/header prices (low count, no product structure, no cart buttons)
+                const isCartOnly = indicators.price_count <= 2 && 
+                                   !indicators.has_product_links && 
+                                   !indicators.has_add_to_cart;
+                
+                // Check URL patterns for product pages
+                const url = window.location.href.toLowerCase();
+                const pathname = window.location.pathname;
+                const isProductUrl = /\/(product|produkt|item|towar)s?[\/\?]/i.test(url) ||
+                                     /[\/\?](category|kategoria|cat)[=\/]/i.test(url) ||
+                                     /[_\/]\d{3,}\.html?$/i.test(pathname);
+                const isHomepage = pathname === '/' || pathname === '/index.html' || pathname === '/sklep.php';
+                
+                // Decision tree
+                if (hasShopFeatures && indicators.product_link_count >= 3) {
+                    // Has cart buttons AND product links = definitely a shop page with products
                     indicators.page_type = 'product_listing';
-                } else if (indicators.price_count > 0) {
-                    indicators.page_type = 'single_product';
-                } else if (indicators.product_link_count > 5) {
+                } else if (hasProductGrid || (hasRealProducts && indicators.has_product_links)) {
+                    indicators.page_type = 'product_listing';
+                } else if (indicators.has_product_links && indicators.product_link_count >= 5) {
                     indicators.page_type = 'category';
+                } else if (isProductUrl && indicators.price_count >= 1) {
+                    indicators.page_type = 'single_product';
+                } else if (isHomepage && hasShopFeatures) {
+                    // Homepage WITH products (like gral.pl main page)
+                    indicators.page_type = 'product_listing';
+                } else if (isCartOnly && !hasShopFeatures) {
+                    // Cart prices only, no shop features
+                    indicators.page_type = 'homepage';
+                } else if (indicators.price_count > 0 && indicators.has_product_links) {
+                    indicators.page_type = 'product_listing';
                 } else {
                     indicators.page_type = 'other';
                 }
@@ -137,9 +227,20 @@ class IterativeExtractor:
         
         self._log("Quick Check Results", result)
         
+        # Decide whether to continue extraction
+        extractable_types = ["product_listing", "category", "single_product"]
+        should_continue = result["page_type"] in extractable_types
+        
+        # Special handling for homepage - suggest navigation
+        if result["page_type"] == "homepage":
+            reason = "Homepage detected (cart prices only). Navigate to product category first."
+        else:
+            reason = f"Page type: {result['page_type']}, prices: {result['price_count']}, product links: {result['product_link_count']}"
+        
         decision = {
-            "should_continue": result["page_type"] in ["product_listing", "category"],
-            "reason": f"Page type: {result['page_type']}, prices: {result['price_count']}, product links: {result['product_link_count']}"
+            "should_continue": should_continue,
+            "reason": reason,
+            "needs_navigation": result["page_type"] in ["homepage", "other"]
         }
         self.state["decisions"].append(decision)
         
@@ -554,10 +655,26 @@ class IterativeExtractor:
         # Step 1: Quick check
         quick_check = await self.quick_page_check()
         
-        if not quick_check or quick_check.get("page_type") not in ["product_listing", "category", "single_product"]:
+        page_type = quick_check.get("page_type") if quick_check else "unknown"
+        extractable_types = ["product_listing", "category", "single_product"]
+        
+        if page_type not in extractable_types:
+            # Provide specific feedback for different page types
+            if page_type == "homepage":
+                reason = "Homepage detected - prices visible are from cart/header, not products. Navigate to a product category first."
+            elif page_type == "other":
+                reason = "Page does not appear to contain products. Try navigating to a product listing or category page."
+            else:
+                reason = f"Page type '{page_type}' not suitable for product extraction"
+            
+            if self.run_logger:
+                self.run_logger.log_text(f"⚠️ {reason}")
+            
             return {
                 "products": [],
-                "reason": "Page type not suitable for extraction",
+                "reason": reason,
+                "page_type": page_type,
+                "needs_navigation": True,
                 "metadata": self.state
             }
         

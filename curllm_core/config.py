@@ -61,6 +61,13 @@ class Config:
     progressive_context_enabled: bool = os.getenv("CURLLM_PROGRESSIVE_CONTEXT", "true").lower() in ["true", "1", "yes"]
     progressive_context_initial_size: int = int(os.getenv("CURLLM_PROGRESSIVE_CONTEXT_INITIAL_SIZE", "5000"))
     
+    # Planner context sizing (used by llm_planner.py)
+    # CURLLM_PLANNER_BASE_CHARS - initial context size (also supports CURLLM_PLANNER_MAX_CHARS)
+    planner_max_chars: int = int(os.getenv("CURLLM_PLANNER_MAX_CHARS", os.getenv("CURLLM_PLANNER_BASE_CHARS", "8000")))
+    planner_growth_per_step: int = int(os.getenv("CURLLM_PLANNER_GROWTH_PER_STEP", "2000"))
+    planner_max_cap: int = int(os.getenv("CURLLM_PLANNER_MAX_CAP", "20000"))
+    stall_limit: int = int(os.getenv("CURLLM_STALL_LIMIT", "5"))
+    
     # LLM-Guided Extractor (LLM makes decisions at each atomic step)
     llm_guided_extractor_enabled: bool = os.getenv("CURLLM_LLM_GUIDED_EXTRACTOR", "true").lower() in ["true", "1", "yes"]
     
