@@ -191,10 +191,10 @@ class CurLLMComponent(Component):
             "params": {}
         }
         
-        # Extract URL from BQL query if present
-        url_match = re.search(r'url:\s*["\']([^"\']+)["\']', query)
-        if url_match:
-            request_data["url"] = url_match.group(1)
+        # Extract URL from BQL query if present (simple parsing)
+        url = self._extract_url_from_query(query)
+        if url:
+            request_data["url"] = url
                 
         return self._execute_request(request_data)
         
@@ -239,6 +239,34 @@ class CurLLMComponent(Component):
             parts.append(f"{readable_field}: {value}")
             
         return " ".join(parts)
+    
+    def _extract_url_from_query(self, query: str) -> Optional[str]:
+        """Extract URL from BQL query without regex - simple parsing"""
+        # Look for url: "..." or url: '...'
+        url_markers = ['url:', 'URL:', 'Url:']
+        
+        for marker in url_markers:
+            if marker in query:
+                start_idx = query.find(marker) + len(marker)
+                rest = query[start_idx:].strip()
+                
+                # Find the URL value
+                if rest.startswith('"'):
+                    end_idx = rest.find('"', 1)
+                    if end_idx > 0:
+                        return rest[1:end_idx]
+                elif rest.startswith("'"):
+                    end_idx = rest.find("'", 1)
+                    if end_idx > 0:
+                        return rest[1:end_idx]
+                else:
+                    # URL without quotes - take until space or end
+                    end_idx = rest.find(' ')
+                    if end_idx > 0:
+                        return rest[:end_idx]
+                    return rest
+        
+        return None
         
     def __del__(self):
         """Cleanup executor on component destruction"""

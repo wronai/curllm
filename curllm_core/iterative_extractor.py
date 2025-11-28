@@ -194,9 +194,9 @@ class IterativeExtractor:
                 // Check URL patterns for product pages
                 const url = window.location.href.toLowerCase();
                 const pathname = window.location.pathname;
-                const isProductUrl = /\/(product|produkt|item|towar)s?[\/\?]/i.test(url) ||
-                                     /[\/\?](category|kategoria|cat)[=\/]/i.test(url) ||
-                                     /[_\/]\d{3,}\.html?$/i.test(pathname);
+                const isProductUrl = /\\/(product|produkt|item|towar)s?[\\/\\?]/i.test(url) ||
+                                     /[\\/\\?](category|kategoria|cat)[=\\/]/i.test(url) ||
+                                     /[_\\/]\\d{3,}\\.html?$/i.test(pathname);
                 const isHomepage = pathname === '/' || pathname === '/index.html' || pathname === '/sklep.php';
                 
                 // Decision tree

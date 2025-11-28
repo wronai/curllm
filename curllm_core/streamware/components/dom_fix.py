@@ -319,29 +319,47 @@ class FieldMapperComponent(TransformComponent):
         }
         
     def _extract_from_instruction(self, instruction: str) -> Dict[str, str]:
-        """Extract field values from instruction"""
-        import re
+        """Extract field values from instruction - DEPRECATED, use LLM version"""
+        # Try to use LLM-based extraction if available
+        try:
+            from .llm_decision import extract_fields_from_instruction_llm
+            import asyncio
+            
+            # Check if we have LLM in context
+            llm = getattr(self, '_llm', None)
+            if llm:
+                # Run async function
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # We're in async context, can't use run_until_complete
+                    # Fall back to simple extraction
+                    pass
+                else:
+                    return loop.run_until_complete(
+                        extract_fields_from_instruction_llm(llm, instruction)
+                    )
+        except ImportError:
+            pass
         
+        # Fallback: Simple parsing without regex patterns
+        # Just extract obvious key=value pairs
         data = {}
         
-        # Patterns for common fields
-        patterns = {
-            'name': r'name[:\s=]+([^,;]+)',
-            'email': r'email[:\s=]+([^,;\s]+)',
-            'phone': r'phone[:\s=]+([^,;]+)',
-            'subject': r'subject[:\s=]+([^,;]+)',
-            'message': r'message[:\s=]+(.+?)(?=,\s*\w+:|$)',
-        }
-        
-        for field, pattern in patterns.items():
-            match = re.search(pattern, instruction, re.IGNORECASE | re.DOTALL)
-            if match:
-                data[field] = match.group(1).strip()
+        # Simple split-based extraction
+        parts = instruction.replace(':', '=').split(',')
+        for part in parts:
+            if '=' in part:
+                key_val = part.split('=', 1)
+                if len(key_val) == 2:
+                    key = key_val[0].strip().lower()
+                    val = key_val[1].strip()
+                    if key in ['name', 'email', 'phone', 'subject', 'message', 'first_name', 'last_name']:
+                        data[key] = val
                 
         return data
         
     def _map_to_fields(self, extracted: Dict, forms: List, strategy: str) -> List[Dict]:
-        """Map extracted data to form fields"""
+        """Map extracted data to form fields - uses LLM for semantic strategy"""
         if not forms:
             return []
             
@@ -350,34 +368,14 @@ class FieldMapperComponent(TransformComponent):
         fields = form.get('fields', [])
         
         for field_type, value in extracted.items():
-            # Find matching form field
-            matched_field = None
+            matched_field = self._find_matching_field(field_type, fields, strategy)
             
-            for form_field in fields:
-                field_name = (form_field.get('name') or '').lower()
-                field_type_lower = field_type.lower()
-                
-                if strategy == 'exact':
-                    if field_type_lower == field_name:
-                        matched_field = form_field
-                        break
-                elif strategy == 'fuzzy':
-                    if field_type_lower in field_name or field_name in field_type_lower:
-                        matched_field = form_field
-                        break
-                    # Also check field type
-                    if field_type_lower == 'email' and form_field.get('type') == 'email':
-                        matched_field = form_field
-                        break
-                    if field_type_lower in ['phone', 'tel'] and 'phone' in field_name or 'tel' in field_name:
-                        matched_field = form_field
-                        break
-                        
             if matched_field:
+                field_name = matched_field.get('name', '')
                 mapping.append({
                     'instruction_field': field_type,
-                    'form_field': matched_field.get('name'),
-                    'selector': matched_field.get('selector', f"[name='{matched_field.get('name')}']"),
+                    'form_field': field_name,
+                    'selector': matched_field.get('selector') or f"[name='{field_name}']",
                     'value': value,
                     'confidence': 0.9 if strategy == 'exact' else 0.7
                 })
@@ -392,6 +390,42 @@ class FieldMapperComponent(TransformComponent):
                 })
                 
         return mapping
+    
+    def _find_matching_field(self, field_type: str, fields: List, strategy: str) -> Dict:
+        """Find matching form field for given field type"""
+        field_type_lower = field_type.lower()
+        
+        for form_field in fields:
+            field_name = (form_field.get('name') or '').lower()
+            form_type = form_field.get('type', '').lower()
+            
+            if strategy == 'exact':
+                if field_type_lower == field_name:
+                    return form_field
+            else:
+                # Fuzzy/semantic matching
+                if self._fields_match(field_type_lower, field_name, form_type):
+                    return form_field
+        
+        return None
+    
+    def _fields_match(self, data_key: str, field_name: str, field_type: str) -> bool:
+        """Check if data key matches field - semantic matching"""
+        # Direct match
+        if data_key in field_name or field_name in data_key:
+            return True
+        
+        # Type-based matching
+        if data_key == 'email' and field_type == 'email':
+            return True
+        if data_key in ['phone', 'tel', 'telephone'] and field_type == 'tel':
+            return True
+        if data_key in ['phone', 'tel'] and ('phone' in field_name or 'tel' in field_name):
+            return True
+        if data_key == 'message' and field_type == 'textarea':
+            return True
+        
+        return False
         
     def _calculate_confidence(self, mapping: List) -> float:
         """Calculate overall mapping confidence"""
