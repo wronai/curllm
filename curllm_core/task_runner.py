@@ -489,7 +489,19 @@ async def _execute_tool(executor, page, instruction: str, tool_name: str, args: 
             except Exception:
                 pass
             return {"ok": ok}
-        # Form fill
+        
+        # Atomic form tools (form.detect, form.fields, form.fill_field, etc.)
+        if tn.startswith("form.") and tn != "form.fill":
+            try:
+                from curllm_core.streamware.components.form import execute_tool
+                result = await execute_tool(page, tn, args or {}, run_logger)
+                if run_logger:
+                    run_logger.log_kv(f"fn:tool.{tn}_ms", str(int((time.time() - _t_tool) * 1000)))
+                return result
+            except Exception as e:
+                return {"error": str(e)}
+        
+        # Form fill (full orchestration)
         if tn == "form.fill":
             try:
                 # Check if LLM orchestrator should be used
