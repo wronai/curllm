@@ -17,6 +17,7 @@ from typing import Dict, Any, List, Optional
 from .page_analyzer import analyze_page_type, detect_price_format
 from .container_finder import find_product_containers, analyze_container_content
 from .field_detector import detect_product_fields, extract_field_value, detect_price_in_container
+from .llm_patterns import generate_extraction_strategy, validate_selector, generate_price_pattern
 
 
 class LLMIterativeExtractor:
@@ -276,28 +277,39 @@ class LLMIterativeExtractor:
             product["name"] = str(product["name"]).strip()
         
         if product.get("price"):
-            product["price"] = self._parse_price_with_llm(str(product["price"]))
+            product["price"] = await self._parse_price_with_llm(str(product["price"]))
         
         return product
     
-    def _parse_price_with_llm(self, price_text: str) -> Optional[float]:
-        """Parse price value - will be enhanced with LLM in complex cases."""
+    async def _parse_price_with_llm(self, price_text: str) -> Optional[float]:
+        """Parse price value using LLM - NO REGEX."""
         if not price_text:
             return None
         
-        # Simple numeric extraction (LLM will handle complex cases)
-        cleaned = price_text.replace(" ", "").replace("\xa0", "")
-        cleaned = cleaned.replace("zł", "").replace("PLN", "").replace("€", "").replace("$", "")
-        cleaned = cleaned.replace(",", ".")
+        # Use LLM to extract numeric price
+        prompt = f"""Extract the numeric price from this text. Return ONLY the number (no currency).
+
+Text: "{price_text}"
+
+Rules:
+- Return just the number (e.g., "299.99")
+- Use dot for decimal separator
+- If multiple numbers, return the price (not quantity)
+- If no price found, return "null"
+
+Number:"""
         
-        # Extract first number
-        import re
-        match = re.search(r'(\d+\.?\d*)', cleaned)
-        if match:
-            try:
-                return float(match.group(1))
-            except ValueError:
-                pass
+        try:
+            response = await self._llm_generate(prompt)
+            value = response.strip().lower()
+            
+            if value and value != "null":
+                # Clean any remaining non-numeric chars
+                cleaned = ''.join(c for c in value if c.isdigit() or c == '.')
+                if cleaned:
+                    return float(cleaned)
+        except Exception:
+            pass
         
         return None
     

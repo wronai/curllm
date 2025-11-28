@@ -20,6 +20,14 @@ from .page_analyzer import analyze_page_type, detect_price_format
 from .container_finder import find_product_containers, analyze_container_content
 from .field_detector import detect_product_fields, extract_field_value, detect_price_in_container
 from .llm_extractor import LLMIterativeExtractor, llm_extract_products
+from .llm_patterns import (
+    generate_price_pattern,
+    generate_product_link_pattern,
+    generate_container_selector,
+    generate_field_selector,
+    generate_extraction_strategy,
+    validate_selector
+)
 
 # Legacy imports (backward compatibility)
 from .selector import find_selector_llm, find_all_selectors
@@ -36,6 +44,10 @@ __all__ = [
     'analyze_page_type', 'detect_price_format',
     'find_product_containers', 'analyze_container_content',
     'detect_product_fields', 'extract_field_value', 'detect_price_in_container',
+    # LLM Pattern generators (NO REGEX in code)
+    'generate_price_pattern', 'generate_product_link_pattern',
+    'generate_container_selector', 'generate_field_selector',
+    'generate_extraction_strategy', 'validate_selector',
     # Legacy (backward compatibility)
     'find_selector_llm', 'find_all_selectors',
     'extract_data', 'extract_emails', 'extract_links', 'extract_products',
