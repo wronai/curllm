@@ -99,6 +99,7 @@ def test_form_field_mapping_via_dsl():
                 {"component": "field-mapper", "params": {"strategy": "fuzzy"}}
             ],
             "data": {
+                "page": page,
                 "instruction": "Fill form: name=Alice Smith, email=alice@example.com, message=Hello"
             }
         }
