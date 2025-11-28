@@ -180,42 +180,53 @@ class IterativeExtractor:
                 // If any class appears 5+ times, likely a list structure
                 indicators.has_list_structure = Object.values(classCount).some(count => count >= 5);
                 
+                // Check for REAL product containers (price + name together)
+                let realProductContainers = 0;
+                const potentialProducts = document.querySelectorAll('[class*="product"], [class*="item"], [class*="card"], table tr');
+                for (const el of potentialProducts) {
+                    const text = el.textContent || '';
+                    const hasName = text.length > 20 && text.length < 500;
+                    const hasLink = el.querySelector('a[href*=".html"], a[href*="product"], a[href*="produkt"]');
+                    const hasPriceInEl = /\\d+[,.]\\d{2}/.test(text) || el.querySelector('img[src*="cb_"], img[src*="cena"]');
+                    if (hasName && hasLink && hasPriceInEl) {
+                        realProductContainers++;
+                    }
+                }
+                indicators.real_product_containers = realProductContainers;
+                
                 // Determine page type with smarter heuristics
-                // Check if prices are in actual product context (not just cart/header)
-                const hasRealProducts = indicators.price_count >= 3 && indicators.has_list_structure;
-                const hasProductGrid = indicators.price_count >= 5;
+                const hasRealProducts = realProductContainers >= 3;
+                const hasProductGrid = realProductContainers >= 5;
                 const hasShopFeatures = indicators.has_add_to_cart && indicators.has_product_links;
                 
-                // Check for cart/header prices (low count, no product structure, no cart buttons)
-                const isCartOnly = indicators.price_count <= 2 && 
-                                   !indicators.has_product_links && 
-                                   !indicators.has_add_to_cart;
+                // Check for cart/header prices (low count, no product structure)
+                const isCartOnly = indicators.price_count <= 2 && !hasRealProducts;
                 
                 // Check URL patterns for product pages
                 const url = window.location.href.toLowerCase();
                 const pathname = window.location.pathname;
-                const isProductUrl = /\\/(product|produkt|item|towar)s?[\\/\\?]/i.test(url) ||
-                                     /[\\/\\?](category|kategoria|cat)[=\\/]/i.test(url) ||
+                const isProductUrl = /\\/(product|produkt|item|towar|prod_lista)s?/i.test(url) ||
+                                     /[\\?&](category|kategoria|cat|grp)[=]/i.test(url) ||
                                      /[_\\/]\\d{3,}\\.html?$/i.test(pathname);
                 const isHomepage = pathname === '/' || pathname === '/index.html' || pathname === '/sklep.php';
                 
-                // Decision tree
-                if (hasShopFeatures && indicators.product_link_count >= 3) {
-                    // Has cart buttons AND product links = definitely a shop page with products
+                // Decision tree - more conservative
+                if (hasProductGrid) {
+                    // Found actual product containers
                     indicators.page_type = 'product_listing';
-                } else if (hasProductGrid || (hasRealProducts && indicators.has_product_links)) {
+                } else if (hasRealProducts && isProductUrl) {
                     indicators.page_type = 'product_listing';
-                } else if (indicators.has_product_links && indicators.product_link_count >= 5) {
-                    indicators.page_type = 'category';
-                } else if (isProductUrl && indicators.price_count >= 1) {
-                    indicators.page_type = 'single_product';
-                } else if (isHomepage && hasShopFeatures) {
-                    // Homepage WITH products (like gral.pl main page)
+                } else if (isProductUrl && indicators.price_count >= 3) {
                     indicators.page_type = 'product_listing';
-                } else if (isCartOnly && !hasShopFeatures) {
-                    // Cart prices only, no shop features
-                    indicators.page_type = 'homepage';
-                } else if (indicators.price_count > 0 && indicators.has_product_links) {
+                } else if (isHomepage && !hasRealProducts) {
+                    // Homepage without real products - needs navigation
+                    indicators.page_type = 'homepage_shop';
+                    indicators.needs_navigation = true;
+                } else if (indicators.has_product_links && indicators.product_link_count >= 10 && !hasRealProducts) {
+                    // Many category links but no products
+                    indicators.page_type = 'category_index';
+                    indicators.needs_navigation = true;
+                } else if (indicators.price_count > 0 && hasRealProducts) {
                     indicators.page_type = 'product_listing';
                 } else {
                     indicators.page_type = 'other';
@@ -229,20 +240,31 @@ class IterativeExtractor:
         
         # Decide whether to continue extraction
         extractable_types = ["product_listing", "category", "single_product"]
+        needs_nav_types = ["homepage", "homepage_shop", "category_index", "other"]
         should_continue = result["page_type"] in extractable_types
+        needs_navigation = result.get("needs_navigation", False) or result["page_type"] in needs_nav_types
         
-        # Special handling for homepage - suggest navigation
-        if result["page_type"] == "homepage":
+        # Build reason based on page type
+        real_products = result.get("real_product_containers", 0)
+        if result["page_type"] in ["homepage_shop", "category_index"]:
+            reason = f"Navigation page detected ({result['page_type']}). Found {real_products} real products. Navigate to a product category to find actual products."
+        elif result["page_type"] == "homepage":
             reason = "Homepage detected (cart prices only). Navigate to product category first."
+        elif should_continue:
+            reason = f"Page type: {result['page_type']}, real products: {real_products}, prices: {result['price_count']}"
         else:
-            reason = f"Page type: {result['page_type']}, prices: {result['price_count']}, product links: {result['product_link_count']}"
+            reason = f"Page type: {result['page_type']} - not a product page"
         
         decision = {
             "should_continue": should_continue,
             "reason": reason,
-            "needs_navigation": result["page_type"] in ["homepage", "other"]
+            "needs_navigation": needs_navigation,
+            "real_product_containers": real_products
         }
         self.state["decisions"].append(decision)
+        
+        if self.run_logger:
+            self.run_logger.log_text(f"📊 Decision: {reason}")
         
         return result
     
@@ -614,6 +636,62 @@ class IterativeExtractor:
         
         return result
     
+    def _validate_results(self, products: List[Dict], price_limit: Optional[float]) -> Dict[str, Any]:
+        """
+        Validate extracted results against instruction criteria.
+        
+        Checks:
+        1. Products have required fields (name, price)
+        2. Prices are within limit
+        3. Data makes sense (not cart items, not duplicates)
+        """
+        issues = []
+        valid_count = 0
+        
+        if not products:
+            return {"valid": False, "issues": ["No products extracted"], "valid_count": 0}
+        
+        seen_names = set()
+        cart_keywords = ["koszyk", "cart", "twój pc", "suma", "razem", "total"]
+        
+        for i, product in enumerate(products):
+            name = str(product.get("name", "")).lower().strip()
+            price = product.get("price")
+            
+            # Check for required fields
+            if not name or len(name) < 3:
+                issues.append(f"Product {i}: Missing or invalid name")
+                continue
+            
+            if price is None:
+                issues.append(f"Product {i}: Missing price")
+                continue
+            
+            # Check for cart/navigation items
+            if any(kw in name for kw in cart_keywords):
+                issues.append(f"Product {i}: Appears to be cart/navigation item: '{name[:30]}'")
+                continue
+            
+            # Check for duplicates
+            if name in seen_names:
+                issues.append(f"Product {i}: Duplicate name: '{name[:30]}'")
+                continue
+            seen_names.add(name)
+            
+            # Check price limit
+            if price_limit and price > price_limit:
+                issues.append(f"Product {i}: Price {price} exceeds limit {price_limit}")
+                continue
+            
+            valid_count += 1
+        
+        return {
+            "valid": valid_count > 0,
+            "valid_count": valid_count,
+            "total_count": len(products),
+            "issues": issues[:10] if issues else None  # Limit to first 10 issues
+        }
+    
     def _extract_price_limit(self, instruction: str) -> Optional[float]:
         """Extract price limit from instruction"""
         import re
@@ -658,9 +736,17 @@ class IterativeExtractor:
         page_type = quick_check.get("page_type") if quick_check else "unknown"
         extractable_types = ["product_listing", "category", "single_product"]
         
+        needs_nav_types = ["homepage", "homepage_shop", "category_index"]
+        
         if page_type not in extractable_types:
             # Provide specific feedback for different page types
-            if page_type == "homepage":
+            real_products = quick_check.get("real_product_containers", 0)
+            
+            if page_type in ["homepage_shop", "category_index"]:
+                reason = f"Navigation page ({page_type}) - found {real_products} potential products but need to navigate to a category. " \
+                         f"Links found: {quick_check.get('product_link_count', 0)}. " \
+                         f"Try clicking on a category link like 'Monitory', 'Drukarki', etc."
+            elif page_type == "homepage":
                 reason = "Homepage detected - prices visible are from cart/header, not products. Navigate to a product category first."
             elif page_type == "other":
                 reason = "Page does not appear to contain products. Try navigating to a product listing or category page."
@@ -674,7 +760,8 @@ class IterativeExtractor:
                 "products": [],
                 "reason": reason,
                 "page_type": page_type,
-                "needs_navigation": True,
+                "needs_navigation": page_type in needs_nav_types,
+                "suggested_action": "Navigate to a product category page" if page_type in needs_nav_types else None,
                 "metadata": self.state
             }
         
@@ -745,7 +832,12 @@ class IterativeExtractor:
                     f"(removed {original_count - filtered_count} above {price_limit} zł)"
                 )
         
-        # Step 6: Screenshot for documentation
+        # Step 6: Validate results against instruction
+        validation = self._validate_results(products, price_limit)
+        if self.run_logger and validation.get("issues"):
+            self.run_logger.log_text(f"⚠️ Validation Issues: {validation['issues']}")
+        
+        # Step 7: Screenshot for documentation
         screenshot_path = None
         if self.run_logger:
             try:

@@ -206,24 +206,21 @@ class ActionPlanComponent(Component):
         }
         
     def _extract_fields_from_instruction(self, instruction: str) -> Dict[str, str]:
-        """Extract field values from instruction"""
-        import re
-        
+        """Extract field values from instruction - NO REGEX, simple parsing"""
         fields = {}
         
-        # Pattern: name=value, email=value, etc.
-        patterns = {
-            'name': r'name[=:]([^,]+)',
-            'email': r'email[=:]([^,]+)',
-            'phone': r'phone[=:]([^,]+)',
-            'subject': r'subject[=:]([^,]+)',
-            'message': r'message[=:]([^,]+)',
-        }
-        
-        for field, pattern in patterns.items():
-            match = re.search(pattern, instruction, re.IGNORECASE)
-            if match:
-                fields[field] = match.group(1).strip()
+        # Simple key=value parsing without regex
+        parts = instruction.replace(':', '=').split(',')
+        for part in parts:
+            if '=' in part:
+                key_val = part.split('=', 1)
+                if len(key_val) == 2:
+                    key = key_val[0].strip().lower()
+                    val = key_val[1].strip()
+                    # Only accept known field names
+                    if key in ['name', 'email', 'phone', 'subject', 'message', 
+                               'first_name', 'last_name', 'company', 'address']:
+                        fields[key] = val
                 
         return fields
 
@@ -264,16 +261,11 @@ class ActionValidateComponent(Component):
         selector = action.get('selector', '')
         expected_value = action.get('value', '')
         
-        # Extract field name from selector
-        import re
-        name_match = re.search(r"name='([^']+)'", selector)
-        if not name_match:
-            name_match = re.search(r"name=([^\]]+)", selector)
+        # Extract field name from selector - simple parsing without regex
+        field_name = self._extract_name_from_selector(selector)
             
-        if not name_match:
+        if not field_name:
             return {'success': False, 'reason': 'cannot_parse_selector'}
-            
-        field_name = name_match.group(1)
         
         # Check if field value changed in after_state
         after_forms = after.get('forms', [])
@@ -303,6 +295,28 @@ class ActionValidateComponent(Component):
             'url_changed': url_changed,
             'validated': True
         }
+    
+    def _extract_name_from_selector(self, selector: str) -> Optional[str]:
+        """Extract field name from CSS selector without regex"""
+        # Handle [name='value'] pattern
+        if "name='" in selector:
+            start = selector.find("name='") + 6
+            end = selector.find("'", start)
+            if end > start:
+                return selector[start:end]
+        
+        # Handle [name=value] pattern (without quotes)
+        if "name=" in selector:
+            start = selector.find("name=") + 5
+            end = selector.find("]", start)
+            if end > start:
+                return selector[start:end].strip("'\"")
+        
+        # Handle #id pattern
+        if selector.startswith("#"):
+            return selector[1:].split()[0]
+        
+        return None
         
     def _validate_navigation(self, action: Dict, before: Dict, after: Dict) -> Dict:
         """Validate navigation"""
