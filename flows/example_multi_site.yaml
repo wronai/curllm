@@ -1,0 +1,39 @@
+# Multi-site data collection
+name: "Multi-Site Scraping"
+description: "Collect data from multiple websites"
+
+diagnostics: true
+
+input:
+  type: "json"
+  data:
+    sites:
+      - url: "https://site1.example.com"
+        instruction: "Get product listings"
+      - url: "https://site2.example.com"
+        instruction: "Get article titles"
+      - url: "https://site3.example.com"
+        instruction: "Get contact information"
+
+steps:
+  # Split into individual sites
+  - component: "split://"
+    params:
+      type: "field"
+      name: "sites"
+      
+  # Extract from each site
+  - component: "curllm://extract"
+    params:
+      stealth: true
+      planner: true
+      
+  # Join results back
+  - component: "join://"
+    params:
+      type: "list"
+      
+  # Save combined results
+  - component: "file://write"
+    params:
+      path: "/tmp/multi_site_results.json"

@@ -1,0 +1,32 @@
+# Data extraction flow
+name: "Data Extraction"
+description: "Extract data from webpage using LLM and save as CSV"
+
+diagnostics: true
+trace: false
+
+input:
+  type: "json"
+  data:
+    url: "https://news.ycombinator.com"
+    instruction: "Extract top 10 story titles and scores"
+
+steps:
+  - component: "curllm://extract"
+    params:
+      url: "${url}"
+      instruction: "${instruction}"
+      stealth: true
+      planner: true
+      
+  - component: "transform://jsonpath"
+    params:
+      query: "$.items[*]"
+      
+  - component: "transform://csv"
+    params:
+      delimiter: ","
+      
+  - component: "file://write"
+    params:
+      path: "/tmp/extracted_stories.csv"

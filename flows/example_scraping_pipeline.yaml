@@ -1,0 +1,47 @@
+# Complete web scraping pipeline
+name: "Web Scraping Pipeline"
+description: "Scrape product data, transform, and export"
+
+diagnostics: true
+trace: true
+
+input:
+  type: "json"
+  data:
+    url: "https://example.com/products"
+    max_items: 20
+
+steps:
+  # Browse to page with stealth
+  - component: "curllm://browse"
+    params:
+      url: "${url}"
+      stealth: true
+      captcha: true
+      
+  # Extract product data
+  - component: "curllm://extract"
+    params:
+      instruction: "Extract all products with name, price, and description. Limit to ${max_items} items."
+      planner: true
+      visual: false
+      
+  # Transform: Extract items array
+  - component: "transform://jsonpath"
+    params:
+      query: "$.items[*]"
+      
+  # Save JSON backup
+  - component: "file://write"
+    params:
+      path: "/tmp/products_raw.json"
+      
+  # Convert to CSV
+  - component: "transform://csv"
+    params:
+      delimiter: ","
+      
+  # Save CSV output
+  - component: "file://write"
+    params:
+      path: "/tmp/products.csv"

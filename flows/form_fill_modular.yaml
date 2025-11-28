@@ -1,0 +1,53 @@
+# Modular Form Filling Flow - Using DSL Decision Tree Components
+name: "Modular Form Fill with Decision Tree"
+description: "Fill forms using modular decision tree components with proper validation"
+
+diagnostics: true
+trace: true
+
+input:
+  data:
+    url: "https://www.prototypowanie.pl/kontakt/"
+    instruction: "Fill contact form: name=John Doe, email=john@example.com, phone=+48123456789, message=Hello I need quota for my MVP project"
+    max_steps: 10
+
+steps:
+  # Step 1: Navigate to URL (if needed)
+  - component: "curllm://browse"
+    params:
+      url: "${url}"
+      stealth: true
+      visual: true
+      
+  # Step 2: Enhanced DOM snapshot with actual field values
+  - component: "dom-snapshot://capture"
+    params:
+      include_values: true
+      include_computed: false
+      
+  # Step 3: Analyze DOM structure
+  - component: "dom-analyze://extract"
+    params:
+      type: "forms"
+      
+  # Step 4: Map instruction fields to form fields
+  - component: "field-mapper://map"
+    params:
+      strategy: "fuzzy"
+      
+  # Step 5: Plan actions based on mapping
+  - component: "action-plan://decide"
+    params:
+      strategy: "smart"
+      
+  # Step 6: Execute decision tree
+  - component: "decision-tree://execute"
+    params:
+      max_steps: "${max_steps}"
+      strategy: "smart"
+      validate_each_step: true
+      
+  # Step 7: Save results
+  - component: "file://write"
+    params:
+      path: "/tmp/form_fill_result.json"

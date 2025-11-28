@@ -1,0 +1,48 @@
+# HTTP API to web scraping pipeline
+name: "API to Scraping Pipeline"
+description: "Get URLs from API, then scrape each page"
+
+diagnostics: true
+
+input:
+  type: "json"
+
+steps:
+  # Get URLs from API
+  - component: "http://api.example.com/urls"
+    params:
+      method: "get"
+      
+  # Extract URLs array
+  - component: "transform://jsonpath"
+    params:
+      query: "$.urls[*]"
+      
+  # Split into individual URLs
+  - component: "split://"
+    params:
+      type: "jsonpath"
+      query: "$[*]"
+      
+  # Browse each URL
+  - component: "curllm://browse"
+    params:
+      stealth: true
+      
+  # Extract data from each
+  - component: "curllm://extract"
+    params:
+      instruction: "Get main content and title"
+      
+  # Join all results
+  - component: "join://"
+    params:
+      type: "list"
+      
+  # Convert to CSV
+  - component: "transform://csv"
+  
+  # Save output
+  - component: "file://write"
+    params:
+      path: "/tmp/scraped_data.csv"

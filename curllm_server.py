@@ -23,6 +23,10 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import aiohttp
 from dotenv import load_dotenv
+from curllm_core.logger import RunLogger as CoreRunLogger
+from curllm_core.config_logger import log_all_config
+from curllm_core.runtime import parse_runtime_from_instruction
+from curllm_core.executor import CurllmExecutor as CoreExecutor
 
 import inspect
 from dataclasses import dataclass as _dc_dataclass
@@ -78,6 +82,16 @@ class Config:
     locale: str = os.getenv("CURLLM_LOCALE", os.getenv("LOCALE", "pl-PL"))
     timezone_id: str = os.getenv("CURLLM_TIMEZONE", os.getenv("TIMEZONE", "Europe/Warsaw"))
     proxy: Optional[str] = (os.getenv("CURLLM_PROXY") or os.getenv("HTTPS_PROXY") or os.getenv("HTTP_PROXY") or None)
+    # Logging and truncation controls
+    log_preview_chars: int = int(os.getenv("CURLLM_LOG_PREVIEW_CHARS", "1500"))
+    log_prompt_chars: int = int(os.getenv("CURLLM_LOG_PROMPT_CHARS", "3000"))
+    no_progress_text_chars: int = int(os.getenv("CURLLM_NO_PROGRESS_TEXT_CHARS", "500"))
+    # Collection limits
+    max_links: int = int(os.getenv("CURLLM_MAX_LINKS", "100"))
+    max_emails: int = int(os.getenv("CURLLM_MAX_EMAILS", "100"))
+    max_phones: int = int(os.getenv("CURLLM_MAX_PHONES", "100"))
+    # Planner behavior
+    stall_limit_default: int = int(os.getenv("CURLLM_STALL_LIMIT", "3"))
     
     def __post_init__(self):
         self.screenshot_dir.mkdir(exist_ok=True)
@@ -89,35 +103,9 @@ config = Config()
 # Core Execution Engine
 # ============================================================================
 
-class RunLogger:
-    """Markdown run logger for step-by-step diagnostics"""
-    def __init__(self, instruction: str, url: Optional[str]):
-        ts = datetime.now().strftime('%Y%m%d-%H%M%S')
-        self.dir = Path('./logs')
-        self.dir.mkdir(parents=True, exist_ok=True)
-        self.path = self.dir / f'run-{ts}.md'
-        with open(self.path, 'w', encoding='utf-8') as f:
-            f.write(f"# curllm Run Log ({ts})\n\n")
-            if url:
-                f.write(f"- URL: {url}\n")
-            if instruction:
-                f.write(f"- Instruction: {instruction}\n\n")
-
-    def _write(self, text: str):
-        with open(self.path, 'a', encoding='utf-8') as f:
-            f.write(text)
-
-    def log_heading(self, text: str):
-        self._write(f"\n## {text}\n\n")
-
-    def log_text(self, text: str):
-        self._write(f"{text}\n\n")
-
-    def log_kv(self, key: str, value: str):
-        self._write(f"- {key}: {value}\n")
-
-    def log_code(self, lang: str, code: str):
-        self._write(f"```{lang}\n{code}\n```\n\n")
+class RunLogger(CoreRunLogger):
+    """Alias to centralized RunLogger with TOC and image support"""
+    pass
 
 class SimpleOllama:
     """Minimal async Ollama client used when langchain_ollama is unavailable"""
@@ -190,108 +178,51 @@ class CurllmExecutor:
         use_bql: bool = False,
         headers: Optional[Dict] = None
     ) -> Dict[str, Any]:
-        """Execute browser automation workflow"""
-        # Prepare run logger
-        run_logger = RunLogger(instruction=instruction, url=url)
-        run_logger.log_heading(f"curllm run: {datetime.now().isoformat()}")
-        run_logger.log_kv("CURLLM_MODEL", config.ollama_model)
-        run_logger.log_kv("CURLLM_OLLAMA_HOST", config.ollama_host)
-        run_logger.log_kv("VISUAL_MODE", str(visual_mode))
-        run_logger.log_kv("STEALTH_MODE", str(stealth_mode))
-        run_logger.log_kv("USE_BQL", str(use_bql))
+        """Execute browser automation workflow - delegates to core executor with orchestrators"""
+        # Parse runtime parameters embedded in JSON instruction and build command line for logging
+        instruction, runtime = parse_runtime_from_instruction(instruction)
+        cmd_parts = ["curllm"]
+        if visual_mode:
+            cmd_parts.append("--visual")
+        if stealth_mode:
+            cmd_parts.append("--stealth")
+        if use_bql:
+            cmd_parts.append("--bql")
+        if captcha_solver:
+            cmd_parts.append("--captcha-solver")
+        if headers:
+            for k, v in (headers or {}).items():
+                cmd_parts.append(f'-H "{k}: {v}"')
+        if url:
+            cmd_parts.append(f'"{url}"')
+        if instruction:
+            escaped = instruction.replace('"', '\\"')
+            cmd_parts.append(f'-d "{escaped}"')
+        command_line = " ".join(cmd_parts)
 
-        browser_context = None
+        # Delegate to core executor (restores orchestrators, progressive context, multi-phase LLM interaction)
         try:
-            # Parse instruction if BQL mode
-            if use_bql:
-                instruction = self._parse_bql(instruction)
-                run_logger.log_text("BQL parsed instruction:")
-                run_logger.log_code("text", instruction)
-            
-            # Setup browser context
-            host = urlparse(url).hostname if url else None
-            if host and any(h in host for h in ["allegro.pl", "allegro.com"]):
-                stealth_mode = True
-            browser_context = await self._setup_browser(stealth_mode, storage_key=host)
-            run_logger.log_text("Browser context initialized.")
-            
-            # Create agent (supports browser_use.Agent if available; else LocalAgent)
-            agent = self._create_agent(
-                browser_context=browser_context,
-                instruction=instruction,
-                visual_mode=visual_mode
-            )
-            
-            # Execute main task
-            result = await self._execute_task(
-                agent=agent,
+            core_executor = CoreExecutor()
+            result = await core_executor.execute_workflow(
                 instruction=instruction,
                 url=url,
                 visual_mode=visual_mode,
                 stealth_mode=stealth_mode,
                 captcha_solver=captcha_solver,
-                run_logger=run_logger
+                use_bql=use_bql,
+                headers=headers,
+                runtime=runtime,
+                command_line=command_line
             )
-            
-            # Cleanup
-            if browser_context is not None:
-                try:
-                    try:
-                        storage_path = getattr(browser_context, "_curllm_storage_path", None)
-                        if storage_path:
-                            await browser_context.storage_state(path=storage_path)
-                    except Exception as e:
-                        logger.warning(f"Unable to persist storage state: {e}")
-                    await browser_context.close()
-                except Exception as e:
-                    logger.warning(f"Error during browser close: {e}")
-                # Close browser and playwright if attached
-                try:
-                    br = getattr(browser_context, "_curllm_browser", None)
-                    if br is not None:
-                        await br.close()
-                    pw = getattr(browser_context, "_curllm_playwright", None)
-                    if pw is not None:
-                        await pw.stop()
-                except Exception as e:
-                    logger.warning(f"Error closing Playwright resources: {e}")
-            
-            # Attach run log path
-            res = {
-                "success": True,
-                "result": result.get("data"),
-                "steps_taken": result.get("steps", 0),
-                "screenshots": result.get("screenshots", []),
-                "timestamp": datetime.now().isoformat(),
-                "run_log": str(run_logger.path)
-            }
-            run_logger.log_text("Run finished successfully.")
-            return res
-            
+            return result
         except Exception as e:
-            logger.error(f"Workflow execution failed: {str(e)}", exc_info=True)
-            run_logger.log_text("Error occurred:")
+            logger.error(f"Core executor failed: {e}", exc_info=True)
+            # Prepare fallback logger for error case
+            run_logger = RunLogger(instruction=instruction, url=url, command_line=command_line)
+            run_logger.log_heading(f"curllm run: {datetime.now().isoformat()}")
+            log_all_config(run_logger, visual_mode, stealth_mode, use_bql, runtime)
+            run_logger.log_text("Error occurred (core executor):")
             run_logger.log_code("text", str(e))
-            if browser_context is not None:
-                try:
-                    try:
-                        storage_path = getattr(browser_context, "_curllm_storage_path", None)
-                        if storage_path:
-                            await browser_context.storage_state(path=storage_path)
-                    except Exception:
-                        pass
-                    await browser_context.close()
-                except Exception as ce:
-                    logger.warning(f"Error during browser close after failure: {ce}")
-                try:
-                    br = getattr(browser_context, "_curllm_browser", None)
-                    if br is not None:
-                        await br.close()
-                    pw = getattr(browser_context, "_curllm_playwright", None)
-                    if pw is not None:
-                        await pw.stop()
-                except Exception as e:
-                    logger.warning(f"Error closing Playwright resources after failure: {e}")
             return {
                 "success": False,
                 "error": str(e),
@@ -507,9 +438,9 @@ class CurllmExecutor:
                 result["data"] = {
                     "title": ctx.get("title"),
                     "url": ctx.get("url"),
-                    "links": anchors[:50],
-                    "emails": emails[:50],
-                    "phones": [p.replace(" ", "").replace("-", "") for p in phones][:50],
+                    "links": anchors[: config.max_links],
+                    "emails": emails[: config.max_emails],
+                    "phones": [p.replace(" ", "").replace("-", "") for p in phones][: config.max_phones],
                 }
                 if run_logger:
                     run_logger.log_text("Generic fast-path used (title/url/links/emails/phones)")
@@ -532,7 +463,7 @@ class CurllmExecutor:
                         }))
                     """
                 )
-                direct["links"] = anchors[:100]
+                direct["links"] = anchors[: config.max_links]
             if "email" in lower_instr or "mail" in lower_instr:
                 text = await page.evaluate("() => document.body.innerText")
                 emails_text = list(set(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", text)))
@@ -547,7 +478,7 @@ class CurllmExecutor:
                     """
                 )
                 emails = list(sorted(set(emails_text + emails_mailto)))
-                direct["emails"] = emails[:100]
+                direct["emails"] = emails[: config.max_emails]
             if "phone" in lower_instr or "tel" in lower_instr or "telefon" in lower_instr:
                 text = await page.evaluate("() => document.body.innerText")
                 phones_text = list(set(re.findall(r"(?:\\+\\d{1,3}[\\s-]?)?(?:\\(?\\d{2,4}\\)?[\\s-]?)?\\d[\\d\\s-]{6,}\\d", text)))
@@ -570,7 +501,7 @@ class CurllmExecutor:
                     # simple cleanup: remove spaces and dashes
                     return p.replace(" ", "").replace("-", "")
                 phones = list(sorted(set([_norm(p) for p in (phones_text + phones_tel) if p])))
-                direct["phones"] = phones[:100]
+                direct["phones"] = phones[: config.max_phones]
             if False and direct:
                 # Apply 'only' filter if requested
                 if "only" in lower_instr and ("email" in lower_instr or "mail" in lower_instr or "phone" in lower_instr or "tel" in lower_instr or "telefon" in lower_instr):
@@ -592,7 +523,7 @@ class CurllmExecutor:
         # Main execution loop
         last_sig = None
         no_progress = 0
-        stall_limit = 3
+        stall_limit = config.stall_limit_default
         for step in range(config.max_steps):
             result["steps"] = step + 1
             if run_logger:
@@ -619,7 +550,7 @@ class CurllmExecutor:
             page_context = await self._extract_page_context(page)
             # No-progress detection based on URL+title+text snippet signature
             try:
-                sig = f"{page_context.get('url','')}|{page_context.get('title','')}|{(page_context.get('text','') or '')[:500]}"
+                sig = f"{page_context.get('url','')}|{page_context.get('title','')}|{(page_context.get('text','') or '')[:config.no_progress_text_chars]}"
                 if last_sig is None:
                     last_sig = sig
                     no_progress = 0
@@ -637,7 +568,7 @@ class CurllmExecutor:
             if run_logger:
                 try:
                     run_logger.log_text("Page context snapshot (truncated):")
-                    run_logger.log_code("json", json.dumps(page_context, indent=2)[:1500])
+                    run_logger.log_code("json", json.dumps(page_context, indent=2)[: config.log_preview_chars])
                 except Exception:
                     pass
             # Heuristic product extraction when instruction requests products under a price
@@ -729,11 +660,11 @@ class CurllmExecutor:
                             href: a.href
                         }))
                     """)
-                    fallback["links"] = anchors[:100]
+                    fallback["links"] = anchors[: config.max_links]
                 if "email" in lower_instr or "mail" in lower_instr:
                     text = await page.evaluate("() => document.body.innerText")
                     emails = list(set(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", text)))
-                    fallback["emails"] = emails[:100]
+                    fallback["emails"] = emails[: config.max_emails]
                 if "phone" in lower_instr or "tel" in lower_instr or "telefon" in lower_instr:
                     text = await page.evaluate("() => document.body.innerText")
                     phones_text = list(set(re.findall(r"(?:\+\d{1,3}[\s-]?)?(?:\(?\d{2,4}\)?[\s-]?)?\d[\d\s-]{6,}\d", text)))
@@ -750,7 +681,7 @@ class CurllmExecutor:
                     def _norm(p: str) -> str:
                         return p.replace(" ", "").replace("-", "")
                     phones = list(sorted(set([_norm(p) for p in (phones_text + phones_tel) if p])))
-                    fallback["phones"] = phones[:100]
+                    fallback["phones"] = phones[: config.max_phones]
                 if not fallback:
                     ctx = await self._extract_page_context(page)
                     fallback = {"title": ctx.get("title"), "url": ctx.get("url")}
@@ -818,7 +749,7 @@ class CurllmExecutor:
     
     async def _generate_action(self, instruction: str, page_context: Dict, step: int, run_logger: 'RunLogger' = None) -> Dict:
         """Generate next action using LLM (robust JSON parsing)."""
-        context_str = json.dumps(page_context, indent=2)[:3000]
+        context_str = json.dumps(page_context, indent=2)[: config.log_prompt_chars]
         prompt_text = (
             "You are a browser automation expert. Analyze the current page and determine the next action.\n\n"
             f"Instruction: {instruction}\n"

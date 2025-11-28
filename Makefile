@@ -137,6 +137,37 @@ docker-down:
 	@echo "Stopping Docker services..."
 	@docker-compose down
 
+# Docker-based test environment
+test-docker-build:
+	@echo "Building Docker test environment..."
+	@docker-compose -f docker-compose.test.yml build
+
+test-docker-run:
+	@echo "Running tests in Docker..."
+	@docker-compose -f docker-compose.test.yml up --abort-on-container-exit; \
+	status=$$?; \
+	docker-compose -f docker-compose.test.yml down; \
+	exit $$status
+
+test-docker: test-docker-build test-docker-run
+	@echo "Docker tests complete!"
+	@echo "View test results in: ./test_results/report.html"
+
+test-pages:
+	@echo "Starting test pages server on http://localhost:8080"
+	@echo "Test pages available:"
+	@echo "  - http://localhost:8080/01_simple_form.html"
+	@echo "  - http://localhost:8080/02_product_list.html"
+	@echo "  - http://localhost:8080/03_login_form.html"
+	@echo "  - http://localhost:8080/04_registration.html"
+	@echo "  - http://localhost:8080/05_search_results.html"
+	@echo "  - http://localhost:8080/06_data_table.html"
+	@echo "  - http://localhost:8080/07_newsletter.html"
+	@echo "  - http://localhost:8080/08_multi_step_form.html"
+	@echo "  - http://localhost:8080/09_ecommerce_cart.html"
+	@echo "  - http://localhost:8080/10_feedback_form.html"
+	cd tests/test_pages && python3 -m http.server 8080
+
 docker-logs:
 	@docker-compose logs -f --tail=100
 

@@ -1,0 +1,32 @@
+# BQL (Browser Query Language) flow
+name: "BQL Query Execution"
+description: "Execute BQL query to extract structured data"
+
+diagnostics: true
+
+input:
+  type: "json"
+  data:
+    target_url: "https://example.com"
+    query: |
+      page(url: "${target_url}") {
+        title
+        meta {
+          description
+        }
+        links {
+          text
+          url
+        }
+      }
+
+steps:
+  - component: "curllm://bql"
+    params:
+      query: "${query}"
+      
+  - component: "transform://normalize"
+  
+  - component: "file://write"
+    params:
+      path: "/tmp/bql_result.json"

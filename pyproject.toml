@@ -34,6 +34,7 @@ dependencies = [
   "requests",
   "python-dotenv",
   "psutil",
+  "pyyaml",
 ]
 
 [project.urls]
@@ -44,6 +45,7 @@ Issues = "https://github.com/wronai/curllm/issues"
 curllm-setup = "curllm_core.cli.setup:main"
 curllm-doctor = "curllm_core.cli.doctor:main"
 curllm-web = "curllm_core.cli.web:main"
+curllm-flow = "curllm_core.cli.flow:main"
 
 [tool.setuptools]
 # Install non-Python CLI script and top-level modules

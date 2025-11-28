@@ -1,0 +1,19 @@
+# Simple web browsing flow
+name: "Simple Browse"
+description: "Browse a webpage and extract basic information"
+
+input:
+  type: "json"
+  data:
+    url: "https://example.com"
+
+steps:
+  - component: "curllm://browse"
+    params:
+      url: "${url}"
+      stealth: true
+      visual: false
+      
+  - component: "file://write"
+    params:
+      path: "/tmp/browse_result.json"

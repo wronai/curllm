@@ -1,18 +1,259 @@
+curllm --stealth "https://www.komputronik.pl/category/5022/laptopy.html" -d "Find all products under 3950zł"
 {
-  "result": {
-    "products": [
-      {
-        "name": "Bestseller\n4,9\n414\n\nIbuvit D3 4000Iu 150kaps.\n\n1000+ kupionych ostatnio\nod41,18z\u0142",
-        "price": 41.18,
-        "url": "https://redirect.ceneo.pl/offers/164000259/9026?e=EOpjbVPvmeU84eOvTVLW8x9ZNVMTIBt6BegLfpT4JtD%2BafUImi8vsfWXXtr8DMq0X88TaxMLTJxeJJJaUCdmGyCBcPvOgXaqbCITGHMyX4V962NVaZY%2Bh2BDFZdla0ceoMYEHuJZOUGcft4g2WWpqA%3D%3D"
-      }
+  "evaluation": {
+    "checks_performed": [
+      "steps_check",
+      "extraction_task_check"
+    ],
+    "evaluated": true,
+    "failures": [],
+    "warnings": [
+      "Zero steps executed"
     ]
   },
-  "run_log": "logs/run-20251124-082824.md",
-  "screenshots": [
-    "screenshots/www.ceneo.pl/step_0_1763969385.938158.png"
-  ],
-  "steps_taken": 1,
+  "hints": [],
+  "reason": "Task completed successfully (0 steps taken)",
+  "result": {
+    "count": 15,
+    "metadata": {
+      "checks_performed": [
+        {
+          "details": "Running fast indicators check...",
+          "step": "Step 1: Quick Page Check"
+        },
+        {
+          "details": {
+            "has_list_structure": false,
+            "has_prices": true,
+            "has_product_links": true,
+            "page_type": "product_listing",
+            "price_count": 78,
+            "product_link_count": 1036,
+            "total_links": 1156
+          },
+          "step": "Quick Check Results"
+        },
+        {
+          "details": "Looking for product_listing containers...",
+          "step": "Step 2: Container Structure Detection"
+        },
+        {
+          "details": {
+            "best": {
+              "classes": "border-transparent relative rounded-xl border-2 p-4 md:grid md:grid-rows-auto-1 md:gap-4 md:[grid-template-columns:1fr_1fr_1.5fr] lg:[grid-template-columns:1fr_1fr_0.9fr] 2xl:gap-x-8 2xl:[grid-template-columns:1fr_1fr_0.7fr]",
+              "count": 17,
+              "has_image": true,
+              "has_link": true,
+              "has_price": true,
+              "sample_text": "Lenovo YOGA Slim 7 14 - Ultra 5 125H | 14''-WUXGA-OLED | 16GB | 1TB | Win11Home\n\nUltra 5 125H |LCD:1",
+              "score": 115.1,
+              "selector": "div.border-transparent",
+              "specificity": 5
+            },
+            "candidates": [
+              {
+                "classes": "border-transparent relative rounded-xl border-2 p-4 md:grid md:grid-rows-auto-1 md:gap-4 md:[grid-template-columns:1fr_1fr_1.5fr] lg:[grid-template-columns:1fr_1fr_0.9fr] 2xl:gap-x-8 2xl:[grid-template-columns:1fr_1fr_0.7fr]",
+                "count": 17,
+                "has_image": true,
+                "has_link": true,
+                "has_price": true,
+                "sample_text": "Lenovo YOGA Slim 7 14 - Ultra 5 125H | 14''-WUXGA-OLED | 16GB | 1TB | Win11Home\n\nUltra 5 125H |LCD:1",
+                "score": 115.1,
+                "selector": "div.border-transparent",
+                "specificity": 5
+              },
+              {
+                "classes": "space-y-4",
+                "count": 11,
+                "has_image": false,
+                "has_link": true,
+                "has_price": true,
+                "sample_text": "Laptopy i komputery\n\nLaptopy\nLaptopy gamingowe\nLaptopy z przek\u0105tn\u0105 17,3\"\nLaptopy biznesowe\nLaptopy u",
+                "score": 103.3,
+                "selector": "div.space-y-4",
+                "specificity": 1
+              },
+              {
+                "classes": "mt-6 grow lg:px-8 xl:pt-12",
+                "count": 22,
+                "has_image": true,
+                "has_link": true,
+                "has_price": true,
+                "sample_text": "Okazja dnia!\nZgarnij 300 z\u0142 zwrotu!\nBlack weeks na gaming!\nB\u0105d\u017a bezpieczny z Windows 11 Pro!\nZapomni",
+                "score": 66.6,
+                "selector": "div.mt-6",
+                "specificity": 2
+              }
+            ],
+            "found": true,
+            "method": "dynamic_detection"
+          },
+          "step": "Container Detection Results"
+        },
+        {
+          "details": "Analyzing fields in div.border-transparent...",
+          "step": "Step 3: Field Location Detection"
+        },
+        {
+          "details": {
+            "completeness": 1,
+            "fields": {
+              "name": {
+                "sample": "Lenovo YOGA Slim 7 14 - Ultra 5 125H | 14''-WUXGA-",
+                "selector": "a"
+              },
+              "price": {
+                "sample": "3\u00a0699 z\u0142",
+                "selector": "div.text-red-pastel",
+                "value": 3699
+              },
+              "url": {
+                "sample": "https://www.komputronik.pl/product/990254/laptop-lenovo-yoga-slim-7-14-ultra-5-125h-14-wuxga-oled-16gb-1tb-win11home.html",
+                "selector": "a[href]"
+              }
+            },
+            "found": true
+          },
+          "step": "Field Detection Results"
+        },
+        {
+          "details": "Extracting up to 50 items using strategy...",
+          "step": "Step 4: Data Extraction"
+        },
+        {
+          "details": {
+            "count": 17,
+            "sample": [
+              {
+                "name": "Lenovo YOGA Slim 7 14 - Ultra 5 125H | 14''-WUXGA-OLED | 16GB | 1TB | Win11Home",
+                "price": 3699,
+                "url": "https://www.komputronik.pl/product/990254/laptop-lenovo-yoga-slim-7-14-ultra-5-125h-14-wuxga-oled-16gb-1tb-win11home.html"
+              },
+              {
+                "name": "HP 255 G10 - Ryzen 7 7735U | 15,6''-FHD | 16GB | 512GB | Win11Home",
+                "price": 1999,
+                "url": "https://www.komputronik.pl/product/967342/laptop-hp-255-g10-ryzen-7-7735u-15-6-fhd-16gb-512gb-win11home.html"
+              },
+              {
+                "name": "HP ProBook 450 G10 - Core i5-1334U | 15,6''-FHD | 16GB | 512GB | Win11Home",
+                "price": 2799,
+                "url": "https://www.komputronik.pl/product/948480/laptop-hp-probook-450-g10-core-i5-1334u-15-6-fhd-16gb-512gb-win11home.html"
+              }
+            ]
+          },
+          "step": "Extraction Results"
+        }
+      ],
+      "decisions": [
+        {
+          "reason": "Page type: product_listing, prices: 78, product links: 1036",
+          "should_continue": true
+        }
+      ],
+      "extraction_strategy": {
+        "container_count": 17,
+        "container_selector": "div.border-transparent",
+        "fields": {
+          "name": {
+            "sample": "Lenovo YOGA Slim 7 14 - Ultra 5 125H | 14''-WUXGA-",
+            "selector": "a"
+          },
+          "price": {
+            "sample": "3\u00a0699 z\u0142",
+            "selector": "div.text-red-pastel",
+            "value": 3699
+          },
+          "url": {
+            "sample": "https://www.komputronik.pl/product/990254/laptop-lenovo-yoga-slim-7-14-ultra-5-125h-14-wuxga-oled-16gb-1tb-win11home.html",
+            "selector": "a[href]"
+          }
+        }
+      }
+    },
+    "price_limit": 3950.0,
+    "products": [
+      {
+        "name": "Lenovo YOGA Slim 7 14 - Ultra 5 125H | 14''-WUXGA-OLED | 16GB | 1TB | Win11Home",
+        "price": 3699,
+        "url": "https://www.komputronik.pl/product/990254/laptop-lenovo-yoga-slim-7-14-ultra-5-125h-14-wuxga-oled-16gb-1tb-win11home.html"
+      },
+      {
+        "name": "HP 255 G10 - Ryzen 7 7735U | 15,6''-FHD | 16GB | 512GB | Win11Home",
+        "price": 1999,
+        "url": "https://www.komputronik.pl/product/967342/laptop-hp-255-g10-ryzen-7-7735u-15-6-fhd-16gb-512gb-win11home.html"
+      },
+      {
+        "name": "HP ProBook 450 G10 - Core i5-1334U | 15,6''-FHD | 16GB | 512GB | Win11Home",
+        "price": 2799,
+        "url": "https://www.komputronik.pl/product/948480/laptop-hp-probook-450-g10-core-i5-1334u-15-6-fhd-16gb-512gb-win11home.html"
+      },
+      {
+        "name": "Lenovo ThinkBook 16 G8 - Core i5-13420H | 16''-WUXGA | 16GB | 512GB | Win11Pro",
+        "price": 3399,
+        "url": "https://www.komputronik.pl/product/985461/laptop-lenovo-thinkbook-16-g6-core-i5-13420h-16-wuxga-16gb-512gb-win11pro-21sh00jmpb.html"
+      },
+      {
+        "name": "ASUS VivoBook 15 X1504VA-BQ2932W - Core 5-120U | 15,6'' | 16GB | 512GB | W11H | Niebieski",
+        "price": 2383,
+        "url": "https://www.komputronik.pl/product/981501/laptop-asus-vivobook-15-x1504va-bq2932w-core-5-120u-15-6-16gb-512gb-w11h-niebieski.html"
+      },
+      {
+        "name": "HP 17-cp3114nw - Ryzen 7 7730U | 17,3''-FHD | 16GB | 512GB | Win11Home | Srebrny",
+        "price": 2549,
+        "url": "https://www.komputronik.pl/product/915367/laptop-hp-17-ryzen-7-7730u-17-3-fhd-16gb-512gb-win11home-srebrny.html"
+      },
+      {
+        "name": "DELL Inspiron 5440 - Core 7 150U | 14'' | 16GB | 1TB | Win11 | MX570 | Pod\u015bw. klawiatura",
+        "price": 3499,
+        "url": "https://www.komputronik.pl/product/983625/laptop-dell-inspiron-5440-core-7-150u-14-16gb-1tb-win11-mx570-podsw-klawiatura.html"
+      },
+      {
+        "name": "HP Victus 15 - Ryzen 5 8645HS | 15,6''-144Hz | 16GB | 512GB | Win11Home | RTX4050 | Bia\u0142y",
+        "price": 3499,
+        "url": "https://www.komputronik.pl/product/915443/laptop-hp-victus-15-ryzen-5-8645hs-15-6-144hz-16gb-512gb-win11home-rtx4050.html"
+      },
+      {
+        "name": "HP ProBook 465 G11 - Ryzen 5 7535U | 16''-WUXGA | 16GB | 512GB | Win11Home",
+        "price": 2549,
+        "url": "https://www.komputronik.pl/product/946382/laptop-hp-probook-465-g11-ryzen-5-7535u-16-wuxga-16gb-512gb-win11home.html"
+      },
+      {
+        "name": "HP Pavilion 16-ag0003nw - Ryzen 7 8840U | 16''-WUXGA | 16GB | 1TB | Win11Home | Srebrny",
+        "price": 2899,
+        "url": "https://www.komputronik.pl/product/915378/laptop-hp-pavilion-16-ryzen-7-8840u-16-wuxga-16gb-512gb-win11home-srebrny.html"
+      },
+      {
+        "name": "Lenovo YOGA Slim 7 14 - Ryzen AI 5 340 | 14''-WUXGA-OLED | 16GB | 512GB | Win11Home",
+        "price": 3299,
+        "url": "https://www.komputronik.pl/product/967476/laptop-lenovo-yoga-slim-7-14-ryzen-ai-5-340-14-wuxga-oled-dotyk-16gb-512gb-win11home.html"
+      },
+      {
+        "name": "DELL Inspiron 15 3520 - i7-1255U | 15,6'' | 32GB | 1TB | Pod\u015bw. klawiatura | Win11 | Srebrny",
+        "price": 3199,
+        "url": "https://www.komputronik.pl/product/970712/laptop-dell-inspiron-15-3520-i7-1255u-15-6-32gb-1tb-podsw-klawiatura-win11-srebrny.html"
+      },
+      {
+        "name": "DELL Inspiron 3530 - i5-1334U | 15,6'' | 16GB | 1TB | Win11 | Czarny",
+        "price": 2499,
+        "url": "https://www.komputronik.pl/product/972098/laptop-dell-inspiron-3530-i5-1334u-15-6-16gb-1tb-win11-czarny.html"
+      },
+      {
+        "name": "Lenovo Ideapad Slim 3-15 - Ryzen 5 7533HS | 15,3''-WUXGA | 16GB | 512GB | Pod\u015bw. klaw. | Win11Home | Niebieski",
+        "price": 2299,
+        "url": "https://www.komputronik.pl/product/975723/laptop-lenovo-ideapad-slim-3-15-ryzen-5-7533hs-15-3-wuxga-16gb-512gb-podsw-klawiatura-niebieski.html"
+      },
+      {
+        "name": "ASUS TUF Gaming F16 FX607VJ-RL001W - Core 5-210H | 16'' | 144Hz | 16GB | 512GB | W11H | RTX3050",
+        "price": 2799,
+        "url": "https://www.komputronik.pl/product/972598/laptop-asus-tuf-gaming-f16-fx607vj-rl001w-core-5-210h-16-144hz-16gb-512gb-w11h-rtx3050.html"
+      }
+    ],
+    "reason": "Success"
+  },
+  "run_log": "logs/run-20251125-232753.md",
+  "screenshots": [],
+  "steps_taken": 0,
   "success": true,
-  "timestamp": "2025-11-24T08:29:48.844432"
+  "suggested_commands": [],
+  "timestamp": "2025-11-25T23:28:19.046794"
 }

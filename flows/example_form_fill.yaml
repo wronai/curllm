@@ -1,0 +1,26 @@
+# Form filling flow
+name: "Contact Form Automation"
+description: "Automatically fill contact form on webpage"
+
+diagnostics: true
+
+input:
+  type: "json"
+  data:
+    url: "https://example.com/contact"
+    form_data:
+      name: "John Doe"
+      email: "john@example.com"
+      phone: "+1234567890"
+      message: "Automated test message"
+
+steps:
+  - component: "curllm://fill_form"
+    params:
+      url: "${url}"
+      visual: true
+      stealth: true
+      
+  - component: "file://write"
+    params:
+      path: "/tmp/form_result.json"

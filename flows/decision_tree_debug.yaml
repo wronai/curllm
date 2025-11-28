@@ -1,0 +1,45 @@
+# Decision Tree Debug Flow - Diagnose form filling issues
+name: "Decision Tree Debugger"
+description: "Debug form filling with detailed diagnostics at each step"
+
+diagnostics: true
+trace: true
+
+input:
+  data:
+    url: "https://www.prototypowanie.pl/kontakt/"
+    instruction: "Fill name field with John Doe"
+
+steps:
+  # Step 1: Browse to page
+  - component: "curllm://browse"
+    params:
+      url: "${url}"
+      stealth: true
+      visual: true
+      
+  # Step 2: Capture DOM with ACTUAL values (fixes bug)
+  - component: "dom-snapshot://capture"
+    params:
+      include_values: true  # Critical: get actual field values
+      
+  # Step 3: Analyze forms
+  - component: "dom-analyze://extract"
+    params:
+      type: "forms"
+      
+  # Step 4: Map fields
+  - component: "field-mapper://map"
+    params:
+      strategy: "fuzzy"
+      instruction: "${instruction}"
+      
+  # Step 5: Validate mapping
+  - component: "dom-validate://check"
+    params:
+      type: "form_filled"
+      
+  # Step 6: Save debug info
+  - component: "file://write"
+    params:
+      path: "/tmp/decision_tree_debug.json"

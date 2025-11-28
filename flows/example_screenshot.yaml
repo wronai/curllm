@@ -1,0 +1,20 @@
+# Screenshot capture flow
+name: "Website Screenshot"
+description: "Capture screenshots of websites"
+
+diagnostics: false
+
+input:
+  type: "json"
+  data:
+    url: "https://example.com"
+    output_path: "/tmp/screenshot.png"
+
+steps:
+  - component: "curllm://screenshot"
+    params:
+      url: "${url}"
+      
+  - component: "file://write"
+    params:
+      path: "${output_path}"
