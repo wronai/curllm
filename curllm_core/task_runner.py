@@ -538,8 +538,32 @@ async def _execute_tool(executor, page, instruction: str, tool_name: str, args: 
                 
                 det = None
                 
-                # TRY LLM ORCHESTRATOR MODE FIRST (if enabled and LLM available)
-                if use_llm_orchestrator and hasattr(executor, 'llm') and executor.llm:
+                # TRY STREAMWARE ORCHESTRATOR FIRST (primary method)
+                use_streamware = runtime.get("streamware_form", True)  # Default enabled
+                if use_streamware:
+                    try:
+                        if run_logger:
+                            run_logger.log_text("\n---\n# 🧩 Streamware Atomic Form Orchestrator\n")
+                        
+                        from curllm_core.streamware.components.form import form_fill_tool
+                        streamware_result = await form_fill_tool(page, merged_args, run_logger)
+                        
+                        if streamware_result and streamware_result.get("form_fill", {}).get("submitted"):
+                            det = streamware_result.get("form_fill")
+                            if run_logger:
+                                run_logger.log_text("\n## ✅ Streamware Result\n")
+                                run_logger.log_text(f"**Status:** Form submitted successfully")
+                        else:
+                            if run_logger:
+                                run_logger.log_text("⚠️ Streamware did not submit, trying legacy orchestrator")
+                            det = None
+                    except Exception as sw_err:
+                        if run_logger:
+                            run_logger.log_text(f"⚠️ Streamware failed: {sw_err}, trying legacy")
+                        det = None
+                
+                # FALLBACK: TRY LLM ORCHESTRATOR MODE (if Streamware failed)
+                if det is None and use_llm_orchestrator and hasattr(executor, 'llm') and executor.llm:
                     try:
                         # Check if transparent mode is enabled
                         use_transparent = runtime.get("llm_transparent_orchestrator", False)
@@ -612,29 +636,6 @@ async def _execute_tool(executor, page, instruction: str, tool_name: str, args: 
                     except Exception as llm_err:
                         if run_logger:
                             run_logger.log_text(f"⚠️  LLM Orchestrator failed: {str(llm_err)}, falling back to deterministic")
-                        det = None
-                
-                # TRY STREAMWARE ORCHESTRATOR (atomic components)
-                use_streamware = runtime.get("streamware_form", True)  # Default enabled
-                if det is None and use_streamware:
-                    try:
-                        if run_logger:
-                            run_logger.log_text("🧩 Using Streamware atomic form orchestrator")
-                        
-                        from curllm_core.streamware.components.form import form_fill_tool
-                        streamware_result = await form_fill_tool(page, merged_args, run_logger)
-                        
-                        if streamware_result and streamware_result.get("form_fill", {}).get("submitted"):
-                            det = streamware_result.get("form_fill")
-                            if run_logger:
-                                run_logger.log_text("✅ Streamware orchestrator succeeded")
-                        else:
-                            if run_logger:
-                                run_logger.log_text("⚠️  Streamware orchestrator did not submit, trying fallback")
-                            det = None
-                    except Exception as sw_err:
-                        if run_logger:
-                            run_logger.log_text(f"⚠️  Streamware failed: {sw_err}, trying fallback")
                         det = None
                 
                 # FALLBACK: DETERMINISTIC MODE (legacy)

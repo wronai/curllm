@@ -35,7 +35,7 @@ class DOMStatistics:
         self.class_frequency = defaultdict(int)
         self.text_length_by_depth = defaultdict(list)
     
-    def analyze_dom_tree(self, page) -> Dict[str, Any]:
+    async def analyze_dom_tree(self, page) -> Dict[str, Any]:
         """
         Analyze entire DOM tree structure
         
@@ -49,10 +49,10 @@ class DOMStatistics:
             "statistical_insights": {}
         }
         
-        # Gather statistics from page
-        self._gather_depth_stats(page)
-        self._gather_feature_stats(page)
-        self._gather_class_patterns(page)
+        # Gather statistics from page (async methods)
+        await self._gather_depth_stats(page)
+        await self._gather_feature_stats(page)
+        await self._gather_class_patterns(page)
         
         # Calculate statistical properties
         stats["depth_distribution"] = dict(self.depth_map)
@@ -73,7 +73,7 @@ class DOMStatistics:
         
         return stats
     
-    def _gather_depth_stats(self, page):
+    async def _gather_depth_stats(self, page):
         """Gather element count statistics per depth level"""
         # Use JavaScript to analyze DOM depth
         script = """
@@ -105,7 +105,7 @@ class DOMStatistics:
         """
         
         try:
-            result = page.evaluate(script)
+            result = await page.evaluate(script)
             self.depth_map = defaultdict(int, {int(k): v for k, v in result['depthMap'].items()})
             self.text_length_by_depth = defaultdict(list, {
                 int(k): v for k, v in result['textLengthByDepth'].items()
@@ -113,7 +113,7 @@ class DOMStatistics:
         except Exception:
             pass
     
-    def _gather_feature_stats(self, page):
+    async def _gather_feature_stats(self, page):
         """Gather price/link/image statistics per depth"""
         script = """
         const stats = {
@@ -158,14 +158,14 @@ class DOMStatistics:
         """
         
         try:
-            result = page.evaluate(script)
+            result = await page.evaluate(script)
             self.price_depth_map = defaultdict(int, {int(k): v for k, v in result['prices'].items()})
             self.link_depth_map = defaultdict(int, {int(k): v for k, v in result['links'].items()})
             self.image_depth_map = defaultdict(int, {int(k): v for k, v in result['images'].items()})
         except Exception:
             pass
     
-    def _gather_class_patterns(self, page):
+    async def _gather_class_patterns(self, page):
         """Find repeating class patterns (potential product containers)"""
         script = """
         const classFreq = {};
@@ -184,7 +184,7 @@ class DOMStatistics:
         """
         
         try:
-            result = page.evaluate(script)
+            result = await page.evaluate(script)
             self.class_frequency = defaultdict(int, result)
         except Exception:
             pass
@@ -342,7 +342,7 @@ class AdaptiveDepthAnalyzer:
             }
         """
         # Gather statistics
-        dom_stats = self.stats.analyze_dom_tree(page)
+        dom_stats = await self.stats.analyze_dom_tree(page)
         
         # Extract optimal depths
         optimal_depths = dom_stats.get("optimal_depths", {})

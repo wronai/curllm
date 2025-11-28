@@ -199,13 +199,14 @@ class BQLExtractionOrchestrator:
             )
         else:
             task_intro = "Analyze DOM for articles."
-            specifics = "Find: container, title, link selectors"
+            specifics = "Find: container, title, link selectors from actual DOM structure"
+            # NO HARDCODED SELECTORS - LLM analyzes actual DOM
             schema = (
                 "{\n"
-                "  \"container\": \"tr.athing|.story\",\n"
-                "  \"title\": \"a.titlelink|h3 a\",\n"
-                "  \"link\": \"a[href]\",\n"
-                "  \"confidence\": 0.8\n"
+                "  \"container\": \"<detect from DOM - repeating article elements>\",\n"
+                "  \"title\": \"<detect from DOM - heading or link text element>\",\n"
+                "  \"link\": \"<detect from DOM - anchor with href>\",\n"
+                "  \"confidence\": 0.0-1.0\n"
                 "}"
             )
         # Safe headings extraction

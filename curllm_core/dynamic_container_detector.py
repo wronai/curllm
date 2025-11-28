@@ -298,9 +298,12 @@ class DynamicContainerDetector:
         
         # If LLM validation available, check its decision
         if llm_validation:
-            # If LLM rejected all candidates, respect that!
-            valid_count = llm_validation.get('valid_count', 0)
-            if valid_count == 0:
+            # Count valid containers from validated list
+            validated = llm_validation.get('validated', [])
+            valid_count = sum(1 for v in validated if v.get('is_valid', True))
+            
+            # If LLM rejected ALL candidates, respect that
+            if valid_count == 0 and len(validated) > 0:
                 self._log("⚠️ LLM rejected all candidates - no valid product containers found")
                 return None  # Respect LLM's decision
             
@@ -309,9 +312,19 @@ class DynamicContainerDetector:
                 recommended = llm_validation['recommended']
                 # Add combined confidence
                 statistical_score = recommended.get('statistical_score', 0)
-                llm_confidence = recommended.get('llm_confidence', 0)
+                llm_confidence = recommended.get('llm_confidence', recommended.get('confidence', 0.5))
                 recommended['combined_confidence'] = (statistical_score / 100 + llm_confidence) / 2
                 return recommended
+            
+            # No recommendation but some valid - use first valid
+            for v in validated:
+                if v.get('is_valid', True):
+                    # Find matching candidate
+                    for c in statistical_candidates:
+                        if c.get('selector') == v.get('selector'):
+                            c['llm_confidence'] = v.get('confidence', 0.5)
+                            c['combined_confidence'] = (c.get('statistical_score', 0) / 100 + c['llm_confidence']) / 2
+                            return c
         
         # Otherwise, use top statistical candidate (if LLM unavailable)
         best = statistical_candidates[0]

@@ -244,11 +244,16 @@ async def extract_links_by_selectors(instruction: str, page, run_logger=None) ->
               document.querySelectorAll(s).forEach(push);
             });
           } catch (e) {}
-          // Fallback for Hacker News current/legacy structure
+          // Dynamic fallback - find any visible links with substantial text
           if (out.length === 0) {
             try {
-              ['span.titleline a','a.titlelink','a.storylink'].forEach(s => {
-                document.querySelectorAll(s).forEach(push);
+              document.querySelectorAll('a[href]').forEach(a => {
+                const text = (a.innerText || '').trim();
+                const rect = a.getBoundingClientRect();
+                // Only visible links with meaningful text
+                if (text.length > 10 && rect.width > 0 && rect.height > 0) {
+                  push(a);
+                }
               });
             } catch (e) {}
           }

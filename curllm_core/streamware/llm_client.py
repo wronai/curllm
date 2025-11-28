@@ -272,3 +272,89 @@ async def llm_evaluate_success(page_diff: Dict) -> Dict[str, Any]:
 async def llm_find_selector(dom_context: str, description: str) -> Optional[str]:
     """Convenience function for selector finding."""
     return await get_llm().find_selector(dom_context, description)
+
+
+async def generate_missing_field_data(
+    missing_fields: List[Dict],
+    existing_data: Dict[str, str],
+    logger=None
+) -> Dict[str, str]:
+    """
+    Generate values for missing required fields using LLM.
+    
+    Args:
+        missing_fields: List of {name, type, tag, placeholder, required}
+        existing_data: Existing user data for context
+        logger: Optional logger
+        
+    Returns:
+        Dict of generated field values
+    """
+    if not missing_fields:
+        return {}
+    
+    llm = get_llm()
+    
+    # Build prompt
+    field_descs = []
+    for f in missing_fields:
+        desc = f"{f['name']} ({f['type']})"
+        if f.get('placeholder'):
+            desc += f" - placeholder: {f['placeholder']}"
+        field_descs.append(desc)
+    
+    prompt = f"""Generate realistic test values for these form fields.
+
+Missing fields:
+{chr(10).join(f'- {d}' for d in field_descs)}
+
+Existing data for context:
+{json.dumps(existing_data, ensure_ascii=False)}
+
+Rules:
+- Generate realistic, appropriate values
+- For textarea/message: generate a short professional message (1-2 sentences)
+- For phone: use format like "+48 123 456 789"
+- For name: generate a realistic name
+- Match the language/style of existing data
+
+Return ONLY JSON object:
+{{"field_name": "generated_value", ...}}
+
+JSON:"""
+
+    response = await llm.generate(prompt)
+    
+    try:
+        match = re.search(r'\{[^}]+\}', response, re.DOTALL)
+        if match:
+            generated = json.loads(match.group())
+            
+            # Map field names directly - no hardcoded type logic
+            result = {}
+            for field in missing_fields:
+                field_name = field['name']
+                
+                # Try to find value in generated data
+                value = generated.get(field_name)
+                if not value:
+                    # Try common variations
+                    for key in generated:
+                        if key.lower() in field_name or field_name in key.lower():
+                            value = generated[key]
+                            break
+                
+                if value:
+                    # Use field_name directly - no hardcoded type mappings
+                    # LLM already knows the field context from the prompt
+                    result[field_name] = value
+            
+            if logger:
+                _log(f"🤖 Generated {len(result)} field value(s)")
+            
+            return result
+    except Exception as e:
+        if logger:
+            _log(f"⚠️ Failed to generate field data: {e}")
+    
+    return {}

@@ -29,6 +29,89 @@ class AtomicFunctionExecutor:
         if self.run_logger:
             self.run_logger.log_text(f"      • {step}: {result}")
     
+    async def _discover_selectors_with_llm(self, entity_type: str) -> List[str]:
+        """
+        Use LLM to discover appropriate selectors for entity type.
+        
+        No hardcoded selectors - LLM analyzes page structure and suggests selectors.
+        """
+        # Get page structure sample
+        dom_sample = await self.page.evaluate("""
+        () => {
+            const elements = [];
+            document.querySelectorAll('*').forEach((el, i) => {
+                if (i > 500) return;
+                const rect = el.getBoundingClientRect();
+                if (rect.width > 0 && rect.height > 0) {
+                    const classes = el.className ? 
+                        (typeof el.className === 'string' ? el.className : '') : '';
+                    if (classes.length > 0 || el.id) {
+                        elements.push({
+                            tag: el.tagName.toLowerCase(),
+                            id: el.id || '',
+                            class: classes.substring(0, 100),
+                            text: (el.innerText || '').substring(0, 50)
+                        });
+                    }
+                }
+            });
+            return elements.slice(0, 100);
+        }
+        """)
+        
+        # Ask LLM to suggest selectors
+        try:
+            from curllm_core.streamware.llm_client import get_llm
+            llm = get_llm()
+            
+            prompt = f"""Analyze this DOM structure and suggest CSS selectors for finding {entity_type} containers.
+
+DOM sample (tag, id, class, text preview):
+{dom_sample[:2000]}
+
+Return JSON array of selectors to try, ordered by likelihood:
+["selector1", "selector2", ...]
+
+JSON:"""
+            
+            response = await llm.generate(prompt)
+            
+            import json
+            match = re.search(r'\[.*?\]', response, re.DOTALL)
+            if match:
+                selectors = json.loads(match.group())
+                self._log("llm_selectors", f"LLM suggested: {selectors}")
+                return selectors
+        except Exception as e:
+            self._log("llm_selectors", f"LLM failed: {e}, using fallback")
+        
+        # Fallback: generic dynamic detection
+        return await self._fallback_selector_discovery(entity_type)
+    
+    async def _fallback_selector_discovery(self, entity_type: str) -> List[str]:
+        """Fallback dynamic selector discovery without hardcoded patterns."""
+        # Find elements with repeating patterns
+        patterns = await self.page.evaluate("""
+        () => {
+            const classCount = {};
+            document.querySelectorAll('*').forEach(el => {
+                if (el.className && typeof el.className === 'string') {
+                    const first = el.className.split(' ')[0];
+                    if (first && first.length > 2) {
+                        classCount[first] = (classCount[first] || 0) + 1;
+                    }
+                }
+            });
+            // Return classes that appear 3+ times (potential containers)
+            return Object.entries(classCount)
+                .filter(([_, count]) => count >= 3)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 10)
+                .map(([cls, _]) => '.' + cls);
+        }
+        """)
+        return patterns if patterns else []
+    
     async def find_containers(self, entity_type: str = "product", min_count: int = 1) -> List[Dict]:
         """
         Find DOM containers that likely contain entities.
@@ -51,24 +134,9 @@ class AtomicFunctionExecutor:
         """
         self._log("find_containers", f"Looking for {entity_type} containers...")
         
-        # DEPRECATED: Hard-coded selectors removed
-        # Now using dynamic pattern detection from iterative_extractor
-        # Use iterative_extract() or dynamic_detector instead
-        selector_map = {
-            "product": [
-                # NO HARD-CODED SELECTORS!
-                # Dynamic detection will find patterns automatically
-            ],
-            "article": [
-                "article", ".post", ".entry", ".story",
-                "[itemtype*='Article']", ".article-item"
-            ],
-            "comment": [
-                ".comment", ".review", "[data-comment-id]"
-            ]
-        }
-        
-        selectors = selector_map.get(entity_type, ["article", "section", "div[class*='item']"])
+        # Use LLM to discover selectors dynamically
+        # No hardcoded selector patterns!
+        selectors = await self._discover_selectors_with_llm(entity_type)
         
         containers = []
         for selector in selectors:

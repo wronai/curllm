@@ -625,12 +625,28 @@ class IterativeExtractor:
                     f"(removed {original_count - filtered_count} above {price_limit} zł)"
                 )
         
+        # Step 6: Screenshot for documentation
+        screenshot_path = None
+        if self.run_logger:
+            try:
+                import time
+                screenshot_path = f"screenshots/extraction_{int(time.time())}.png"
+                await self.page.screenshot(path=screenshot_path)
+                
+                self.run_logger.log_text("\n## 📸 Extraction Screenshot\n")
+                self.run_logger.log_text(f"> `streamware.page.screenshot(path=\"{screenshot_path}\")`")
+                self.run_logger.log_text(f"\n![Extraction result](../{screenshot_path})\n")
+            except Exception as e:
+                if self.run_logger:
+                    self.run_logger.log_text(f"⚠️ Screenshot failed: {e}")
+        
         return {
             "products": products,
             "count": len(products),
             "reason": "Success" if products else "No products matched criteria",
             "metadata": self.state,
-            "price_limit": price_limit
+            "price_limit": price_limit,
+            "screenshot": screenshot_path
         }
 
 

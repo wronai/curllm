@@ -19,12 +19,14 @@ from .submit import (
 # Import Streamware LLM client
 try:
     from curllm_core.streamware.llm_client import (
-        get_llm, llm_map_fields, llm_evaluate_success, set_llm_logger
+        get_llm, llm_map_fields, llm_evaluate_success, set_llm_logger,
+        generate_missing_field_data
     )
     HAS_LLM = True
 except ImportError:
     HAS_LLM = False
     set_llm_logger = None
+    generate_missing_field_data = None
 
 
 def parse_instruction(instruction: str) -> Dict[str, str]:
@@ -154,16 +156,37 @@ async def orchestrate_form_fill(
     if HAS_LLM and set_llm_logger and logger:
         set_llm_logger(logger)
     
-    def log(msg):
+    # Track all DSL commands for summary
+    dsl_commands = []
+    
+    def log(msg, inline=False):
         if logger:
-            logger.log_text(msg)
+            if inline:
+                logger.log_text(msg, newline=False)
+            else:
+                logger.log_text(msg)
         result["steps"].append(msg)
     
-    def log_dsl(action: str, args: dict = None):
+    def log_dsl(action: str, args: dict = None, description: str = None):
         """Log DSL command that could replay this action."""
         args_str = ", ".join(f'{k}="{v}"' for k, v in (args or {}).items())
         dsl = f"streamware.{action}({args_str})"
-        log(f"```dsl\n{dsl}\n```")
+        dsl_commands.append({"cmd": dsl, "desc": description or action})
+        log(f"> `{dsl}`")
+    
+    def log_raw(text: str):
+        """Log raw text without extra newlines (for tables, code blocks)."""
+        if logger and hasattr(logger, '_write'):
+            logger._write(text)
+        result["steps"].append(text)
+    
+    def log_table(headers: list, rows: list):
+        """Log a properly formatted markdown table."""
+        header_row = "| " + " | ".join(headers) + " |"
+        separator = "|" + "|".join(["---" for _ in headers]) + "|"
+        table_rows = [f"| {' | '.join(str(c) for c in row)} |" for row in rows]
+        table = "\n" + "\n".join([header_row, separator] + table_rows) + "\n\n"
+        log_raw(table)
     
     # Step 1: Parse instruction
     log("\n## 📝 Step 1: Parse Instruction\n")
@@ -188,10 +211,82 @@ async def orchestrate_form_fill(
     log(f"**Form selector:** `{form_selector}`")
     
     # Log detected fields in a table
-    log("\n| # | Type | Name | Selector |")
-    log("|---|------|------|----------|")
-    for i, f in enumerate(fields[:10]):  # Max 10 fields
-        log(f"| {i} | {f.get('type', '')} | {f.get('name', '')} | `{f.get('selector', '')[:40]}` |")
+    if fields:
+        rows = []
+        for i, f in enumerate(fields[:10]):
+            sel = f.get('selector') or 'N/A'
+            req = "✓" if f.get('required') else ""
+            rows.append([i, f.get('type', ''), f.get('name', ''), req, f"`{sel[:30]}`"])
+        log_table(["#", "Type", "Name", "Req", "Selector"], rows)
+    else:
+        log("⚠️ **No fields detected in form**")
+    
+    # Step 2b: Check for missing required data and generate with LLM
+    log("\n## 🔍 Step 2b: Analyze Required Fields\n")
+    
+    # Find required fields that need data
+    required_fields = []
+    for f in fields:
+        field_type = f.get('type', '').lower()
+        field_name = f.get('name', '').lower()
+        
+        # Skip submit, file, checkbox, hidden
+        if field_type in ['submit', 'file', 'hidden', 'checkbox', 'button']:
+            continue
+        
+        # Check if required or looks like a main form field
+        is_required = f.get('required', False)
+        is_main_field = field_type in ['email', 'text', 'textarea', 'tel']
+        
+        if is_required or is_main_field:
+            required_fields.append({
+                "type": field_type,
+                "name": field_name,
+                "tag": f.get('tag', ''),
+                "placeholder": f.get('placeholder', ''),
+                "required": is_required
+            })
+    
+    # Check what data we have vs what's needed
+    missing_fields = []
+    for rf in required_fields:
+        field_name = rf['name']
+        field_type = rf['type']
+        
+        # Check if we have data for this field
+        has_data = False
+        for data_key, data_value in user_data.items():
+            if data_value and data_value.strip():  # Has non-empty value
+                # Check if data_key matches field
+                if data_key.lower() in field_name or field_name in data_key.lower():
+                    has_data = True
+                    break
+                if data_key == 'email' and field_type == 'email':
+                    has_data = True
+                    break
+                if data_key == 'message' and (rf['tag'] == 'textarea' or field_type == 'textarea'):
+                    has_data = True
+                    break
+        
+        if not has_data:
+            missing_fields.append(rf)
+    
+    if missing_fields:
+        log(f"**Missing data for {len(missing_fields)} field(s):**")
+        for mf in missing_fields:
+            log(f"- `{mf['name']}` ({mf['type']})")
+        
+        # Use LLM to generate missing data
+        if HAS_LLM:
+            log("\n> 🤖 Generating missing field values with LLM...")
+            log_dsl("llm.generate_field_values", {"missing": str([m['name'] for m in missing_fields])})
+            
+            generated = await generate_missing_field_data(missing_fields, user_data, logger)
+            if generated:
+                user_data.update(generated)
+                log(f"**Generated values:** `{list(generated.keys())}`")
+    else:
+        log("**All required fields have data** ✓")
     
     # Step 3: Map fields to data using LLM
     log("\n## 🗺️ Step 3: LLM Field Mapping\n")
@@ -286,15 +381,77 @@ async def orchestrate_form_fill(
     result["submitted"] = True
     log(f"**Clicked:** `{submit_result.get('selector')}`")
     
-    # Wait for response
-    log_dsl("page.wait", {"ms": "2000"})
+    # Wait for response - longer wait for AJAX forms
+    log_dsl("page.wait", {"ms": "3000"})
     try:
-        await page.wait_for_timeout(2000)
+        # Wait for network to stabilize
+        await page.wait_for_load_state("networkidle", timeout=5000)
     except Exception:
         pass
     
-    # Step 6: Analyze success with LLM
-    log("\n## 🎯 Step 6: LLM Success Analysis\n")
+    try:
+        await page.wait_for_timeout(1500)  # Extra time for DOM updates
+    except Exception:
+        pass
+    
+    # Step 6: Capture page response
+    log("\n## 📄 Step 6: Page Response After Submit\n")
+    log_dsl("page.capture_response", {"moment": "after_submit"})
+    
+    # Capture visible text that user sees
+    try:
+        visible_response = await page.evaluate("""
+        () => {
+            // Look for common success message containers
+            const selectors = [
+                '.success', '.message', '.alert', '.notification',
+                '[class*="success"]', '[class*="message"]', '[class*="thank"]',
+                '.form-response', '.form-message', '[role="alert"]'
+            ];
+            
+            let responseText = '';
+            for (const sel of selectors) {
+                const els = document.querySelectorAll(sel);
+                els.forEach(el => {
+                    const text = el.innerText?.trim();
+                    if (text && text.length > 5 && text.length < 500) {
+                        responseText += text + '\\n';
+                    }
+                });
+            }
+            
+            // Also check for any new visible text near form
+            const form = document.querySelector('form');
+            if (form) {
+                const parent = form.parentElement;
+                if (parent) {
+                    const siblings = parent.children;
+                    for (const sib of siblings) {
+                        if (sib !== form && sib.innerText) {
+                            const text = sib.innerText.trim();
+                            if (text.length > 10 && text.length < 200) {
+                                responseText += text + '\\n';
+                            }
+                        }
+                    }
+                }
+            }
+            
+            return responseText.trim() || null;
+        }
+        """)
+        
+        if visible_response:
+            log(f"**Server response:**\n```\n{visible_response[:500]}\n```")
+            result["server_response"] = visible_response
+        else:
+            log("**Server response:** _(no visible response message detected)_")
+            
+    except Exception as resp_err:
+        log(f"⚠️ Could not capture response: {resp_err}")
+    
+    # Step 7: Analyze success with LLM
+    log("\n## 🎯 Step 7: LLM Success Analysis\n")
     log_dsl("page.capture_state", {"moment": "after_submit"})
     success_data = await detect_success_data(page, state_before)
     
@@ -302,14 +459,15 @@ async def orchestrate_form_fill(
     llm_context = success_data.get("llm_context", {})
     
     # Log changes in a table
-    log("\n**Page changes detected:**\n")
-    log("| Change | Value |")
-    log("|--------|-------|")
-    log(f"| URL changed | {diff.get('url_changed', False)} |")
-    log(f"| Form disappeared | {diff.get('form_disappeared', False)} |")
-    log(f"| New errors | {diff.get('new_errors', False)} |")
+    log("\n**Page changes detected:**")
+    changes_rows = [
+        ["URL changed", "✅" if diff.get('url_changed') else "❌"],
+        ["Form disappeared", "✅" if diff.get('form_disappeared') else "❌"],
+        ["New errors", "⚠️" if diff.get('new_errors') else "❌"],
+    ]
     if diff.get("new_text"):
-        log(f"| New text | `{diff.get('new_text', '')[:50]}...` |")
+        changes_rows.append(["New text", f"`{diff.get('new_text', '')[:40]}...`"])
+    log_table(["Change", "Status"], changes_rows)
     
     # Evaluate with LLM
     log_dsl("llm.evaluate_success", {"diff": "page_changes"})
@@ -380,6 +538,28 @@ async def orchestrate_form_fill(
         
     except Exception as ss_err:
         log(f"⚠️ **Screenshot error:** {ss_err}")
+    
+    # Generate DSL summary for replay
+    log("\n---\n## 📋 DSL Execution Summary\n")
+    log("**Complete DSL sequence for replay:**")
+    
+    # Build code block as single string
+    dsl_block = "\n```streamware\n"
+    dsl_block += "\n".join(cmd["cmd"] for cmd in dsl_commands)
+    dsl_block += "\n```\n"
+    log_raw(dsl_block)
+    
+    # Result summary
+    status = "✅ SUCCESS" if result.get("success") else "⚠️ PARTIAL"
+    summary = f"""
+**Execution result:**
+- **Status:** {status}
+- **Fields filled:** `{list(result.get('filled', {}).keys())}`
+- **Submitted:** {result.get('submitted', False)}
+"""
+    if result.get("errors"):
+        summary += f"- **Errors:** {result['errors']}\n"
+    log_raw(summary)
     
     return result
 
