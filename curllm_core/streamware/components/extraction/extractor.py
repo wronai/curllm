@@ -153,53 +153,78 @@ async def extract_products(
     """
     Extract product data using LLM for pattern detection.
     """
-    # First, get page structure
-    js = """
-    () => {
-        const products = [];
-        
-        // Find potential product containers
-        const containers = document.querySelectorAll(
-            '[class*="product"], [class*="item"], [class*="card"], article, .woocommerce-loop-product__link'
-        );
-        
-        containers.forEach((el, i) => {
-            if (i >= 100) return;
-            
-            const rect = el.getBoundingClientRect();
-            if (rect.width < 100 || rect.height < 50) return;
-            
-            // Try to find product info
-            const nameEl = el.querySelector('h1, h2, h3, h4, .product-title, .title, [class*="name"]');
-            const priceEl = el.querySelector('[class*="price"], .amount');
-            const linkEl = el.querySelector('a[href]');
-            
-            if (nameEl || priceEl) {
-                products.push({
-                    name: nameEl ? nameEl.innerText.trim().substring(0, 100) : '',
-                    price: priceEl ? priceEl.innerText.trim() : '',
-                    url: linkEl ? linkEl.href : ''
-                });
-            }
-        });
-        
-        return products;
-    }
-    """
+    # Use dynamic container detection - no hardcoded selectors
+    from .container import detect_containers, extract_from_container
     
     try:
-        products = await page.evaluate(js) or []
+        # Step 1: Detect containers dynamically
+        detection = await detect_containers(page, entity_type="product", min_count=3)
         
-        # Filter empty and deduplicate
+        if detection.get("found") and detection.get("best"):
+            container_selector = detection["best"]["selector"]
+            
+            # Step 2: Extract from detected containers
+            result = await extract_from_container(
+                page, 
+                container_selector,
+                max_items=max_items
+            )
+            
+            return {
+                "data": result.get("items", [])[:max_items],
+                "count": result.get("count", 0),
+                "container": container_selector
+            }
+        
+        # Fallback: Use statistical pattern detection
+        products = await page.evaluate("""
+        () => {
+            const products = [];
+            const priceRegex = /(\\d+[\\d\\s]*(?:[\\.,]\\d{2})?)\\s*(?:zł|PLN|€|\\$|USD|EUR)/i;
+            
+            // Find elements with prices
+            document.querySelectorAll('*').forEach(el => {
+                const text = (el.innerText || '').substring(0, 500);
+                if (!priceRegex.test(text)) return;
+                
+                const rect = el.getBoundingClientRect();
+                if (rect.width < 100 || rect.height < 50) return;
+                
+                // Get name from heading or link
+                const headings = el.querySelectorAll('h1, h2, h3, h4, a');
+                let name = '';
+                headings.forEach(h => {
+                    const t = (h.innerText || '').trim();
+                    if (t.length > name.length && t.length < 200) name = t;
+                });
+                
+                const priceMatch = text.match(priceRegex);
+                const link = el.querySelector('a[href]');
+                
+                if (name && priceMatch) {
+                    products.push({
+                        name: name.substring(0, 100),
+                        price: priceMatch[0],
+                        url: link ? link.href : ''
+                    });
+                }
+            });
+            
+            return products.slice(0, 50);
+        }
+        """)
+        
+        # Deduplicate
         seen = set()
         unique = []
-        for p in products:
+        for p in (products or []):
             key = (p.get("name", ""), p.get("url", ""))
-            if key not in seen and (p.get("name") or p.get("price")):
+            if key not in seen and p.get("name"):
                 seen.add(key)
                 unique.append(p)
         
         return {"data": unique[:max_items], "count": len(unique)}
+        
     except Exception as e:
         return {"data": [], "count": 0, "error": str(e)}
 

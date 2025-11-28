@@ -458,6 +458,11 @@ async def orchestrate_form_fill(
     diff = success_data.get("diff", {})
     llm_context = success_data.get("llm_context", {})
     
+    # Add server response to context for better evaluation
+    if result.get("server_response"):
+        diff["server_response"] = result["server_response"]
+        llm_context["server_response"] = result["server_response"]
+    
     # Log changes in a table
     log("\n**Page changes detected:**")
     changes_rows = [
@@ -486,8 +491,17 @@ async def orchestrate_form_fill(
         result["llm_confidence"] = llm_result.get("confidence", 0)
     else:
         # Fallback heuristics
-        if diff.get("form_disappeared") or diff.get("url_changed") or len(diff.get("messages", [])) > 0:
-            log("**Heuristic:** ✓ Success indicators detected")
+        server_resp = result.get("server_response", "").lower()
+        has_success_indicator = any(word in server_resp for word in [
+            "thank", "dziękuj", "success", "sukces", "wysłan", "sent", 
+            "otrzym", "received", "potwierdz", "confirm"
+        ])
+        
+        if has_success_indicator:
+            log("**Heuristic:** ✓ Success message detected in server response")
+            result["success"] = True
+        elif diff.get("form_disappeared") or diff.get("url_changed") or len(diff.get("messages", [])) > 0:
+            log("**Heuristic:** ✓ Success indicators detected (form/URL change)")
             result["success"] = True
         elif result["submitted"] and filled_count > 0 and not diff.get("new_errors"):
             log("**Heuristic:** ⚠️ No explicit success, but form submitted with data")
@@ -495,8 +509,8 @@ async def orchestrate_form_fill(
         else:
             log("**Heuristic:** ⚠️ Success unclear")
     
-    # Step 7: Capture screenshot of form area
-    log("\n## 📸 Step 7: Form Screenshot\n")
+    # Step 8: Capture screenshot of form area
+    log("\n## 📸 Step 8: Form Screenshot\n")
     
     try:
         import time
