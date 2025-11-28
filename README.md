@@ -18,6 +18,7 @@
 - **🧠 Local LLM Integration**: Run on 8GB GPUs with models like Qwen 2.5, Mistral, or Llama
 - **🎯 Hierarchical Planner**: 87% token reduction with intelligent 3-level decision tree ([docs](docs/HIERARCHICAL_PLANNER.md))
 - **📝 Smart Form Filling**: Automated form completion with error detection and remediation ([docs](docs/FORM_FILLING.md))
+- **🧩 Streamware DSL**: Atomic browser automation with replayable DSL commands ([streamware-js](https://github.com/wronai/streamware-js))
 - **👁️ Visual Analysis**: Computer vision for CAPTCHA detection and page understanding  
 - **🥷 Stealth Mode**: Advanced anti-bot detection bypass techniques
 - **🔍 BQL Support**: Browser Query Language for structured data extraction

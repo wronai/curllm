@@ -398,6 +398,9 @@ class IterativeExtractor:
         self._log("Field Detection Results", result)
         
         if result["found"]:
+            # Ensure extraction_strategy exists
+            if self.state["extraction_strategy"] is None:
+                self.state["extraction_strategy"] = {"container_selector": container_selector}
             self.state["extraction_strategy"]["fields"] = result["fields"]
         
         return result
@@ -493,8 +496,8 @@ class IterativeExtractor:
                         }
                     }
                     
-                    // Add if has at least name OR (price AND url)
-                    if ((product.name && product.url) || (product.price && product.url)) {
+                    // Add if has at least name AND price (url optional)
+                    if (product.name && product.price) {
                         products.push(product);
                     }
                 }

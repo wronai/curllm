@@ -282,10 +282,18 @@ async def product_heuristics(instruction: str, page, run_logger=None) -> Optiona
     if run_logger:
         run_logger.log_text("⚠️ products.heuristics is DEPRECATED - using dynamic extraction system")
     
+    # Get LLM instance
+    try:
+        from .streamware.components.llm import get_llm
+        llm = get_llm()
+    except Exception:
+        from .llm_factory import setup_llm
+        llm = setup_llm()
+    
     # Redirect to new dynamic system
     from .iterative_extractor import iterative_extract
     try:
-        result = await iterative_extract(instruction, page, None, run_logger)
+        result = await iterative_extract(instruction, page, llm, run_logger)
         return result
     except Exception as e:
         if run_logger:
