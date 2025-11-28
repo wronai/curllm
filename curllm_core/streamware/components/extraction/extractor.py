@@ -1,10 +1,14 @@
 """
 Data Extraction from DOM
 
-Atomic extraction functions using LLM for pattern detection.
+DEPRECATED: Use llm_extractor.py for pure LLM-based extraction.
+This module is kept for backward compatibility only.
+
+For new code, use:
+    from .llm_extractor import LLMIterativeExtractor, llm_extract_products
 """
+import warnings
 from typing import Dict, Any, Optional, List
-import re
 import json
 
 try:
@@ -12,6 +16,13 @@ try:
     HAS_LLM = True
 except ImportError:
     HAS_LLM = False
+
+# Deprecation warning
+warnings.warn(
+    "extractor.py is deprecated. Use llm_extractor.py for pure LLM-based extraction.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 
 async def extract_data(

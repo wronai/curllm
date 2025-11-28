@@ -411,6 +411,17 @@ class IterativeExtractor:
                     const hasSpecs = /\\d+GB|\\d+TB|\\d+"|\\d+MHz|\\d+GHz|Core|Ryzen|GeForce|Radeon/i.test(text);
                     const hasMarketingNoise = /okazja|promocja|rabat|zwrot|kup|teraz|black|weeks|banner/i.test(text);
                     
+                    // CRITICAL: Cart/navigation penalties
+                    // Replace non-breaking spaces (U+00A0) with regular spaces
+                    const normalizedText = text.replace(/[\u00a0\xa0]/g, ' ').toLowerCase();
+                    // Match cart/navigation keywords with flexible whitespace
+                    const cartKeywords = ['twój pc', 'twój koszyk', 'your cart', 'koszyk', 'cart', 'zaloguj', 'login', 'menu', 'nawigacja'];
+                    const isCartNavigation = cartKeywords.some(kw => normalizedText.includes(kw));
+                    const hasZeroPrice = normalizedText.includes('0,00') || normalizedText.includes('0.00');
+                    
+                    if (isCartNavigation) score -= 100;  // Heavy penalty for cart/nav
+                    if (hasZeroPrice) score -= 50;  // Penalty for empty cart prices
+                    
                     if (hasProductKeywords) score += 15;  // Product-like text
                     if (hasSpecs) score += 20;  // Technical specs present
                     if (hasMarketingNoise) score -= 15;  // Marketing content
@@ -423,11 +434,15 @@ class IterativeExtractor:
                 
                 dynamicCandidates.sort((a, b) => b.score - a.score);
                 
+                // HARD FILTER: Remove candidates with negative scores (cart/navigation)
+                const validCandidates = dynamicCandidates.filter(c => c.score > 0);
+                
                 return {
-                    found: dynamicCandidates.length > 0,
-                    candidates: dynamicCandidates.slice(0, 3),
-                    best: dynamicCandidates[0] || null,
-                    method: 'dynamic_detection'
+                    found: validCandidates.length > 0,
+                    candidates: validCandidates.slice(0, 3),
+                    best: validCandidates[0] || null,
+                    method: 'dynamic_detection',
+                    filtered_out: dynamicCandidates.length - validCandidates.length
                 };
             }
         """, page_type)

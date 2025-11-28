@@ -1,12 +1,22 @@
 """
 Container Detection - Dynamic container discovery for extraction
 
-Uses statistical analysis + LLM to find repeating elements.
-No hardcoded selectors.
-"""
+DEPRECATED: Use container_finder.py for pure LLM-based detection.
+This module is kept for backward compatibility only.
 
+For new code, use:
+    from .container_finder import find_product_containers, analyze_container_content
+"""
+import warnings
 from typing import Dict, Any, List, Optional
 import json
+
+# Deprecation warning
+warnings.warn(
+    "container.py is deprecated. Use container_finder.py for pure LLM-based detection.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 
 async def detect_containers(

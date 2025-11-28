@@ -208,8 +208,12 @@ class DynamicContainerDetector:
         function isCartOrNavElement(element) {{
             const text = (element.textContent || '').toLowerCase();
             // Filter out cart, navigation, and header elements
-            const cartPatterns = ['twój pc', 'twój koszyk', 'your cart', 'shopping cart', 'zaloguj', 'login', 'menu główne'];
-            return cartPatterns.some(p => text.includes(p)) && text.length < 100;
+            const cartPatterns = ['twój pc', 'twój koszyk', 'your cart', 'shopping cart', 'zaloguj', 'login', 'menu główne', 'nawigacja', 'katalog produktów', 'konfigurator'];
+            const hasCartPattern = cartPatterns.some(p => text.includes(p));
+            // Check for empty cart prices (0,00 zł)
+            const hasZeroPrice = /0,00\s*zł|0\.00/i.test(text);
+            // If has cart pattern OR has zero price with short text = cart/nav element
+            return (hasCartPattern && text.length < 150) || (hasZeroPrice && text.length < 50);
         }}
         
         function hasProductLink(element) {{

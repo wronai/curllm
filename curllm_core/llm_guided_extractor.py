@@ -1,15 +1,14 @@
 """
-LLM-Guided Atomic Extractor - Decision Tree with Small Steps
+LLM-Guided Atomic Extractor - Pure LLM Decision Tree
 
-Instead of monolithic heuristics, LLM makes decisions at each atomic step:
+NO HARDCODED REGEX OR SELECTORS - Every decision made by LLM:
 
-1. LLM: "What container selector should I use?" → Dynamically detected from DOM
-2. LLM: "How do I extract name?" → Analyze text patterns in containers
-3. LLM: "How do I extract price?" → Detect price patterns dynamically
-4. Execute extraction with LLM-chosen strategy
-5. LLM: "Should I filter results?" → Yes, price < threshold
+1. LLM: "What container selector should I use?" → LLM analyzes DOM
+2. LLM: "How do I extract name?" → LLM determines strategy
+3. LLM: "How do I extract price?" → LLM parses price text
+4. LLM: "Should I filter results?" → LLM interprets criteria
 
-Each step is small, atomic, and LLM-guided.
+Each step is atomic and LLM-guided. NO REGEX IN CODE.
 """
 
 import json
@@ -87,7 +86,7 @@ JSON:"""
         """
         self._log("Step 1: Identify Container Selector", "Asking LLM...")
         
-        # Get sample HTML structure
+        # Get sample HTML structure - NO REGEX, just raw data for LLM
         sample_html = await self.page.evaluate("""
             () => {
                 const body = document.body;
@@ -96,7 +95,7 @@ JSON:"""
                 return elements.map(el => ({
                     tag: el.tagName.toLowerCase(),
                     classes: el.className,
-                    hasPrice: /\\d+[\\.,]\\d{2}\\s*(?:zł|PLN)/i.test(el.innerText || ''),
+                    text: (el.innerText || '').substring(0, 200),
                     hasLink: !!el.querySelector('a[href]'),
                     textLength: (el.innerText || '').length
                 }));
@@ -118,29 +117,37 @@ JSON:"""
     
     async def step2_verify_container(self, selector: str) -> Dict[str, Any]:
         """
-        Step 2: Verify container works
+        Step 2: Verify container works using LLM
         
-        Execute JS to check if selector finds items
+        Execute JS to get raw data, LLM analyzes if it's a product
         """
         self._log("Step 2: Verify Container", f"Testing selector: {selector}")
         
-        result = await self.page.evaluate(f"""
-            (selector) => {{
+        # Get raw data - NO REGEX
+        raw_result = await self.page.evaluate("""
+            (selector) => {
                 const containers = document.querySelectorAll(selector);
-                return {{
+                return {
                     found: containers.length > 0,
                     count: containers.length,
-                    sample: containers.length > 0 ? {{
-                        hasText: !!(containers[0].innerText || '').trim(),
-                        hasPrice: /\\d+[\\.,]\\d{{2}}\\s*(?:zł|PLN)/i.test(containers[0].innerText || ''),
+                    sample: containers.length > 0 ? {
+                        text: (containers[0].innerText || '').substring(0, 500),
                         hasLink: !!containers[0].querySelector('a[href]')
-                    }} : null
-                }};
-            }}
+                    } : null
+                };
+            }
         """, selector)
         
-        self._log("Container Verification", result)
-        return result
+        # Let LLM verify if this looks like a product container
+        if raw_result.get("sample"):
+            verification = await self._ask_llm(
+                "Does this text look like a product container? Return: {'is_product': true/false, 'has_price': true/false, 'reasoning': '...'}",
+                {"sample_text": raw_result["sample"]["text"][:300]}
+            )
+            raw_result["llm_verification"] = verification
+        
+        self._log("Container Verification", raw_result)
+        return raw_result
     
     async def step3_ask_field_selectors(self, container_selector: str) -> Dict[str, str]:
         """
@@ -150,9 +157,9 @@ JSON:"""
         """
         self._log("Step 3: Field Extraction Strategy", "Asking LLM for each field...")
         
-        # Get structure of first container
-        structure = await self.page.evaluate(f"""
-            (selector) => {{
+        # Get structure of first container - NO REGEX, raw data for LLM
+        structure = await self.page.evaluate("""
+            (selector) => {
                 const container = document.querySelector(selector);
                 if (!container) return null;
                 
@@ -160,16 +167,15 @@ JSON:"""
                 const descendants = Array.from(container.querySelectorAll('*'))
                     .filter(el => (el.innerText || '').trim().length > 0 || el.href)
                     .slice(0, 20)
-                    .map(el => ({{
+                    .map(el => ({
                         tag: el.tagName.toLowerCase(),
                         classes: el.className,
                         text: (el.innerText || '').substring(0, 100),
-                        hasHref: !!el.href,
-                        hasPrice: /\\d+[\\.,]\\d{{2}}\\s*(?:zł|PLN)/i.test(el.innerText || '')
-                    }}));
+                        hasHref: !!el.href
+                    }));
                 
                 return descendants;
-            }}
+            }
         """, container_selector)
         
         decision = await self._ask_llm(
@@ -195,12 +201,14 @@ Return format: {
         max_items: int = 50
     ) -> List[Dict]:
         """
-        Step 4: Execute extraction using LLM-decided strategy
-        """
-        self._log("Step 4: Execute Extraction", f"Using strategy from LLM...")
+        Step 4: Execute extraction using LLM - NO REGEX
         
-        # Build JS code from LLM strategy
-        products = await self.page.evaluate("""
+        Extract raw text, then LLM parses prices
+        """
+        self._log("Step 4: Execute Extraction", "Using LLM for field extraction...")
+        
+        # Get raw data from containers - NO REGEX
+        raw_products = await self.page.evaluate("""
             (args) => {
                 const {containerSelector, fieldStrategy, maxItems} = args;
                 const products = [];
@@ -210,7 +218,7 @@ Return format: {
                     const container = containers[i];
                     const product = {};
                     
-                    // Extract name
+                    // Extract raw name text
                     if (fieldStrategy.name && fieldStrategy.name.selector) {
                         try {
                             const el = container.querySelector(fieldStrategy.name.selector);
@@ -218,19 +226,16 @@ Return format: {
                         } catch (e) {}
                     }
                     
-                    // Extract price
+                    // Extract raw price text - NO PARSING, LLM will do it
                     if (fieldStrategy.price && fieldStrategy.price.selector) {
                         try {
                             const el = container.querySelector(fieldStrategy.price.selector);
-                            if (el) {
-                                const text = (el.innerText || '').trim();
-                                const match = text.match(/(\\d+[\\d\\s]*(?:[\\.,]\\d{2})?)\\s*(?:zł|PLN)/i);
-                                if (match) {
-                                    product.price = parseFloat(match[1].replace(/\\s/g, '').replace(',', '.'));
-                                }
-                            }
+                            if (el) product.price_text = (el.innerText || '').trim();
                         } catch (e) {}
                     }
+                    
+                    // Also get full container text for LLM fallback
+                    product.full_text = (container.innerText || '').substring(0, 300);
                     
                     // Extract URL
                     if (fieldStrategy.url && fieldStrategy.url.selector) {
@@ -240,10 +245,7 @@ Return format: {
                         } catch (e) {}
                     }
                     
-                    // Add if valid
-                    if (product.name || product.price) {
-                        products.push(product);
-                    }
+                    products.push(product);
                 }
                 
                 return products;
@@ -254,12 +256,61 @@ Return format: {
             "maxItems": max_items
         })
         
+        # Use LLM to parse prices from raw text
+        products = await self._parse_prices_with_llm(raw_products)
+        
         self._log("Extraction Results", {
             "count": len(products),
             "sample": products[:3] if products else []
         })
         
         return products
+    
+    async def _parse_prices_with_llm(self, raw_products: List[Dict]) -> List[Dict]:
+        """Parse prices using LLM - NO REGEX"""
+        if not raw_products:
+            return []
+        
+        # Batch parse prices with LLM
+        price_texts = [p.get("price_text") or p.get("full_text", "")[:100] for p in raw_products]
+        
+        prompt = f"""Extract numeric prices from these texts. Return JSON array of numbers (or null if no price).
+
+Texts:
+{json.dumps(price_texts[:20], ensure_ascii=False)}
+
+Rules:
+- Return just the numeric value (e.g., 299.99)
+- Use dot for decimal separator
+- Return null if no price found
+
+Return JSON array of numbers: [price1, price2, ...]
+
+JSON:"""
+        
+        try:
+            response = await self.llm.ainvoke(prompt)
+            
+            # Parse LLM response
+            if isinstance(response, str):
+                json_start = response.find('[')
+                json_end = response.rfind(']') + 1
+                if json_start >= 0 and json_end > json_start:
+                    prices = json.loads(response[json_start:json_end])
+                    
+                    # Apply prices to products
+                    for i, product in enumerate(raw_products[:len(prices)]):
+                        if i < len(prices) and prices[i] is not None:
+                            product["price"] = float(prices[i])
+                        # Clean up temp fields
+                        product.pop("price_text", None)
+                        product.pop("full_text", None)
+        except Exception as e:
+            if self.run_logger:
+                self.run_logger.log_text(f"⚠️ LLM price parsing error: {e}")
+        
+        # Filter to only products with name or price
+        return [p for p in raw_products if p.get("name") or p.get("price")]
     
     async def step5_ask_filtering(self, products: List[Dict]) -> Dict[str, Any]:
         """
