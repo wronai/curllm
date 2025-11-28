@@ -103,7 +103,9 @@ Respond with JSON:
 JSON only:"""
 
         try:
-            response = await self.llm.generate(prompt, temperature=0.2)
+            # Use ainvoke (SimpleOllama method)
+            llm_response = await self.llm.ainvoke(prompt)
+            response = llm_response.get('text', '') if isinstance(llm_response, dict) else str(llm_response)
             
             # Parse LLM response
             result = json.loads(response.strip().replace("```json", "").replace("```", ""))
@@ -190,7 +192,9 @@ Respond with JSON array:
 JSON only:"""
 
         try:
-            response = await self.llm.generate(prompt, temperature=0.2)
+            # Use ainvoke (SimpleOllama method)
+            llm_response = await self.llm.ainvoke(prompt)
+            response = llm_response.get('text', '') if isinstance(llm_response, dict) else str(llm_response)
             
             # Parse LLM response
             results = json.loads(response.strip().replace("```json", "").replace("```", ""))

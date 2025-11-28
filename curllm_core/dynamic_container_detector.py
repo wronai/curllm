@@ -290,22 +290,30 @@ class DynamicContainerDetector:
         Priority:
         1. LLM validated + high statistical score
         2. High statistical score (if LLM unavailable)
-        3. LLM validated (even if lower statistical score)
+        3. REJECT if LLM found no valid containers
         """
         
         if not statistical_candidates:
             return None
         
-        # If LLM validation available, use it
-        if llm_validation and llm_validation.get('recommended'):
-            recommended = llm_validation['recommended']
-            # Add combined confidence
-            statistical_score = recommended.get('statistical_score', 0)
-            llm_confidence = recommended.get('llm_confidence', 0)
-            recommended['combined_confidence'] = (statistical_score / 100 + llm_confidence) / 2
-            return recommended
+        # If LLM validation available, check its decision
+        if llm_validation:
+            # If LLM rejected all candidates, respect that!
+            valid_count = llm_validation.get('valid_count', 0)
+            if valid_count == 0:
+                self._log("⚠️ LLM rejected all candidates - no valid product containers found")
+                return None  # Respect LLM's decision
+            
+            # If LLM approved at least one, use its recommendation
+            if llm_validation.get('recommended'):
+                recommended = llm_validation['recommended']
+                # Add combined confidence
+                statistical_score = recommended.get('statistical_score', 0)
+                llm_confidence = recommended.get('llm_confidence', 0)
+                recommended['combined_confidence'] = (statistical_score / 100 + llm_confidence) / 2
+                return recommended
         
-        # Otherwise, use top statistical candidate
+        # Otherwise, use top statistical candidate (if LLM unavailable)
         best = statistical_candidates[0]
         best['combined_confidence'] = best.get('statistical_score', 0) / 100
         return best
