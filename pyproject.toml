@@ -26,6 +26,7 @@ dependencies = [
   "aiohttp",
   "playwright",
   "langchain-ollama",
+  "litellm>=1.0.0",
   "pillow",
   "opencv-python",
   "pytesseract",

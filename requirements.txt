@@ -8,6 +8,7 @@ playwright>=1.45.0
 
 # LLM integration
 langchain-ollama>=0.1.0
+litellm>=1.0.0
 
 # Vision and OCR
 opencv-python>=4.10.0.84

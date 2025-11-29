@@ -1,11 +1,20 @@
 #!/usr/bin/env python3
 """
 examples.py - Example usage of curllm for various automation tasks
+
+Supports multiple LLM providers:
+- ollama: Local Ollama server (default)
+- openai: OpenAI API (gpt-4o-mini, gpt-4o, o1-mini, o3-mini)
+- anthropic: Anthropic API (claude-3-haiku, claude-3-opus, claude-3-5-sonnet)
+- gemini: Google Gemini API (gemini-2.0-flash, gemini-1.5-pro)
+- groq: Groq API (fast cloud Llama models)
+- deepseek: DeepSeek API
 """
 
 import asyncio
 import json
-from curllm_core import CurllmExecutor
+import os
+from curllm_core import CurllmExecutor, LLMConfig, LLMPresets
 
 async def example_simple_extraction():
     """Example: Extract data from a webpage"""
@@ -262,45 +271,232 @@ async def example_multi_step_workflow():
     print(f"Workflow completed: {result['success']}")
     print(f"Total steps: {result.get('steps_taken', 0)}")
 
-# Performance testing
-async def benchmark_models():
-    """Benchmark different models"""
-    print("\n=== Model Benchmarking ===")
+# ============================================================
+# LLM PROVIDER EXAMPLES
+# ============================================================
+
+async def example_with_openai():
+    """Example: Using OpenAI as LLM provider"""
+    print("\n=== OpenAI Provider Example ===")
     
-    models = [
-        "qwen2.5:7b",
-        "mistral:7b-instruct",
-        "llama3.2:3b",
-        "phi3:mini"
-    ]
+    # Method 1: Direct configuration
+    llm_config = LLMConfig(
+        provider="openai/gpt-4o-mini",
+        api_token=os.getenv("OPENAI_API_KEY"),  # Or set api_token directly
+        temperature=0.3
+    )
+    
+    executor = CurllmExecutor(llm_config=llm_config)
+    result = await executor.execute_workflow(
+        instruction="Extract the page title and main heading",
+        url="https://example.com",
+    )
+    
+    print(f"Result: {json.dumps(result.get('result'), indent=2)}")
+
+
+async def example_with_anthropic():
+    """Example: Using Anthropic Claude as LLM provider"""
+    print("\n=== Anthropic Provider Example ===")
+    
+    # API token will be read from ANTHROPIC_API_KEY environment variable
+    llm_config = LLMConfig(
+        provider="anthropic/claude-3-haiku-20240307",
+        temperature=0.2
+    )
+    
+    executor = CurllmExecutor(llm_config=llm_config)
+    result = await executor.execute_workflow(
+        instruction="Extract all links from the page",
+        url="https://example.com",
+    )
+    
+    print(f"Result: {json.dumps(result.get('result'), indent=2)}")
+
+
+async def example_with_gemini():
+    """Example: Using Google Gemini as LLM provider"""
+    print("\n=== Gemini Provider Example ===")
+    
+    # API token will be read from GEMINI_API_KEY environment variable
+    llm_config = LLMConfig(
+        provider="gemini/gemini-2.0-flash",
+        temperature=0.3
+    )
+    
+    executor = CurllmExecutor(llm_config=llm_config)
+    result = await executor.execute_workflow(
+        instruction="Summarize the page content",
+        url="https://example.com",
+    )
+    
+    print(f"Result: {json.dumps(result.get('result'), indent=2)}")
+
+
+async def example_with_groq():
+    """Example: Using Groq (fast cloud Llama) as LLM provider"""
+    print("\n=== Groq Provider Example ===")
+    
+    # Groq offers fast inference for open source models
+    llm_config = LLMConfig(
+        provider="groq/llama3-70b-8192",
+        # api_token="env:GROQ_API_KEY"  # Alternative: specify env var explicitly
+    )
+    
+    executor = CurllmExecutor(llm_config=llm_config)
+    result = await executor.execute_workflow(
+        instruction="Extract product information",
+        url="https://example.com",
+    )
+    
+    print(f"Result: {json.dumps(result.get('result'), indent=2)}")
+
+
+async def example_with_deepseek():
+    """Example: Using DeepSeek as LLM provider"""
+    print("\n=== DeepSeek Provider Example ===")
+    
+    llm_config = LLMConfig(
+        provider="deepseek/deepseek-chat",
+        temperature=0.3
+    )
+    
+    executor = CurllmExecutor(llm_config=llm_config)
+    result = await executor.execute_workflow(
+        instruction="Extract the main content",
+        url="https://example.com",
+    )
+    
+    print(f"Result: {json.dumps(result.get('result'), indent=2)}")
+
+
+async def example_with_presets():
+    """Example: Using LLMPresets for quick configuration"""
+    print("\n=== LLM Presets Example ===")
+    
+    # Available presets:
+    # - LLMPresets.local_fast()      - Fast local Ollama model
+    # - LLMPresets.local_balanced()  - Balanced local model (default)
+    # - LLMPresets.local_smart()     - Smart local model for complex tasks
+    # - LLMPresets.openai_fast()     - Fast OpenAI model (gpt-4o-mini)
+    # - LLMPresets.openai_smart()    - Smart OpenAI model (gpt-4o)
+    # - LLMPresets.anthropic_fast()  - Fast Claude model
+    # - LLMPresets.anthropic_smart() - Smart Claude model
+    # - LLMPresets.gemini_fast()     - Fast Gemini model
+    # - LLMPresets.groq_fast()       - Fast Groq model
+    # - LLMPresets.groq_smart()      - Smart Groq model
+    # - LLMPresets.deepseek()        - DeepSeek model
+    
+    # Use a preset
+    executor = CurllmExecutor(llm_config=LLMPresets.openai_fast())
+    
+    result = await executor.execute_workflow(
+        instruction="Extract page title",
+        url="https://example.com",
+    )
+    
+    print(f"Result: {json.dumps(result.get('result'), indent=2)}")
+
+
+async def example_env_based_config():
+    """Example: Configuration from environment variables"""
+    print("\n=== Environment-based Configuration ===")
+    
+    # Set environment variables:
+    # CURLLM_LLM_PROVIDER=openai/gpt-4o-mini
+    # OPENAI_API_KEY=sk-...
+    
+    # LLMConfig.from_env() reads these automatically
+    llm_config = LLMConfig.from_env()
+    print(f"Provider: {llm_config.provider_name}/{llm_config.model_name}")
+    print(f"Has API token: {llm_config.resolved_api_token is not None}")
+    
+    executor = CurllmExecutor(llm_config=llm_config)
+    result = await executor.execute_workflow(
+        instruction="Extract page title",
+        url="https://example.com",
+    )
+    
+    print(f"Result: {json.dumps(result.get('result'), indent=2)}")
+
+
+# Performance testing
+async def benchmark_providers():
+    """Benchmark different LLM providers"""
+    print("\n=== Provider Benchmarking ===")
+    
+    import time
+    
+    # Define providers to test (only test those with API keys set)
+    providers = []
+    
+    # Always test local Ollama
+    providers.append(("ollama/qwen2.5:7b", LLMConfig(provider="ollama/qwen2.5:7b")))
+    
+    # Test cloud providers if API keys are set
+    if os.getenv("OPENAI_API_KEY"):
+        providers.append(("openai/gpt-4o-mini", LLMConfig(provider="openai/gpt-4o-mini")))
+    
+    if os.getenv("ANTHROPIC_API_KEY"):
+        providers.append(("anthropic/claude-3-haiku", LLMConfig(provider="anthropic/claude-3-haiku-20240307")))
+    
+    if os.getenv("GEMINI_API_KEY"):
+        providers.append(("gemini/gemini-2.0-flash", LLMConfig(provider="gemini/gemini-2.0-flash")))
+    
+    if os.getenv("GROQ_API_KEY"):
+        providers.append(("groq/llama3-8b", LLMConfig(provider="groq/llama3-8b-8192")))
+    
+    if os.getenv("DEEPSEEK_API_KEY"):
+        providers.append(("deepseek/deepseek-chat", LLMConfig(provider="deepseek/deepseek-chat")))
     
     test_instruction = "Navigate to page, extract title and first paragraph"
     test_url = "https://example.com"
     
-    for model in models:
-        print(f"\nTesting model: {model}")
+    results = []
+    for name, llm_config in providers:
+        print(f"\nTesting: {name}")
         
-        import time
-        start = time.time()
-        
-        executor = CurllmExecutor()
-        executor.config.ollama_model = model
-        
-        result = await executor.execute_workflow(
-            instruction=test_instruction,
-            url=test_url
-        )
-        
-        elapsed = time.time() - start
-        
-        print(f"  Success: {result['success']}")
-        print(f"  Time: {elapsed:.2f}s")
-        print(f"  Steps: {result.get('steps_taken', 0)}")
+        try:
+            start = time.time()
+            
+            executor = CurllmExecutor(llm_config=llm_config)
+            result = await executor.execute_workflow(
+                instruction=test_instruction,
+                url=test_url
+            )
+            
+            elapsed = time.time() - start
+            
+            results.append({
+                "provider": name,
+                "success": result['success'],
+                "time": elapsed,
+                "steps": result.get('steps_taken', 0)
+            })
+            
+            print(f"  Success: {result['success']}")
+            print(f"  Time: {elapsed:.2f}s")
+            print(f"  Steps: {result.get('steps_taken', 0)}")
+            
+        except Exception as e:
+            print(f"  Error: {e}")
+            results.append({
+                "provider": name,
+                "success": False,
+                "error": str(e)
+            })
+    
+    print("\n=== Benchmark Summary ===")
+    for r in results:
+        status = "✅" if r.get("success") else "❌"
+        time_str = f"{r.get('time', 0):.2f}s" if 'time' in r else "N/A"
+        print(f"  {status} {r['provider']}: {time_str}")
 
 async def main():
     """Run all examples"""
     
-    examples = [
+    # Basic automation examples
+    basic_examples = [
         example_simple_extraction,
         example_form_automation,
         example_bql_query,
@@ -309,11 +505,29 @@ async def main():
         example_multi_step_workflow
     ]
     
-    print("="*50)
-    print("curllm Examples - Browser Automation with Local LLM")
-    print("="*50)
+    # LLM provider examples (require API keys)
+    provider_examples = [
+        example_env_based_config,  # Works with any config
+        # Uncomment below if you have API keys set:
+        # example_with_openai,
+        # example_with_anthropic,
+        # example_with_gemini,
+        # example_with_groq,
+        # example_with_deepseek,
+        # example_with_presets,
+    ]
     
-    for example in examples:
+    print("="*60)
+    print("curllm Examples - Browser Automation with Multi-Provider LLM")
+    print("="*60)
+    print("\nSupported providers: ollama, openai, anthropic, gemini, groq, deepseek")
+    print()
+    
+    print("\n" + "="*60)
+    print("BASIC EXAMPLES")
+    print("="*60)
+    
+    for example in basic_examples:
         try:
             await example()
         except Exception as e:
@@ -321,8 +535,21 @@ async def main():
         
         print("\n" + "-"*50)
     
-    # Run benchmark
-    await benchmark_models()
+    print("\n" + "="*60)
+    print("LLM PROVIDER EXAMPLES")
+    print("="*60)
+    
+    for example in provider_examples:
+        try:
+            await example()
+        except Exception as e:
+            print(f"Error in {example.__name__}: {e}")
+        
+        print("\n" + "-"*50)
+    
+    # Run provider benchmark
+    await benchmark_providers()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

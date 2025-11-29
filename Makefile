@@ -18,6 +18,11 @@ help:
 	@echo "  make test-integration - Run integration tests (needs browsers)"
 	@echo "  make test-all        - Run all tests (unit + integration)"
 	@echo "  make test-linux      - Run cross-platform Linux tests (Docker)"
+	@echo "  make test-orchestrators - Run all orchestrator tests"
+	@echo "  make test-validation - Run validation system tests"
+	@echo "  make test-auth       - Run auth orchestrator tests"
+	@echo "  make test-ecommerce  - Run e-commerce tests"
+	@echo "  make test-workflows  - Run workflow tests"
 	@echo "  make benchmark       - Run performance benchmarks"
 	@echo "  make clean           - Clean temporary files"
 	@echo "  make clean-cache     - Deep clean: remove all Python cache"
@@ -118,10 +123,6 @@ test-curlx-compose:
 	@chmod +x curlx_pkg/tests/e2e/test_compose.sh
 	@bash curlx_pkg/tests/e2e/test_compose.sh
 
-test-integration:
-	@echo "Running integration tests..."
-	@python3 examples.py
-
 test-linux:
 	@echo "Running cross-platform Linux tests..."
 	@chmod +x tests/linux/run_tests.sh
@@ -166,19 +167,44 @@ test-docker: test-docker-build test-docker-run
 	@echo "Docker tests complete!"
 	@echo "View test results in: ./test_results/report.html"
 
+test-orchestrators:
+	@echo "Running orchestrator tests..."
+	@PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/integration/test_orchestrators.py -v
+
+test-validation:
+	@echo "Running validation tests..."
+	@PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/integration/test_orchestrators.py::TestValidationSystem tests/integration/test_orchestrators.py::TestTaskValidator -v
+
+test-auth:
+	@echo "Running authentication orchestrator tests..."
+	@PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/integration/test_orchestrators.py::TestAuthOrchestrator -v
+
+test-ecommerce:
+	@echo "Running e-commerce orchestrator tests..."
+	@PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/integration/test_orchestrators.py::TestECommerceOrchestrator -v
+
+test-workflows:
+	@echo "Running workflow tests..."
+	@PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/integration/test_orchestrators.py::TestComprehensiveWorkflows tests/integration/test_orchestrators.py::TestMultiStepWorkflow -v
+
 test-pages:
 	@echo "Starting test pages server on http://localhost:8080"
 	@echo "Test pages available:"
-	@echo "  - http://localhost:8080/01_simple_form.html"
-	@echo "  - http://localhost:8080/02_product_list.html"
-	@echo "  - http://localhost:8080/03_login_form.html"
-	@echo "  - http://localhost:8080/04_registration.html"
-	@echo "  - http://localhost:8080/05_search_results.html"
-	@echo "  - http://localhost:8080/06_data_table.html"
-	@echo "  - http://localhost:8080/07_newsletter.html"
-	@echo "  - http://localhost:8080/08_multi_step_form.html"
-	@echo "  - http://localhost:8080/09_ecommerce_cart.html"
-	@echo "  - http://localhost:8080/10_feedback_form.html"
+	@echo "  - http://localhost:8080/01_simple_form.html      - Basic form"
+	@echo "  - http://localhost:8080/02_products.html        - Product list"
+	@echo "  - http://localhost:8080/03_login_form.html      - Basic login"
+	@echo "  - http://localhost:8080/04_registration.html    - Registration"
+	@echo "  - http://localhost:8080/05_search_results.html  - Search results"
+	@echo "  - http://localhost:8080/06_data_table.html      - Data table"
+	@echo "  - http://localhost:8080/07_newsletter.html      - Newsletter"
+	@echo "  - http://localhost:8080/08_multi_step_form.html - Multi-step form"
+	@echo "  - http://localhost:8080/09_ecommerce_cart.html  - Shopping cart"
+	@echo "  - http://localhost:8080/10_feedback_form.html   - Feedback form"
+	@echo "  - http://localhost:8080/11_interactive.html     - Interactive UI"
+	@echo "  - http://localhost:8080/12_validation_test.html - Form validation"
+	@echo "  - http://localhost:8080/13_login.html           - Advanced login with 2FA"
+	@echo "  - http://localhost:8080/14_checkout.html        - E-commerce checkout"
+	@echo "  - http://localhost:8080/15_dashboard.html       - User dashboard"
 	cd tests/test_pages && python3 -m http.server 8080
 
 docker-logs:
