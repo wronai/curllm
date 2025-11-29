@@ -3,11 +3,7 @@ Tests for atomic form components
 """
 
 import pytest
-import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock
-
-# Configure pytest-asyncio
-pytestmark = pytest.mark.asyncio(loop_scope="function")
 
 # Test parse_instruction
 from curllm_core.streamware.components.form.map_fields import (
@@ -149,7 +145,7 @@ class TestFillField:
     """Tests for field filling"""
     
     async def test_fill_field_success(self):
-        from curllm_core.streamware.components.form.fill_field import fill_field
+        from curllm_core.streamware.components.form.fill import fill_field
         
         mock_page = AsyncMock()
         mock_page.fill = AsyncMock()
@@ -161,7 +157,7 @@ class TestFillField:
         assert result['error'] is None
     
     async def test_fill_field_failure_with_fallback(self):
-        from curllm_core.streamware.components.form.fill_field import fill_field
+        from curllm_core.streamware.components.form.fill import fill_field
         
         mock_page = AsyncMock()
         mock_page.fill = AsyncMock(side_effect=Exception("Element not found"))

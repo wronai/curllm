@@ -2,19 +2,56 @@
 """
 examples.py - Example usage of curllm for various automation tasks
 
-Supports multiple LLM providers:
-- ollama: Local Ollama server (default)
-- openai: OpenAI API (gpt-4o-mini, gpt-4o, o1-mini, o3-mini)
-- anthropic: Anthropic API (claude-3-haiku, claude-3-opus, claude-3-5-sonnet)
-- gemini: Google Gemini API (gemini-2.0-flash, gemini-1.5-pro)
-- groq: Groq API (fast cloud Llama models)
-- deepseek: DeepSeek API
+curllm supports multiple LLM providers via litellm:
+- ollama: Local Ollama server (default) - ollama/qwen2.5:7b, ollama/llama3
+- openai: OpenAI API - openai/gpt-4o-mini, openai/gpt-4o, openai/o1-mini, openai/o3-mini
+- anthropic: Anthropic - anthropic/claude-3-haiku-20240307, anthropic/claude-3-5-sonnet-20240620
+- gemini: Google Gemini - gemini/gemini-2.0-flash, gemini/gemini-1.5-pro
+- groq: Groq (fast inference) - groq/llama3-70b-8192, groq/llama3-8b-8192
+- deepseek: DeepSeek - deepseek/deepseek-chat
+
+API tokens are automatically read from environment variables:
+- OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY, GROQ_API_KEY, DEEPSEEK_API_KEY
+
+Usage:
+    # Quick start with default provider (ollama)
+    curllm "https://example.com" -d "Extract all links"
+    
+    # Use specific provider
+    CURLLM_LLM_PROVIDER=openai/gpt-4o-mini curllm "https://example.com" -d "Extract data"
 """
 
 import asyncio
 import json
 import os
 from curllm_core import CurllmExecutor, LLMConfig, LLMPresets
+
+
+# ============================================================
+# QUICK START EXAMPLES - Minimal code to get started
+# ============================================================
+
+async def quick_extract():
+    """Simplest extraction example"""
+    executor = CurllmExecutor()
+    result = await executor.execute_workflow(
+        instruction="Extract page title and all links",
+        url="https://example.com"
+    )
+    return result
+
+
+async def quick_extract_with_provider():
+    """Quick extraction with specific LLM provider"""
+    # Provider auto-detects API key from environment
+    executor = CurllmExecutor(
+        llm_config=LLMConfig(provider="openai/gpt-4o-mini")
+    )
+    result = await executor.execute_workflow(
+        instruction="Extract all product names and prices",
+        url="https://example.com/products"
+    )
+    return result
 
 async def example_simple_extraction():
     """Example: Extract data from a webpage"""

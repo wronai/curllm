@@ -49,6 +49,9 @@ def test_simple_form_fill_via_llm_dsl():
         # Step 4: Fill message
         page.fill('#message', 'Test message from integration test')
         
+        # Step 4b: Check consent checkbox (required)
+        page.check('#consent')
+        
         # Step 5: Validate form is filled (LLM command)
         validate_command = {
             "action": "validate_state",
