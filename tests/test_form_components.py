@@ -104,70 +104,83 @@ class TestFieldKeywords:
         assert 'telefon' in FIELD_KEYWORDS['phone']
 
 
-# Async tests for page interactions
-@pytest.mark.asyncio
+# Async tests for page interactions - using asyncio.run() for compatibility
+import asyncio
+
+
 class TestDetectForm:
     """Tests for form detection (requires mock page)"""
     
-    async def test_detect_form_found(self):
+    def test_detect_form_found(self):
         from curllm_core.streamware.components.form.detect import detect_form
         
-        mock_page = AsyncMock()
-        mock_page.evaluate = AsyncMock(return_value=[
-            {
-                'id': 'contact-form',
-                'fields': [
-                    {'type': 'email', 'name': 'email', 'visible': True},
-                    {'type': 'textarea', 'name': 'message', 'visible': True}
-                ]
-            }
-        ])
+        async def run_test():
+            mock_page = AsyncMock()
+            mock_page.evaluate = AsyncMock(return_value=[
+                {
+                    'id': 'contact-form',
+                    'fields': [
+                        {'type': 'email', 'name': 'email', 'visible': True},
+                        {'type': 'textarea', 'name': 'message', 'visible': True}
+                    ]
+                }
+            ])
+            
+            result = await detect_form(mock_page)
+            
+            assert result['found'] is True
+            assert result['form_id'] == 'contact-form'
+            assert len(result['fields']) == 2
         
-        result = await detect_form(mock_page)
-        
-        assert result['found'] is True
-        assert result['form_id'] == 'contact-form'
-        assert len(result['fields']) == 2
+        asyncio.run(run_test())
     
-    async def test_detect_form_not_found(self):
+    def test_detect_form_not_found(self):
         from curllm_core.streamware.components.form.detect import detect_form
         
-        mock_page = AsyncMock()
-        mock_page.evaluate = AsyncMock(return_value=[])
+        async def run_test():
+            mock_page = AsyncMock()
+            mock_page.evaluate = AsyncMock(return_value=[])
+            
+            result = await detect_form(mock_page)
+            
+            assert result['found'] is False
         
-        result = await detect_form(mock_page)
-        
-        assert result['found'] is False
+        asyncio.run(run_test())
 
 
-@pytest.mark.asyncio
 class TestFillField:
     """Tests for field filling"""
     
-    async def test_fill_field_success(self):
+    def test_fill_field_success(self):
         from curllm_core.streamware.components.form.fill import fill_field
         
-        mock_page = AsyncMock()
-        mock_page.fill = AsyncMock()
-        mock_page.evaluate = AsyncMock()
+        async def run_test():
+            mock_page = AsyncMock()
+            mock_page.fill = AsyncMock()
+            mock_page.evaluate = AsyncMock()
+            
+            result = await fill_field(mock_page, '#email', 'test@example.com')
+            
+            assert result['success'] is True
+            assert result['error'] is None
         
-        result = await fill_field(mock_page, '#email', 'test@example.com')
-        
-        assert result['success'] is True
-        assert result['error'] is None
+        asyncio.run(run_test())
     
-    async def test_fill_field_failure_with_fallback(self):
+    def test_fill_field_failure_with_fallback(self):
         from curllm_core.streamware.components.form.fill import fill_field
         
-        mock_page = AsyncMock()
-        mock_page.fill = AsyncMock(side_effect=Exception("Element not found"))
-        mock_page.evaluate = AsyncMock()  # Fallback succeeds
+        async def run_test():
+            mock_page = AsyncMock()
+            mock_page.fill = AsyncMock(side_effect=Exception("Element not found"))
+            mock_page.evaluate = AsyncMock()  # Fallback succeeds
+            
+            result = await fill_field(mock_page, '#email', 'test@example.com')
+            
+            # Should succeed via fallback
+            assert result['success'] is True
+            assert result.get('fallback') is True
         
-        result = await fill_field(mock_page, '#email', 'test@example.com')
-        
-        # Should succeed via fallback
-        assert result['success'] is True
-        assert result.get('fallback') is True
+        asyncio.run(run_test())
 
 
 if __name__ == '__main__':

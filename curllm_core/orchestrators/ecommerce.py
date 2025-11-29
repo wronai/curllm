@@ -120,15 +120,20 @@ class ECommerceOrchestrator:
             query_match = re.search(r'(?:search|find|szukaj|znajdź)\s+["\']?([^"\']+)["\']?', instr_lower)
             if query_match:
                 intent['query'] = query_match.group(1).strip()
-                
-        elif any(kw in instr_lower for kw in ['add to cart', 'dodaj do koszyka', 'buy', 'kup']):
+        
+        # Check for "add to cart" with flexible patterns (add X to cart, add to cart X, buy X)
+        elif (re.search(r'\badd\b.*\bcart\b', instr_lower) or 
+              re.search(r'\bdodaj\b.*\bkoszyk', instr_lower) or 
+              'add to cart' in instr_lower or 
+              'dodaj do koszyka' in instr_lower or
+              any(kw in instr_lower for kw in ['buy', 'kup', 'purchase now', 'kup teraz'])):
             intent['action'] = 'add_to_cart'
             # Extract product names or selectors
             
-        elif any(kw in instr_lower for kw in ['checkout', 'pay', 'order', 'zamów', 'zapłać']):
+        elif any(kw in instr_lower for kw in ['checkout', 'pay', 'order', 'zamów', 'zapłać', 'proceed to']):
             intent['action'] = 'checkout'
             
-        elif 'purchase' in instr_lower or 'zakup' in instr_lower:
+        elif 'full purchase' in instr_lower or 'zakup' in instr_lower:
             intent['action'] = 'full_purchase'
         
         # Parse payment method

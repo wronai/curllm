@@ -119,7 +119,7 @@ async def example_bql_query():
     
     bql_query = """
     query ProductCatalog {
-        page(url: "https://shop.example.com/products") {
+        page(url: "https://ceneo.pl") {
             products: select(css: ".product-card") {
                 name: text(css: ".product-title")
                 price: text(css: ".product-price")

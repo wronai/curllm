@@ -1,39 +1,68 @@
-# curllm Documentation
+# curllm Documentation v2
 
-Welcome to the **curllm** documentation! This directory contains comprehensive guides, tutorials, and reference materials.
+Current documentation for curllm - Browser Automation with Multi-Provider LLM support.
 
-## 📖 Quick Navigation
+## 🚀 Quick Start
 
-**Start here:** [Documentation Index (INDEX.md)](INDEX.md)
+```bash
+# Install
+pip install curllm
 
-### Popular Pages
+# Extract data (uses local Ollama by default)
+curllm "https://example.com" -d "Extract all links"
 
-- **[Installation Guide](Installation.md)** - Get curllm up and running
-- **[Examples](EXAMPLES.md)** - Practical use cases and code samples
-- **[Hierarchical Planner](HIERARCHICAL_PLANNER.md)** - 87% token reduction with intelligent planning
-- **[Form Filling](FORM_FILLING.md)** - Automated form completion
-- **[API Reference](API.md)** - REST API endpoints
-- **[Environment Variables](Environment.md)** - Configuration options
-- **[Troubleshooting](Troubleshooting.md)** - Common issues and solutions
+# Use cloud provider (auto-detects API key from environment)
+CURLLM_LLM_PROVIDER=openai/gpt-4o-mini curllm "https://example.com" -d "Extract products"
+```
 
-## 🗂️ Documentation Structure
+## 🤖 LLM Providers
+
+curllm supports multiple LLM providers via **litellm**:
+
+| Provider | Format | Environment Variable |
+|----------|--------|---------------------|
+| Ollama (local) | `ollama/qwen2.5:7b` | - |
+| OpenAI | `openai/gpt-4o-mini` | `OPENAI_API_KEY` |
+| Anthropic | `anthropic/claude-3-haiku-20240307` | `ANTHROPIC_API_KEY` |
+| Gemini | `gemini/gemini-2.0-flash` | `GEMINI_API_KEY` |
+| Groq | `groq/llama3-70b-8192` | `GROQ_API_KEY` |
+| DeepSeek | `deepseek/deepseek-chat` | `DEEPSEEK_API_KEY` |
+
+```python
+from curllm_core import CurllmExecutor, LLMConfig
+
+# Auto-detects API key from OPENAI_API_KEY
+executor = CurllmExecutor(LLMConfig(provider="openai/gpt-4o-mini"))
+
+# Or specify explicitly
+executor = CurllmExecutor(LLMConfig(
+    provider="anthropic/claude-3-haiku-20240307",
+    api_token="sk-ant-..."
+))
+```
+
+## 📁 Documentation Structure
 
 ```
-docs/
-├── INDEX.md                     # Main documentation index
-├── Installation.md              # Installation instructions
-├── EXAMPLES.md                  # Practical examples
-├── HIERARCHICAL_PLANNER.md      # LLM optimization guide (NEW!)
-├── FORM_FILLING.md              # Form automation guide (NEW!)
-├── API.md                       # REST API reference
-├── Environment.md               # Configuration guide
-├── Playwright_BQL.md            # Browser Query Language
-├── DIFFING.md                   # Content diffing system
-├── REMOTE_PROXY_TUTORIAL.md     # Proxy setup
-├── Docker.md                    # Docker deployment
-├── Devbox.md                    # Development environment
-├── Troubleshooting.md           # Common issues
-└── TODO_DETAILED.md             # Development roadmap
+docs/v2/
+├── architecture/          # System architecture docs
+│   ├── ARCHITECTURE.md    # Core architecture
+│   ├── STREAMWARE.md      # Component system
+│   ├── LLM.md             # LLM integration
+│   └── COMPONENTS.md      # Component reference
+├── features/              # Feature documentation
+│   ├── FORM_FILLING.md    # Form automation
+│   ├── ITERATIVE_EXTRACTOR.md
+│   ├── HIERARCHICAL_PLANNER.md
+│   └── VISION_FORM_ANALYSIS.md
+├── guides/                # User guides
+│   ├── Installation.md    # Setup instructions
+│   ├── EXAMPLES.md        # Code examples
+│   ├── Docker.md          # Docker deployment
+│   └── Troubleshooting.md
+└── api/                   # API reference
+    ├── API.md             # REST API
+    └── CLI_COMMANDS.md    # CLI reference
 ```
 
 ## 🆕 Recent Additions
@@ -50,12 +79,25 @@ docs/
   - Automatic error detection
   - Email validation fallbacks
 
+## 📂 Code Examples
+
+See the [examples/](../../examples/) directory for runnable code:
+
+| Example | Description | Link |
+|---------|-------------|------|
+| **LLM Providers** | Use OpenAI, Anthropic, Gemini, Groq | [examples/llm-providers/](../../examples/llm-providers/) |
+| **Product Extraction** | Extract product data | [examples/extraction/products/](../../examples/extraction/products/) |
+| **Form Filling** | Automate contact forms | [examples/forms/contact/](../../examples/forms/contact/) |
+| **BQL Queries** | Browser Query Language | [examples/bql/](../../examples/bql/) |
+| **Streamware** | Component pipelines | [examples/streamware/](../../examples/streamware/) |
+| **API Clients** | Node.js, PHP clients | [examples/api-clients/](../../examples/api-clients/) |
+
 ## 🔗 External Links
 
-- [Main Project README](../README.md)
+- [Main Project README](../../README.md)
+- [Examples Directory](../../examples/)
 - [GitHub Repository](https://github.com/wronai/curllm)
-- [TODO List](../TODO.md)
-- [CHANGELOG](../CHANGELOG.md)
+- [TODO List](../../TODO.md)
 
 ## 📝 Contributing to Documentation
 

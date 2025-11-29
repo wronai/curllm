@@ -6,10 +6,10 @@ Extract product data from e-commerce websites.
 
 ```bash
 # Extract all products
-curllm "https://shop.example.com/products" -d "Extract all products with prices"
+curllm "https://ceneo.pl" -d "Extract all products with prices"
 
 # Filter by price
-curllm "https://shop.example.com/products" -d "Extract products under $100"
+curllm "https://ceneo.pl" -d "Extract products under $100"
 ```
 
 ## Files
@@ -30,7 +30,7 @@ async def extract_products():
     
     result = await executor.execute_workflow(
         instruction="Extract all products with name, price, and image URL",
-        url="https://shop.example.com/products"
+        url="https://ceneo.pl"
     )
     
     return result.get("result", {}).get("products", [])

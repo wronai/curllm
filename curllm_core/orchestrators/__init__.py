@@ -8,6 +8,7 @@ Provides domain-specific orchestrators for different task types:
 - ECommerceOrchestrator - Shopping cart, checkout, payments
 - SocialMediaOrchestrator - Login, captcha, social actions
 - LiveInteractionOrchestrator - Real-time GUI interactions
+- AuthOrchestrator - Authentication, login, 2FA, CAPTCHA solving
 """
 
 from .master import MasterOrchestrator, TaskType
@@ -16,6 +17,7 @@ from .extraction import ExtractionOrchestrator
 from .ecommerce import ECommerceOrchestrator
 from .social import SocialMediaOrchestrator
 from .live import LiveInteractionOrchestrator
+from .auth import AuthOrchestrator
 
 __all__ = [
     'MasterOrchestrator',
@@ -24,6 +26,7 @@ __all__ = [
     'ExtractionOrchestrator',
     'ECommerceOrchestrator',
     'SocialMediaOrchestrator',
-    'LiveInteractionOrchestrator'
+    'LiveInteractionOrchestrator',
+    'AuthOrchestrator'
 ]
 

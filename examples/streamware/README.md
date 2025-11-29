@@ -42,7 +42,7 @@ async def product_pipeline():
         >> "file://cheap_products.json"
     )
     
-    return await flow.execute(url="https://shop.example.com/products")
+    return await flow.execute(url="https://ceneo.pl")
 ```
 
 ## Related Documentation

@@ -6,6 +6,9 @@ This directory contains organized examples demonstrating curllm capabilities.
 
 ```
 examples/
+├── basic/                   # Simple CLI and curl examples
+├── detection/               # Dynamic container & pattern detection
+├── orchestration/           # Multi-strategy extraction orchestration
 ├── extraction/              # Data extraction examples
 │   ├── products/           # Product scraping
 │   └── links/              # Link extraction
@@ -34,7 +37,7 @@ python examples/extraction/links/extract_links.py
 
 ```bash
 # CLI with price filter
-curllm "https://shop.example.com/products" -d "Extract products under $100"
+curllm "https://ceneo.pl" -d "Extract products under $100"
 
 # Python
 python examples/extraction/products/extract_products.py
@@ -72,6 +75,9 @@ executor = CurllmExecutor(LLMConfig(provider="ollama/qwen2.5:7b"))
 
 | Project | Description | Files |
 |---------|-------------|-------|
+| [basic](basic/) | Simple CLI and curl examples | Bash |
+| [detection](detection/) | Dynamic container & LLM heuristics | Python |
+| [orchestration](orchestration/) | Multi-strategy extraction | Python |
 | [extraction/products](extraction/products/) | Product data extraction | Python, Bash |
 | [extraction/links](extraction/links/) | Link extraction | Python, Bash |
 | [forms/contact](forms/contact/) | Contact form filling | Python, Bash |

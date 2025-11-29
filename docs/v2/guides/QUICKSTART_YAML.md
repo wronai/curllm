@@ -85,7 +85,7 @@ trace: false
 
 input:
   data:
-    url: "https://shop.example.com/products"
+    url: "https://ceneo.pl"
 
 steps:
   # 1. Browse with stealth

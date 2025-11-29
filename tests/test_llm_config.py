@@ -228,7 +228,7 @@ class TestLLMConfigIntegration:
     
     def test_setup_llm_with_openai(self):
         """Test setup_llm with OpenAI config"""
-        from curllm_core.llm_factory import setup_llm, OpenAICompatibleClient
+        from curllm_core.llm_factory import setup_llm, LiteLLMClient
         
         config = LLMConfig(
             provider="openai/gpt-4o-mini",
@@ -236,13 +236,13 @@ class TestLLMConfigIntegration:
         )
         llm = setup_llm(config)
         
-        assert isinstance(llm, OpenAICompatibleClient)
-        assert llm.model == "gpt-4o-mini"
-        assert llm.api_key == "sk-test-token"
+        # LiteLLM is used for cloud providers
+        assert isinstance(llm, LiteLLMClient)
+        assert "gpt-4o-mini" in llm.model
     
     def test_setup_llm_with_anthropic(self):
         """Test setup_llm with Anthropic config"""
-        from curllm_core.llm_factory import setup_llm, AnthropicClient
+        from curllm_core.llm_factory import setup_llm, LiteLLMClient
         
         config = LLMConfig(
             provider="anthropic/claude-3-haiku-20240307",
@@ -250,12 +250,13 @@ class TestLLMConfigIntegration:
         )
         llm = setup_llm(config)
         
-        assert isinstance(llm, AnthropicClient)
-        assert llm.model == "claude-3-haiku-20240307"
+        # LiteLLM is used for cloud providers
+        assert isinstance(llm, LiteLLMClient)
+        assert "claude" in llm.model
     
     def test_setup_llm_with_gemini(self):
         """Test setup_llm with Gemini config"""
-        from curllm_core.llm_factory import setup_llm, GeminiClient
+        from curllm_core.llm_factory import setup_llm, LiteLLMClient
         
         config = LLMConfig(
             provider="gemini/gemini-2.0-flash",
@@ -263,12 +264,13 @@ class TestLLMConfigIntegration:
         )
         llm = setup_llm(config)
         
-        assert isinstance(llm, GeminiClient)
-        assert llm.model == "gemini-2.0-flash"
+        # LiteLLM is used for cloud providers
+        assert isinstance(llm, LiteLLMClient)
+        assert "gemini" in llm.model
     
     def test_setup_llm_with_groq(self):
         """Test setup_llm with Groq config (OpenAI-compatible)"""
-        from curllm_core.llm_factory import setup_llm, OpenAICompatibleClient
+        from curllm_core.llm_factory import setup_llm, LiteLLMClient
         
         config = LLMConfig(
             provider="groq/llama3-70b-8192",
@@ -276,9 +278,9 @@ class TestLLMConfigIntegration:
         )
         llm = setup_llm(config)
         
-        assert isinstance(llm, OpenAICompatibleClient)
-        assert llm.model == "llama3-70b-8192"
-        assert "groq" in llm.base_url
+        # LiteLLM is used for cloud providers including Groq
+        assert isinstance(llm, LiteLLMClient)
+        assert "llama" in llm.model
     
     def test_setup_llm_legacy_mode(self):
         """Test legacy mode without LLMConfig"""

@@ -21,6 +21,7 @@ class TaskType(Enum):
     ECOMMERCE = "ecommerce"
     SOCIAL_MEDIA = "social_media"
     LIVE_INTERACTION = "live_interaction"
+    AUTH = "auth"
     NAVIGATION = "navigation"
     UNKNOWN = "unknown"
 
@@ -71,6 +72,11 @@ class MasterOrchestrator:
             'click', 'scroll', 'hover', 'drag', 'type', 'select', 'wait',
             'kliknij', 'przewiń', 'najedź', 'przeciągnij', 'wpisz', 'wybierz'
         ],
+        TaskType.AUTH: [
+            'login', 'sign in', 'authenticate', 'log in', 'signin',
+            'zaloguj', 'zaloguj się', 'uwierzytelnij', 'autoryzacja',
+            '2fa', 'two-factor', 'otp', 'verification code'
+        ],
         TaskType.NAVIGATION: [
             'go to', 'navigate', 'open', 'visit', 'browse',
             'przejdź', 'otwórz', 'odwiedź'
@@ -96,6 +102,7 @@ class MasterOrchestrator:
         self._ecommerce_orch = None
         self._social_orch = None
         self._live_orch = None
+        self._auth_orch = None
     
     async def orchestrate(
         self,
@@ -218,11 +225,12 @@ INSTRUCTION: {instruction}
 PAGE URL: {url}
 
 TASK TYPES:
-- form_fill: Fill and submit forms (login, contact, registration)
+- form_fill: Fill and submit forms (contact, registration)
 - extraction: Extract data from page (products, links, articles)
 - ecommerce: Shopping actions (add to cart, checkout, payment)
-- social_media: Social platform actions (login, post, message)
+- social_media: Social platform actions (post, message, share)
 - live_interaction: Direct UI interactions (click, scroll, type)
+- auth: Authentication tasks (login, sign in, 2FA, OAuth)
 - navigation: Simple page navigation
 
 RESPOND JSON:
@@ -442,6 +450,10 @@ JSON:"""
             orch = self._get_live_orchestrator()
             return await orch.orchestrate(instruction, page_context)
         
+        elif task_type == TaskType.AUTH:
+            orch = self._get_auth_orchestrator()
+            return await orch.orchestrate(instruction, page_context)
+        
         else:
             # Fallback to extraction
             orch = self._get_extraction_orchestrator()
@@ -524,6 +536,12 @@ JSON:"""
             from .live import LiveInteractionOrchestrator
             self._live_orch = LiveInteractionOrchestrator(self.llm, self.page, self.run_logger)
         return self._live_orch
+    
+    def _get_auth_orchestrator(self):
+        if self._auth_orch is None:
+            from .auth import AuthOrchestrator
+            self._auth_orch = AuthOrchestrator(self.llm, self.page, self.run_logger)
+        return self._auth_orch
     
     def _log(self, message: str, level: str = "info"):
         """Log message with formatting"""
