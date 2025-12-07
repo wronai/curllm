@@ -271,6 +271,34 @@ class TaskPlanner:
         form_data = parsed.form_data
         prev_step = after_step
         
+        # Generate name if not provided (required for most forms)
+        name_value = form_data.name
+        if not name_value and form_data.email:
+            # Extract name from email (before @)
+            email_local = form_data.email.split('@')[0]
+            # Clean up: test.user -> Test User
+            name_value = ' '.join(word.capitalize() for word in email_local.replace('.', ' ').replace('_', ' ').split())
+        if not name_value:
+            name_value = "Użytkownik"  # Default placeholder
+        
+        # Fill name first (usually required)
+        prev_step = plan.add_step(
+            StepType.FILL_FIELD,
+            params={
+                "field_type": "name",
+                "value": name_value,
+                "selectors": [
+                    'input[name*="name"]',
+                    'input[name*="imie"]',
+                    'input[name*="nazwisko"]',
+                    'input[placeholder*="imię" i]',
+                    'input[placeholder*="name" i]'
+                ]
+            },
+            description=f"Fill name: {name_value}",
+            depends_on=[prev_step]
+        )
+        
         # Fill email
         if form_data.email:
             prev_step = plan.add_step(
@@ -289,8 +317,8 @@ class TaskPlanner:
                 depends_on=[prev_step]
             )
         
-        # Fill name
-        if form_data.name:
+        # Fill name again only if explicitly different from auto-generated
+        if form_data.name and form_data.name != name_value:
             prev_step = plan.add_step(
                 StepType.FILL_FIELD,
                 params={

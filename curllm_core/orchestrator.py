@@ -89,6 +89,8 @@ class OrchestratorConfig:
     log_dir: str = "logs"
     screenshot_dir: str = "screenshots"
     dry_run: bool = False  # Parse and plan only, don't execute
+    auto_captcha_visible: bool = True  # Auto-switch to visible mode on CAPTCHA
+    captcha_wait_seconds: int = 60  # How long to wait for user to solve CAPTCHA
 
 
 class Orchestrator:
@@ -191,20 +193,44 @@ class Orchestrator:
             else:
                 # Check verification step result if it exists
                 verification_passed = True
+                verification_reason = None
                 for sr in step_results:
                     if sr.step_type == "verify" and sr.data:
                         verified = sr.data.get("verified", True)
                         has_error = sr.data.get("has_error_indicator", False)
-                        if not verified or has_error:
+                        has_security = sr.data.get("has_security_block", False)
+                        verification_reason = sr.data.get("reason", "unknown")
+                        
+                        if not verified:
                             verification_passed = False
-                            self._log("warning", f"⚠️ Verification check failed (success_indicator={sr.data.get('has_success_indicator')}, error_indicator={has_error})")
+                            self._log("warning", f"⚠️ Verification failed: {verification_reason}")
                             break
                 
                 if verification_passed:
                     result.success = True
+                elif verification_reason == "security_block" and self.config.auto_captcha_visible and self.config.headless:
+                    # CAPTCHA detected - retry with visible browser
+                    self._log("warning", "🔒 CAPTCHA detected! Switching to visible mode for manual solving...")
+                    
+                    await self._cleanup()
+                    
+                    # Re-run with visible browser
+                    original_headless = self.config.headless
+                    self.config.headless = False
+                    
+                    try:
+                        result = await self._execute_with_captcha_handling(command, parsed, plan)
+                    finally:
+                        self.config.headless = original_headless
                 else:
                     result.success = False
-                    result.error = "Verification failed: no success confirmation found on page"
+                    # Provide specific error messages
+                    error_messages = {
+                        "security_block": "Form blocked by CAPTCHA/security check",
+                        "form_error": "Form validation error (missing required fields)",
+                        "no_confirmation": "No success confirmation found on page",
+                    }
+                    result.error = error_messages.get(verification_reason, f"Verification failed: {verification_reason}")
             
             # Get final state
             if self.page:
@@ -316,6 +342,121 @@ class Orchestrator:
                 await self._playwright.stop()
         except Exception as e:
             logger.debug(f"Cleanup error: {e}")
+    
+    async def _execute_with_captcha_handling(
+        self,
+        command: str,
+        parsed: ParsedCommand,
+        plan: TaskPlan
+    ) -> OrchestratorResult:
+        """
+        Execute plan in visible mode with CAPTCHA handling.
+        
+        Opens visible browser, navigates to form, and waits for user
+        to solve CAPTCHA before continuing.
+        """
+        result = OrchestratorResult(success=False, command=command)
+        result.parsed = parsed
+        result.plan = plan
+        
+        try:
+            self._log("phase", "Phase 5: Retry with visible browser (CAPTCHA mode)")
+            await self._setup_browser()
+            
+            # Execute navigation and resolve steps first
+            for i, step in enumerate(plan.steps):
+                if step.step_type.value in ["navigate", "resolve", "analyze"]:
+                    self._log("step", f"Executing step {i+1}/{len(plan.steps)}: {step.step_type.value}")
+                    await self.step_executor.execute(step, parsed)
+                    self._log("success", f"  ✅ {step.description}")
+            
+            # Now wait for user to solve CAPTCHA
+            self._log("warning", "")
+            self._log("warning", "=" * 60)
+            self._log("warning", "🔒 CAPTCHA DETECTED - MANUAL ACTION REQUIRED")
+            self._log("warning", "=" * 60)
+            self._log("warning", f"Please solve the CAPTCHA in the browser window.")
+            self._log("warning", f"You have {self.config.captcha_wait_seconds} seconds.")
+            self._log("warning", "The form will be re-submitted after CAPTCHA is solved.")
+            self._log("warning", "=" * 60)
+            
+            print("\n" + "=" * 60)
+            print("🔒 CAPTCHA DETECTED - MANUAL ACTION REQUIRED")
+            print("=" * 60)
+            print(f"1. A browser window should be visible")
+            print(f"2. Solve the CAPTCHA/verification challenge")
+            print(f"3. Wait - the script will continue automatically")
+            print(f"   (timeout: {self.config.captcha_wait_seconds}s)")
+            print("=" * 60 + "\n")
+            
+            # Wait for page changes (CAPTCHA solved indicator)
+            captcha_solved = False
+            wait_interval = 2
+            waited = 0
+            
+            while waited < self.config.captcha_wait_seconds:
+                await asyncio.sleep(wait_interval)
+                waited += wait_interval
+                
+                # Check if CAPTCHA indicators disappeared
+                content = await self.page.evaluate("() => document.body.innerText.toLowerCase()")
+                security_indicators = [
+                    "captcha", "recaptcha", "kod jednorazowy", "nonce",
+                    "robot", "weryfikacja", "verification code",
+                    "nieprawidłowy kod", "nieprawidlowy kod"
+                ]
+                
+                still_has_captcha = any(ind in content for ind in security_indicators)
+                
+                if not still_has_captcha:
+                    self._log("success", "✅ CAPTCHA appears to be solved!")
+                    captcha_solved = True
+                    break
+                
+                # Show progress
+                remaining = self.config.captcha_wait_seconds - waited
+                if remaining > 0 and remaining % 10 == 0:
+                    print(f"   Waiting... {remaining}s remaining")
+            
+            if not captcha_solved:
+                self._log("warning", "⏰ CAPTCHA timeout - continuing anyway...")
+            
+            # Re-fill and submit form
+            self._log("phase", "Phase 6: Re-submitting form after CAPTCHA")
+            
+            for i, step in enumerate(plan.steps):
+                if step.step_type.value in ["fill_field", "fill_form", "submit"]:
+                    self._log("step", f"Executing step: {step.step_type.value}")
+                    try:
+                        await self.step_executor.execute(step, parsed)
+                        self._log("success", f"  ✅ {step.description}")
+                    except Exception as e:
+                        self._log("error", f"  ❌ {step.description}: {e}")
+            
+            # Verify again
+            await asyncio.sleep(2)  # Wait for form submission
+            
+            for step in plan.steps:
+                if step.step_type.value == "verify":
+                    verify_result = await self.step_executor.execute(step, parsed)
+                    if verify_result.get("verified"):
+                        result.success = True
+                        self._log("success", "✅ Form submitted successfully after CAPTCHA!")
+                    else:
+                        result.success = False
+                        result.error = f"Verification failed after CAPTCHA: {verify_result.get('reason')}"
+                    break
+            
+            result.final_url = self.page.url
+            
+        except Exception as e:
+            logger.exception(f"CAPTCHA handling failed: {e}")
+            result.error = f"CAPTCHA handling failed: {e}"
+        
+        finally:
+            await self._cleanup()
+        
+        return result
     
     async def _execute_plan(
         self,

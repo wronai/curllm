@@ -329,21 +329,41 @@ class StepExecutor:
         
         # Error indicators (PL + EN)
         error_indicators = [
-            "błąd", "blad", "error", "failed", "failure",
-            "nieprawidłow", "nieprawidlow", "invalid",
             "wymagane", "required", "must fill", "please enter",
             "nie udało", "nie udalo", "could not", "unable"
         ]
         
+        # Security/CAPTCHA indicators (treated separately)
+        security_indicators = [
+            "captcha", "recaptcha", "kod jednorazowy", "nonce",
+            "robot", "weryfikacja", "verification code",
+            "nieprawidłowy kod", "nieprawidlowy kod"
+        ]
+        
+        has_security = any(ind in content for ind in security_indicators)
+        
         has_success = any(ind in content for ind in success_indicators)
         has_error = any(ind in content for ind in error_indicators)
         
-        is_verified = has_success and not has_error
+        # Determine verification result
+        if has_security:
+            is_verified = False
+            reason = "security_block"
+        elif has_success and not has_error:
+            is_verified = True
+            reason = "success"
+        elif has_error:
+            is_verified = False
+            reason = "form_error"
+        else:
+            is_verified = False
+            reason = "no_confirmation"
         
         self._log("step", f"  📋 Verification check:")
         self._log("step", f"     Success indicators found: {has_success}")
         self._log("step", f"     Error indicators found: {has_error}")
-        self._log("step", f"     Result: {'✅ VERIFIED' if is_verified else '⚠️ NOT VERIFIED'}")
+        self._log("step", f"     Security block detected: {has_security}")
+        self._log("step", f"     Result: {'✅ VERIFIED' if is_verified else '⚠️ NOT VERIFIED'} ({reason})")
         
         if strict and not is_verified:
             raise Exception(f"Verification failed: success={has_success}, error={has_error}")
@@ -352,6 +372,8 @@ class StepExecutor:
             "verified": is_verified,
             "has_success_indicator": has_success,
             "has_error_indicator": has_error,
+            "has_security_block": has_security,
+            "reason": reason,
             "expected": expected
         }
     
