@@ -1,0 +1,12 @@
+url_pattern: '*www.ceneo.pl/*'
+task: extract_products
+algorithm: statistical_containers
+selector: div.cat-prod-row__price
+fields:
+  name: a.js_seoUrl
+  price: a.js_seoUrl
+  url: a[href]
+metadata:
+  success_rate: 1.0
+  use_count: 3
+  last_used: '2025-12-07T11:50:04.854756'

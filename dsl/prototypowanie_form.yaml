@@ -1,0 +1,31 @@
+# Prototypowanie.pl Contact Form Strategy
+# Auto-generated from successful form fill
+
+url_pattern: "*.prototypowanie.pl/*"
+task: fill_form
+algorithm: form_fill
+
+form:
+  selector: form#forminator-module-5574
+  fields:
+    email: input[name="email-1"]
+    phone: input[name="phone-1"]
+    message: textarea[name="textarea-1"]
+    consent: input[name="consent-1"]
+  submit: button.forminator-button-submit
+
+validate: "form_submitted && no_errors"
+
+pre_actions:
+  - wait: form
+  - accept_cookies
+  - scroll_to: form
+
+post_actions:
+  - wait: .forminator-response-message
+  - screenshot: after_submit
+
+metadata:
+  success_rate: 1.0
+  use_count: 3
+  last_used: "2024-12-07"

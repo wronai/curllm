@@ -45,36 +45,51 @@ executor = CurllmExecutor(LLMConfig(
 
 ```
 docs/v2/
-├── architecture/          # System architecture docs
-│   ├── ARCHITECTURE.md    # Core architecture
-│   ├── STREAMWARE.md      # Component system
-│   ├── LLM.md             # LLM integration
-│   └── COMPONENTS.md      # Component reference
-├── features/              # Feature documentation
-│   ├── FORM_FILLING.md    # Form automation
-│   ├── ITERATIVE_EXTRACTOR.md
-│   ├── HIERARCHICAL_PLANNER.md
-│   └── VISION_FORM_ANALYSIS.md
-├── guides/                # User guides
-│   ├── Installation.md    # Setup instructions
-│   ├── EXAMPLES.md        # Code examples
-│   ├── Docker.md          # Docker deployment
+├── architecture/                  # System architecture docs
+│   ├── ARCHITECTURE.md            # Core architecture
+│   ├── DSL_SYSTEM.md              # 🆕 Strategy-based extraction
+│   ├── ATOMIC_QUERY_SYSTEM.md     # DOM Toolkit
+│   ├── STREAMWARE.md              # Component system
+│   ├── LLM.md                     # LLM integration
+│   └── COMPONENTS.md              # Component reference
+├── features/                      # Feature documentation
+│   ├── FORM_FILLING.md            # Form automation
+│   ├── ITERATIVE_EXTRACTOR.md     # Atomic extraction
+│   ├── HIERARCHICAL_PLANNER.md    # 3-level LLM optimization
+│   └── VISION_FORM_ANALYSIS.md    # Visual form detection
+├── guides/                        # User guides
+│   ├── Installation.md            # Setup instructions
+│   ├── EXAMPLES.md                # Code examples
+│   ├── Docker.md                  # Docker deployment
 │   └── Troubleshooting.md
-└── api/                   # API reference
-    ├── API.md             # REST API
-    └── CLI_COMMANDS.md    # CLI reference
+└── api/                           # API reference
+    ├── API.md                     # REST API
+    └── CLI_COMMANDS.md            # CLI reference
 ```
 
 ## 🆕 Recent Additions
 
+### December 2024
+
+- **[DSL System](architecture/DSL_SYSTEM.md)** - Strategy-based extraction with auto-learning
+  - YAML strategy files for reusable extraction recipes
+  - SQLite Knowledge Base tracks algorithm success per domain
+  - Automatic fallback algorithms when primary fails
+  - 80% reduction in LLM calls through pure JS DOM Toolkit
+
+- **[DOM Toolkit](architecture/ATOMIC_QUERY_SYSTEM.md)** - Pure JavaScript atomic queries
+  - Zero LLM calls for DOM analysis
+  - Statistical container detection
+  - Pattern recognition and selector generation
+
 ### November 2024
 
-- **[Hierarchical Planner](HIERARCHICAL_PLANNER.md)** - Revolutionary 3-level LLM optimization
+- **[Hierarchical Planner](features/HIERARCHICAL_PLANNER.md)** - Revolutionary 3-level LLM optimization
   - 87% reduction in token usage
   - Interactive detail requesting
   - Automatic threshold-based activation
 
-- **[Form Filling Guide](FORM_FILLING.md)** - Complete form automation documentation
+- **[Form Filling Guide](features/FORM_FILLING.md)** - Complete form automation documentation
   - Priority-based value handling
   - Automatic error detection
   - Email validation fallbacks

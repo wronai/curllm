@@ -300,7 +300,7 @@ class DSLExecutor:
         domain = urlparse(url).netloc
         matching = []
         
-        for dsl_file in dsl_path.glob("*.dsl"):
+        for dsl_file in list(dsl_path.glob("*.yaml")) + list(dsl_path.glob("*.dsl")):
             try:
                 strategy = self.parser.parse_file(str(dsl_file))
                 

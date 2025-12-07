@@ -17,7 +17,38 @@ from pathlib import Path
 class TestDSLParser:
     """Test DSL parsing and generation."""
     
-    def test_parse_simple_strategy(self):
+    def test_parse_yaml_strategy(self):
+        """Test parsing YAML format strategy."""
+        from curllm_core.dsl import DSLParser, DSLStrategy
+        
+        yaml_content = """
+url_pattern: "*.example.com/*"
+task: extract_products
+algorithm: statistical_containers
+selector: div.product
+fields:
+  name: h3.title
+  price: span.price
+filter: "price < 1000"
+metadata:
+  success_rate: 0.95
+  use_count: 10
+"""
+        
+        parser = DSLParser()
+        strategy = parser.parse(yaml_content)
+        
+        assert strategy.url_pattern == "*.example.com/*"
+        assert strategy.task == "extract_products"
+        assert strategy.algorithm == "statistical_containers"
+        assert strategy.selector == "div.product"
+        assert strategy.fields == {"name": "h3.title", "price": "span.price"}
+        assert strategy.filter_expr == "price < 1000"
+        assert strategy.success_rate == 0.95
+        assert strategy.use_count == 10
+    
+    def test_parse_legacy_dsl_strategy(self):
+        """Test parsing legacy @directive format for backward compatibility."""
         from curllm_core.dsl import DSLParser, DSLStrategy
         
         dsl_content = """
@@ -61,7 +92,8 @@ class TestDSLParser:
         assert strategy.use_count == 42
         assert strategy.last_used == "2024-01-15"
     
-    def test_to_dsl_roundtrip(self):
+    def test_to_yaml_roundtrip(self):
+        """Test YAML serialization and parsing roundtrip."""
         from curllm_core.dsl import DSLParser, DSLStrategy
         
         original = DSLStrategy(
@@ -75,10 +107,16 @@ class TestDSLParser:
             use_count=10
         )
         
-        dsl_text = original.to_dsl()
+        yaml_text = original.to_yaml()
+        
+        # Verify YAML output contains expected keys
+        assert 'url_pattern:' in yaml_text
+        assert 'task:' in yaml_text
+        assert 'algorithm:' in yaml_text
+        assert 'metadata:' in yaml_text
         
         parser = DSLParser()
-        parsed = parser.parse(dsl_text)
+        parsed = parser.parse(yaml_text)
         
         assert parsed.url_pattern == original.url_pattern
         assert parsed.task == original.task

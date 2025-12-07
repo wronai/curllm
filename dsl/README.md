@@ -1,59 +1,63 @@
-# DSL - Domain Specific Language for Web Automation
+# Strategy Files - YAML Format for Web Automation
 
 ## Overview
 
-DSL files (`.dsl`) define reusable strategies for:
+Strategy files (`.yaml`) define reusable strategies for:
 - **Extraction**: Product lists, articles, links
 - **Form filling**: Contact forms, login, search
 - **Navigation**: Multi-step workflows
 
 ## File Format
 
-```dsl
+```yaml
 # Strategy: Ceneo Product Extraction
-@url_pattern: *.ceneo.pl/*
-@task: extract_products
-@algorithm: statistical_containers
-@fallback: pattern_detection, llm_guided
+url_pattern: "*.ceneo.pl/*"
+task: extract_products
+algorithm: statistical_containers
 
-@selector: div.category-list-body > div
-@fields:
+fallback_algorithms:
+  - pattern_detection
+  - llm_guided
+
+selector: div.category-list-body > div
+
+fields:
   name: a.go-to-product
   price: span.price
-  url: a.go-to-product @href
-  image: img @src
+  url: a[href]
+  image: img
 
-@filter: price < 2000
-@validate: has(name, price) && count >= 5
+filter: "price < 2000"
+validate: "has(name, price) && count >= 5"
 
-@pre_actions:
+pre_actions:
   - wait: div.category-list-body
   - accept_cookies
 
-# Metadata (auto-generated)
-# success_rate: 0.92
-# use_count: 47
-# last_used: 2024-12-07
+metadata:
+  success_rate: 0.92
+  use_count: 47
+  last_used: "2024-12-07"
 ```
 
-## Directives
+## YAML Keys
 
-| Directive | Description | Example |
-|-----------|-------------|---------|
-| `@url_pattern` | URL pattern to match | `*.shop.pl/*` |
-| `@task` | Task type | `extract_products`, `fill_form` |
-| `@algorithm` | Primary algorithm | `statistical_containers` |
-| `@fallback` | Fallback algorithms | `pattern_detection, llm_guided` |
-| `@selector` | Container selector | `div.product-card` |
-| `@fields` | Field mappings | `name: h3.title` |
-| `@filter` | Result filter | `price < 1000` |
-| `@validate` | Validation expression | `has(name, price)` |
-| `@form` | Form selector | `form#contact` |
-| `@form_fields` | Form field mappings | `email: input[name="email"]` |
-| `@submit` | Submit button selector | `button[type="submit"]` |
-| `@wait` | Wait condition | `div.loaded` |
-| `@pre_actions` | Actions before extraction | `accept_cookies` |
-| `@post_actions` | Actions after extraction | `scroll_down` |
+| Key | Description | Example |
+|-----|-------------|---------|
+| `url_pattern` | URL pattern to match | `"*.shop.pl/*"` |
+| `task` | Task type | `extract_products`, `fill_form` |
+| `algorithm` | Primary algorithm | `statistical_containers` |
+| `fallback_algorithms` | Fallback algorithms | `[pattern_detection, llm_guided]` |
+| `selector` | Container selector | `div.product-card` |
+| `fields` | Field mappings (dict) | `{name: h3.title, price: span.price}` |
+| `filter` | Result filter expression | `"price < 1000"` |
+| `validate` | Validation expression | `"has(name, price)"` |
+| `form` | Form config (dict) | `{selector: form#contact, submit: button}` |
+| `form.fields` | Form field mappings | `{email: input[name="email"]}` |
+| `wait_for` | Wait condition | `div.loaded` |
+| `pre_actions` | Actions before extraction | `[accept_cookies, scroll_load]` |
+| `post_actions` | Actions after extraction | `[screenshot: result]` |
+| `metadata` | Auto-generated stats | `{success_rate: 0.9, use_count: 10}` |
 
 ## Algorithms
 
@@ -94,7 +98,7 @@ from curllm_core.dsl import DSLParser, DSLExecutor
 
 # Load strategy from file
 parser = DSLParser()
-strategy = parser.parse_file("dsl/ceneo_extract.dsl")
+strategy = parser.parse_file("dsl/ceneo_products.yaml")
 
 # Execute strategy
 executor = DSLExecutor(page, llm_client)
@@ -116,8 +120,8 @@ if result.success:
 # Use auto-detection
 curllm "https://shop.pl/products" -d "Extract products"
 
-# Use specific DSL file
-curllm "https://shop.pl/products" --dsl dsl/shop_products.dsl
+# Use specific strategy file
+curllm "https://shop.pl/products" --strategy dsl/shop_products.yaml
 
 # Save successful strategy
 curllm "https://shop.pl/products" -d "Extract products" --save-dsl
@@ -138,3 +142,10 @@ print(f"Total strategies: {stats['total_strategies']}")
 print(f"Success rate: {stats['overall_success_rate']:.2%}")
 print(f"Top algorithms: {stats['top_algorithms']}")
 ```
+
+## 📚 More Documentation
+
+- **[🧬 DSL System Architecture](../docs/v2/architecture/DSL_SYSTEM.md)** - Full technical documentation
+- **[⚛️ DOM Toolkit](../docs/v2/architecture/ATOMIC_QUERY_SYSTEM.md)** - Pure JS queries
+- **[🏗️ Main Architecture](../docs/v2/architecture/ARCHITECTURE.md)** - System overview
+- **[🏠 Main README](../README.md)** - Getting started

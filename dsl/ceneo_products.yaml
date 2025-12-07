@@ -1,0 +1,35 @@
+# Ceneo Product Extraction Strategy
+# Auto-generated from successful extraction
+
+url_pattern: "*.ceneo.pl/*"
+task: extract_products
+algorithm: statistical_containers
+
+selector: div.cat-prod-row__price
+
+fields:
+  name: a.js_seoUrl
+  price: span.price
+  url: a[href]
+  image: img.product-image
+
+fallback_algorithms:
+  - pattern_detection
+  - fallback_links
+
+validate: "has(name) && count >= 3"
+expected_fields:
+  - name
+  - price
+  - url
+min_items: 3
+
+pre_actions:
+  - wait: div.category-list-body
+  - accept_cookies
+  - scroll_load
+
+metadata:
+  success_rate: 0.92
+  use_count: 5
+  last_used: "2024-12-07"

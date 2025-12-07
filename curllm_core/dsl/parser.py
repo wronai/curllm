@@ -175,83 +175,128 @@ class DSLParser:
     """Parse YAML strategy files."""
     
     def parse(self, content: str) -> DSLStrategy:
-        """Parse DSL content into strategy."""
+        """Parse YAML content into strategy."""
+        # Try YAML first
+        try:
+            data = yaml.safe_load(content)
+            if isinstance(data, dict):
+                return self._from_yaml_dict(data)
+        except yaml.YAMLError:
+            pass
+        
+        # Fallback to legacy @directive format
+        return self._parse_legacy(content)
+    
+    def _from_yaml_dict(self, data: Dict[str, Any]) -> DSLStrategy:
+        """Create strategy from YAML dict."""
+        strategy = DSLStrategy()
+        
+        strategy.url_pattern = data.get('url_pattern', '*')
+        strategy.task = data.get('task', 'extract')
+        strategy.name = data.get('name', '')
+        strategy.algorithm = data.get('algorithm', 'auto')
+        strategy.fallback_algorithms = data.get('fallback_algorithms', [])
+        strategy.selector = data.get('selector', '')
+        strategy.fields = data.get('fields', {})
+        strategy.filter_expr = data.get('filter', '')
+        strategy.validate_expr = data.get('validate', '')
+        strategy.expected_fields = data.get('expected_fields', [])
+        strategy.min_items = data.get('min_items', 1)
+        strategy.wait_for = data.get('wait_for', '')
+        strategy.pre_actions = data.get('pre_actions', [])
+        strategy.post_actions = data.get('post_actions', [])
+        
+        # Form config
+        form = data.get('form', {})
+        if isinstance(form, dict):
+            strategy.form_selector = form.get('selector', '')
+            strategy.form_fields = form.get('fields', {})
+            strategy.submit_selector = form.get('submit', '')
+        
+        # Metadata
+        metadata = data.get('metadata', {})
+        if isinstance(metadata, dict):
+            strategy.success_rate = metadata.get('success_rate', 0.0)
+            strategy.use_count = metadata.get('use_count', 0)
+            strategy.last_used = metadata.get('last_used', '')
+            strategy.source_file = metadata.get('source_file', '')
+        
+        return strategy
+    
+    def _parse_legacy(self, content: str) -> DSLStrategy:
+        """Parse legacy @directive format for backward compatibility."""
         strategy = DSLStrategy()
         current_section = None
         
         for line in content.split('\n'):
             line = line.rstrip()
-            
-            # Skip empty lines
             if not line:
                 continue
             
-            # Parse comments for metadata
-            comment_match = self.COMMENT_PATTERN.match(line)
-            if comment_match:
-                comment = comment_match.group(1)
+            # Comments with metadata
+            if line.startswith('#'):
+                comment = line[1:].strip()
                 if ':' in comment:
                     key, value = comment.split(':', 1)
                     key = key.strip().lower().replace(' ', '_')
                     value = value.strip()
                     if key == 'success_rate':
-                        strategy.success_rate = float(value)
+                        try:
+                            strategy.success_rate = float(value)
+                        except ValueError:
+                            pass
                     elif key == 'use_count':
-                        strategy.use_count = int(value)
+                        try:
+                            strategy.use_count = int(value)
+                        except ValueError:
+                            pass
                     elif key == 'last_used':
                         strategy.last_used = value
                     elif key == 'strategy':
                         strategy.name = value
                 continue
             
-            # Parse directives
-            directive_match = self.DIRECTIVE_PATTERN.match(line)
-            if directive_match:
-                directive = directive_match.group(1)
-                value = directive_match.group(2).strip()
-                
-                current_section = directive
-                self._apply_directive(strategy, directive, value)
+            # Directives (@key: value)
+            if line.startswith('@'):
+                match = re.match(r'^@(\w+):\s*(.*)$', line)
+                if match:
+                    directive, value = match.group(1), match.group(2).strip()
+                    current_section = directive
+                    self._apply_directive(strategy, directive, value)
                 continue
             
-            # Parse indented fields (for @fields, @form_fields sections)
-            field_match = self.FIELD_PATTERN.match(line)
-            if field_match and current_section:
-                field_name = field_match.group(2)
-                field_value = field_match.group(3)
+            # Indented fields
+            if line.startswith('  ') and current_section:
+                match = re.match(r'^\s+(\w+):\s*(.+)$', line)
+                if match:
+                    fname, fval = match.group(1), match.group(2)
+                    if current_section == 'fields':
+                        strategy.fields[fname] = fval
+                    elif current_section == 'form_fields':
+                        strategy.form_fields[fname] = fval
+                    continue
                 
-                if current_section == 'fields':
-                    strategy.fields[field_name] = field_value
-                elif current_section == 'form_fields':
-                    strategy.form_fields[field_name] = field_value
-                continue
-            
-            # Parse list items (for @pre_actions, @post_actions)
-            list_match = self.LIST_ITEM_PATTERN.match(line)
-            if list_match and current_section:
-                item = list_match.group(2)
-                
-                if current_section == 'pre_actions':
-                    strategy.pre_actions.append(item)
-                elif current_section == 'post_actions':
-                    strategy.post_actions.append(item)
-                elif current_section == 'fallback':
-                    strategy.fallback_algorithms.append(item)
-                continue
+                # List items
+                match = re.match(r'^\s+-\s*(.+)$', line)
+                if match:
+                    item = match.group(1)
+                    if current_section == 'pre_actions':
+                        strategy.pre_actions.append(item)
+                    elif current_section == 'post_actions':
+                        strategy.post_actions.append(item)
         
         return strategy
     
     def _apply_directive(self, strategy: DSLStrategy, directive: str, value: str):
-        """Apply a directive to the strategy."""
+        """Apply legacy @directive to strategy."""
         if directive == 'url_pattern':
             strategy.url_pattern = value
         elif directive == 'task':
             strategy.task = value
         elif directive == 'algorithm':
             strategy.algorithm = value
-        elif directive == 'fallback':
-            if value:
-                strategy.fallback_algorithms = [v.strip() for v in value.split(',')]
+        elif directive == 'fallback' and value:
+            strategy.fallback_algorithms = [v.strip() for v in value.split(',')]
         elif directive == 'selector':
             strategy.selector = value
         elif directive == 'filter':
@@ -265,7 +310,10 @@ class DSLParser:
         elif directive == 'wait':
             strategy.wait_for = value
         elif directive == 'min_items':
-            strategy.min_items = int(value)
+            try:
+                strategy.min_items = int(value)
+            except ValueError:
+                pass
         elif directive == 'expected_fields':
             strategy.expected_fields = [f.strip() for f in value.split(',')]
     
@@ -308,8 +356,7 @@ class DSLParser:
         return strategy
     
     def save_strategy(self, strategy: DSLStrategy, directory: str = "dsl") -> str:
-        """Save strategy to DSL file."""
-        from urllib.parse import urlparse
+        """Save strategy to YAML file."""
         import hashlib
         from datetime import datetime
         
@@ -322,12 +369,15 @@ class DSLParser:
         if not pattern:
             pattern = "default"
         
+        # Sanitize pattern for filename
+        pattern = re.sub(r'[^a-zA-Z0-9._-]', '_', pattern)
+        
         # Add hash for uniqueness
-        content_hash = hashlib.md5(strategy.to_dsl().encode()).hexdigest()[:8]
-        filename = f"{pattern}_{strategy.task}_{content_hash}.dsl"
+        content_hash = hashlib.md5(strategy.to_yaml().encode()).hexdigest()[:8]
+        filename = f"{pattern}_{strategy.task}_{content_hash}.yaml"
         
         filepath = dir_path / filename
-        filepath.write_text(strategy.to_dsl(), encoding='utf-8')
+        filepath.write_text(strategy.to_yaml(), encoding='utf-8')
         
         strategy.source_file = str(filepath)
         strategy.last_used = datetime.now().isoformat()
