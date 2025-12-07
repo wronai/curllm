@@ -1,0 +1,116 @@
+#!/usr/bin/env python3
+"""
+URL Resolver - Przykład: Szukanie produktów
+
+Scenariusz: User podaje stronę główną sklepu, ale chce
+znaleźć konkretną kategorię produktów (np. RAM DDR5).
+
+URL Resolver:
+1. Analizuje stronę główną
+2. Wykrywa że brak szukanych produktów
+3. Używa wyszukiwarki sklepu lub nawiguje do kategorii
+4. Zwraca URL z odpowiednimi produktami
+"""
+
+import asyncio
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+from curllm_core.url_resolver import UrlResolver, resolve_url
+from curllm_core.browser_setup import setup_browser
+from curllm_core.stealth import apply_stealth
+
+
+# Realne przykłady - strony główne sklepów
+EXAMPLES = [
+    {
+        "name": "Morele.net - szukanie RAM DDR5",
+        "url": "https://www.morele.net",
+        "instruction": "Znajdź pamięci RAM DDR5 32GB",
+        "expected": "Powinien znaleźć kategorię RAM DDR5 lub wyniki wyszukiwania"
+    },
+    {
+        "name": "X-kom - szukanie laptopów gamingowych",
+        "url": "https://www.x-kom.pl",
+        "instruction": "Pokaż laptopy gamingowe",
+        "expected": "Powinien nawigować do kategorii laptopów gaming"
+    },
+    {
+        "name": "Allegro - szukanie słuchawek",
+        "url": "https://allegro.pl",
+        "instruction": "Znajdź słuchawki bezprzewodowe Sony",
+        "expected": "Powinien użyć wyszukiwarki i znaleźć oferty"
+    },
+    {
+        "name": "MediaExpert - szukanie telewizorów",
+        "url": "https://www.mediaexpert.pl",
+        "instruction": "Wylistuj telewizory 55 cali",
+        "expected": "Powinien znaleźć kategorię TV 55\""
+    },
+]
+
+
+async def run_example(example: dict):
+    """Run single example"""
+    print(f"\n{'='*60}")
+    print(f"📍 {example['name']}")
+    print(f"   URL: {example['url']}")
+    print(f"   Instrukcja: {example['instruction']}")
+    print(f"   Oczekiwane: {example['expected']}")
+    print(f"{'='*60}")
+    
+    browser = None
+    try:
+        browser, context = await setup_browser(stealth_mode=True, headless=True)
+        page = await context.new_page()
+        await apply_stealth(page)
+        
+        resolver = UrlResolver(page=page, llm=None)
+        result = await resolver.resolve(example['url'], example['instruction'])
+        
+        print(f"\n📊 Wynik:")
+        print(f"   Sukces: {'✅' if result.success else '❌'}")
+        print(f"   Metoda: {result.resolution_method}")
+        print(f"   Oryginalny URL: {result.original_url}")
+        print(f"   Rozwiązany URL: {result.resolved_url}")
+        print(f"   Kroki: {' → '.join(result.steps_taken)}")
+        
+        if result.page_match:
+            print(f"   Typ strony: {result.page_match.page_type}")
+            print(f"   Znaleziono produktów: {result.page_match.found_items}")
+            print(f"   Pewność dopasowania: {result.page_match.confidence:.0%}")
+        
+        await page.close()
+        await context.close()
+        await browser.close()
+        
+        return result.success
+        
+    except Exception as e:
+        print(f"   ❌ Błąd: {e}")
+        if browser:
+            try:
+                await browser.close()
+            except:
+                pass
+        return False
+
+
+async def main():
+    print("🔍 URL Resolver - Przykłady szukania produktów")
+    print("=" * 60)
+    
+    successes = 0
+    for example in EXAMPLES:
+        if await run_example(example):
+            successes += 1
+    
+    print(f"\n{'='*60}")
+    print(f"📊 Podsumowanie: {successes}/{len(EXAMPLES)} udanych")
+    print(f"{'='*60}")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

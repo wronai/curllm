@@ -172,23 +172,123 @@ class UrlResolver:
     
     # Goal detection keywords
     GOAL_KEYWORDS = {
+        # Shopping
         TaskGoal.FIND_CART: [
             'koszyk', 'cart', 'basket', 'bag', 'dodaj do koszyka', 'add to cart',
-            'zakup', 'buy', 'purchase', 'kup', 'zamów'
+            'zakup', 'buy', 'purchase', 'kup'
         ],
         TaskGoal.FIND_CHECKOUT: [
-            'checkout', 'zamówienie', 'kasa', 'płatność', 'payment', 'order',
-            'finalizuj', 'złóż zamówienie', 'place order'
+            'checkout', 'zamówienie', 'kasa', 'płatność', 'payment',
+            'finalizuj', 'złóż zamówienie', 'place order', 'zapłać'
         ],
-        TaskGoal.FIND_CONTACT_FORM: [
-            'kontakt', 'contact', 'formularz', 'form', 'napisz', 'write',
-            'wyślij wiadomość', 'send message', 'zapytanie', 'inquiry'
+        TaskGoal.FIND_WISHLIST: [
+            'wishlist', 'ulubione', 'favorites', 'schowek', 'zapisane',
+            'lista życzeń', 'save for later', 'polubione'
         ],
+        TaskGoal.TRACK_ORDER: [
+            'śledzenie', 'tracking', 'status zamówienia', 'order status',
+            'gdzie jest', 'where is my', 'track order', 'sprawdź zamówienie'
+        ],
+        
+        # Account
         TaskGoal.FIND_LOGIN: [
-            'zaloguj', 'login', 'sign in', 'logowanie', 'konto', 'account'
+            'zaloguj', 'login', 'sign in', 'logowanie'
         ],
         TaskGoal.FIND_REGISTER: [
-            'zarejestruj', 'register', 'sign up', 'rejestracja', 'załóż konto'
+            'zarejestruj', 'register', 'sign up', 'rejestracja', 'załóż konto',
+            'create account', 'nowe konto'
+        ],
+        TaskGoal.FIND_ACCOUNT: [
+            'moje konto', 'my account', 'profil', 'profile', 'ustawienia konta',
+            'account settings', 'panel klienta'
+        ],
+        
+        # Communication
+        TaskGoal.FIND_CONTACT_FORM: [
+            'kontakt', 'contact', 'napisz do nas', 'write to us',
+            'formularz kontaktowy', 'contact form', 'zapytanie', 'inquiry'
+        ],
+        TaskGoal.FIND_NEWSLETTER: [
+            'newsletter', 'zapisz się', 'subscribe', 'subskrypcja',
+            'biuletyn', 'mailing', 'powiadomienia email'
+        ],
+        TaskGoal.FIND_CHAT: [
+            'chat', 'czat', 'live chat', 'rozmowa', 'konsultant',
+            'pomoc online', 'support chat'
+        ],
+        
+        # Information
+        TaskGoal.FIND_FAQ: [
+            'faq', 'pytania', 'questions', 'często zadawane',
+            'frequently asked', 'q&a', 'odpowiedzi'
+        ],
+        TaskGoal.FIND_HELP: [
+            'pomoc', 'help', 'support', 'wsparcie', 'centrum pomocy',
+            'help center', 'jak', 'how to'
+        ],
+        TaskGoal.FIND_ABOUT: [
+            'o nas', 'about', 'about us', 'kim jesteśmy', 'who we are',
+            'nasza historia', 'our story', 'o firmie'
+        ],
+        TaskGoal.FIND_SHIPPING: [
+            'dostawa', 'shipping', 'delivery', 'wysyłka', 'czas dostawy',
+            'koszty dostawy', 'shipping cost', 'metody dostawy'
+        ],
+        TaskGoal.FIND_RETURNS: [
+            'zwrot', 'return', 'returns', 'zwroty', 'reklamacja',
+            'wymiana', 'exchange', 'polityka zwrotów', 'return policy'
+        ],
+        TaskGoal.FIND_WARRANTY: [
+            'gwarancja', 'warranty', 'guarantee', 'rękojmia',
+            'warunki gwarancji', 'warranty terms', 'serwis'
+        ],
+        TaskGoal.FIND_PRICING: [
+            'cennik', 'pricing', 'prices', 'ceny', 'plany', 'plans',
+            'pakiety', 'packages', 'subscription', 'subskrypcja'
+        ],
+        TaskGoal.FIND_TERMS: [
+            'regulamin', 'terms', 'terms of service', 'warunki',
+            'terms and conditions', 'zasady', 'rules'
+        ],
+        TaskGoal.FIND_PRIVACY: [
+            'prywatność', 'privacy', 'privacy policy', 'polityka prywatności',
+            'rodo', 'gdpr', 'dane osobowe', 'cookies'
+        ],
+        
+        # Content
+        TaskGoal.FIND_BLOG: [
+            'blog', 'artykuły', 'articles', 'wpisy', 'posts',
+            'poradnik', 'guide', 'tips'
+        ],
+        TaskGoal.FIND_NEWS: [
+            'aktualności', 'news', 'nowości', 'what\'s new',
+            'ogłoszenia', 'announcements', 'wydarzenia'
+        ],
+        TaskGoal.FIND_DOWNLOADS: [
+            'pobierz', 'download', 'downloads', 'pliki', 'files',
+            'dokumenty', 'documents', 'materiały', 'resources'
+        ],
+        TaskGoal.FIND_RESOURCES: [
+            'zasoby', 'resources', 'materiały', 'dokumentacja',
+            'documentation', 'instrukcja', 'manual', 'tutorial'
+        ],
+        
+        # Other
+        TaskGoal.FIND_CAREERS: [
+            'kariera', 'careers', 'praca', 'jobs', 'oferty pracy',
+            'job openings', 'rekrutacja', 'hiring', 'dołącz do nas'
+        ],
+        TaskGoal.FIND_STORES: [
+            'sklepy', 'stores', 'lokalizacje', 'locations', 'znajdź sklep',
+            'store locator', 'punkty sprzedaży', 'gdzie kupić', 'salony'
+        ],
+        TaskGoal.FIND_SOCIAL: [
+            'social', 'facebook', 'instagram', 'twitter', 'linkedin',
+            'youtube', 'tiktok', 'społeczność', 'obserwuj nas', 'follow us'
+        ],
+        TaskGoal.FIND_COMPARE: [
+            'porównaj', 'compare', 'porównanie', 'comparison',
+            'zestawienie', 'versus', 'vs', 'różnice'
         ],
     }
     
@@ -306,48 +406,199 @@ class UrlResolver:
     
     async def find_login_url(self) -> Optional[str]:
         """Find login page URL on current page"""
+        return await self.find_generic_url([
+            'a[href*="login"]', 'a[href*="logowanie"]', 'a[href*="signin"]',
+            'a[href*="zaloguj"]', 'a[href*="account"]', 'a[href*="konto"]',
+        ], ['zaloguj', 'login', 'moje konto', 'sign in', 'logowanie'])
+    
+    async def find_generic_url(
+        self,
+        href_patterns: List[str],
+        text_keywords: List[str]
+    ) -> Optional[str]:
+        """
+        Generic URL finder using href patterns and text keywords.
+        
+        Args:
+            href_patterns: CSS selectors with href patterns
+            text_keywords: Keywords to search in link text
+        """
         if not self.page:
             return None
         
         try:
-            login_url = await self.page.evaluate("""
-                () => {
-                    const patterns = [
-                        'a[href*="login"]', 'a[href*="logowanie"]', 'a[href*="signin"]',
-                        'a[href*="zaloguj"]', 'a[href*="account"]', 'a[href*="konto"]',
-                        '.login-link', '#login-link', '[data-testid="login"]'
-                    ];
+            # Convert to JSON-safe format
+            patterns_json = json.dumps(href_patterns)
+            keywords_json = json.dumps(text_keywords)
+            
+            found_url = await self.page.evaluate(f"""
+                () => {{
+                    const patterns = {patterns_json};
+                    const keywords = {keywords_json};
                     
-                    for (const sel of patterns) {
-                        const el = document.querySelector(sel);
-                        if (el) {
-                            const href = el.getAttribute('href');
-                            if (href) return href;
-                        }
-                    }
+                    // Try href patterns first
+                    for (const sel of patterns) {{
+                        try {{
+                            const el = document.querySelector(sel);
+                            if (el) {{
+                                const href = el.getAttribute('href') || el.closest('a')?.getAttribute('href');
+                                if (href && !href.startsWith('javascript:') && !href.startsWith('#')) {{
+                                    return href;
+                                }}
+                            }}
+                        }} catch (e) {{}}
+                    }}
                     
                     // Try by link text
-                    const links = Array.from(document.querySelectorAll('a'));
-                    const loginLink = links.find(a => {
-                        const text = a.innerText.toLowerCase();
-                        return text.includes('zaloguj') || text.includes('login') || 
-                               text.includes('moje konto') || text.includes('sign in');
-                    });
-                    if (loginLink) return loginLink.getAttribute('href');
+                    const links = Array.from(document.querySelectorAll('a[href]'));
+                    for (const kw of keywords) {{
+                        const found = links.find(a => {{
+                            const text = (a.innerText || '').toLowerCase();
+                            const href = (a.getAttribute('href') || '').toLowerCase();
+                            return text.includes(kw.toLowerCase()) || href.includes(kw.toLowerCase());
+                        }});
+                        if (found) {{
+                            const href = found.getAttribute('href');
+                            if (href && !href.startsWith('javascript:') && !href.startsWith('#')) {{
+                                return href;
+                            }}
+                        }}
+                    }}
                     
                     return null;
-                }
+                }}
             """)
             
-            if login_url:
-                if login_url.startswith('/'):
-                    login_url = urljoin(self.page.url, login_url)
-                return login_url
+            if found_url:
+                if found_url.startswith('/'):
+                    found_url = urljoin(self.page.url, found_url)
+                return found_url
                 
         except Exception as e:
-            logger.debug(f"Login URL search failed: {e}")
+            logger.debug(f"Generic URL search failed: {e}")
         
         return None
+    
+    async def find_url_for_goal(self, goal: TaskGoal) -> Optional[str]:
+        """Find URL for any goal type"""
+        
+        # Define patterns and keywords for each goal
+        goal_patterns = {
+            TaskGoal.FIND_CART: {
+                'patterns': ['a[href*="cart"]', 'a[href*="koszyk"]', 'a[href*="basket"]'],
+                'keywords': ['koszyk', 'cart', 'basket']
+            },
+            TaskGoal.FIND_CHECKOUT: {
+                'patterns': ['a[href*="checkout"]', 'a[href*="zamow"]', 'a[href*="kasa"]'],
+                'keywords': ['checkout', 'zamówienie', 'kasa', 'finalizuj']
+            },
+            TaskGoal.FIND_WISHLIST: {
+                'patterns': ['a[href*="wishlist"]', 'a[href*="ulubione"]', 'a[href*="favorites"]'],
+                'keywords': ['wishlist', 'ulubione', 'schowek', 'favorites']
+            },
+            TaskGoal.TRACK_ORDER: {
+                'patterns': ['a[href*="track"]', 'a[href*="order"]', 'a[href*="status"]'],
+                'keywords': ['śledzenie', 'tracking', 'status', 'zamówienia']
+            },
+            TaskGoal.FIND_LOGIN: {
+                'patterns': ['a[href*="login"]', 'a[href*="signin"]', 'a[href*="zaloguj"]'],
+                'keywords': ['zaloguj', 'login', 'sign in']
+            },
+            TaskGoal.FIND_REGISTER: {
+                'patterns': ['a[href*="register"]', 'a[href*="signup"]', 'a[href*="rejestr"]'],
+                'keywords': ['zarejestruj', 'register', 'załóż konto', 'sign up']
+            },
+            TaskGoal.FIND_ACCOUNT: {
+                'patterns': ['a[href*="account"]', 'a[href*="konto"]', 'a[href*="profile"]'],
+                'keywords': ['moje konto', 'my account', 'profil']
+            },
+            TaskGoal.FIND_CONTACT_FORM: {
+                'patterns': ['a[href*="contact"]', 'a[href*="kontakt"]'],
+                'keywords': ['kontakt', 'contact', 'napisz do nas']
+            },
+            TaskGoal.FIND_NEWSLETTER: {
+                'patterns': ['a[href*="newsletter"]', 'a[href*="subscribe"]'],
+                'keywords': ['newsletter', 'zapisz się', 'subscribe']
+            },
+            TaskGoal.FIND_CHAT: {
+                'patterns': ['a[href*="chat"]', '[class*="chat"]', '[id*="chat"]'],
+                'keywords': ['chat', 'czat', 'live chat']
+            },
+            TaskGoal.FIND_FAQ: {
+                'patterns': ['a[href*="faq"]', 'a[href*="pytania"]', 'a[href*="questions"]'],
+                'keywords': ['faq', 'pytania', 'często zadawane']
+            },
+            TaskGoal.FIND_HELP: {
+                'patterns': ['a[href*="help"]', 'a[href*="pomoc"]', 'a[href*="support"]'],
+                'keywords': ['pomoc', 'help', 'wsparcie', 'support']
+            },
+            TaskGoal.FIND_ABOUT: {
+                'patterns': ['a[href*="about"]', 'a[href*="o-nas"]', 'a[href*="firma"]'],
+                'keywords': ['o nas', 'about', 'kim jesteśmy', 'o firmie']
+            },
+            TaskGoal.FIND_SHIPPING: {
+                'patterns': ['a[href*="shipping"]', 'a[href*="dostawa"]', 'a[href*="delivery"]'],
+                'keywords': ['dostawa', 'shipping', 'wysyłka', 'delivery']
+            },
+            TaskGoal.FIND_RETURNS: {
+                'patterns': ['a[href*="return"]', 'a[href*="zwrot"]', 'a[href*="reklamac"]'],
+                'keywords': ['zwroty', 'returns', 'reklamacja', 'wymiana']
+            },
+            TaskGoal.FIND_WARRANTY: {
+                'patterns': ['a[href*="warranty"]', 'a[href*="gwarancja"]', 'a[href*="serwis"]'],
+                'keywords': ['gwarancja', 'warranty', 'serwis']
+            },
+            TaskGoal.FIND_PRICING: {
+                'patterns': ['a[href*="pricing"]', 'a[href*="cennik"]', 'a[href*="plans"]'],
+                'keywords': ['cennik', 'pricing', 'plany', 'ceny']
+            },
+            TaskGoal.FIND_TERMS: {
+                'patterns': ['a[href*="terms"]', 'a[href*="regulamin"]', 'a[href*="tos"]'],
+                'keywords': ['regulamin', 'terms', 'warunki']
+            },
+            TaskGoal.FIND_PRIVACY: {
+                'patterns': ['a[href*="privacy"]', 'a[href*="prywatno"]', 'a[href*="rodo"]'],
+                'keywords': ['prywatność', 'privacy', 'rodo', 'gdpr']
+            },
+            TaskGoal.FIND_BLOG: {
+                'patterns': ['a[href*="blog"]', 'a[href*="artykul"]', 'a[href*="articles"]'],
+                'keywords': ['blog', 'artykuły', 'poradnik']
+            },
+            TaskGoal.FIND_NEWS: {
+                'patterns': ['a[href*="news"]', 'a[href*="aktualnosci"]', 'a[href*="nowosci"]'],
+                'keywords': ['aktualności', 'news', 'nowości']
+            },
+            TaskGoal.FIND_DOWNLOADS: {
+                'patterns': ['a[href*="download"]', 'a[href*="pobierz"]', 'a[href*="files"]'],
+                'keywords': ['pobierz', 'download', 'pliki']
+            },
+            TaskGoal.FIND_RESOURCES: {
+                'patterns': ['a[href*="resources"]', 'a[href*="zasoby"]', 'a[href*="docs"]'],
+                'keywords': ['zasoby', 'resources', 'dokumentacja']
+            },
+            TaskGoal.FIND_CAREERS: {
+                'patterns': ['a[href*="career"]', 'a[href*="jobs"]', 'a[href*="praca"]'],
+                'keywords': ['kariera', 'careers', 'praca', 'jobs']
+            },
+            TaskGoal.FIND_STORES: {
+                'patterns': ['a[href*="stores"]', 'a[href*="locations"]', 'a[href*="sklepy"]'],
+                'keywords': ['sklepy', 'stores', 'lokalizacje', 'znajdź sklep']
+            },
+            TaskGoal.FIND_SOCIAL: {
+                'patterns': ['a[href*="facebook"]', 'a[href*="instagram"]', 'a[href*="twitter"]'],
+                'keywords': ['facebook', 'instagram', 'twitter', 'social']
+            },
+            TaskGoal.FIND_COMPARE: {
+                'patterns': ['a[href*="compare"]', 'a[href*="porownaj"]'],
+                'keywords': ['porównaj', 'compare', 'porównanie']
+            },
+        }
+        
+        if goal not in goal_patterns:
+            return None
+        
+        config = goal_patterns[goal]
+        return await self.find_generic_url(config['patterns'], config['keywords'])
     
     async def resolve_for_goal(
         self,
@@ -356,8 +607,12 @@ class UrlResolver:
     ) -> ResolvedUrl:
         """
         Resolve URL for a specific goal (cart, contact, login, etc.)
+        
+        Works for all TaskGoal types - automatically finds the right page
+        based on the goal using link patterns and text matching.
         """
         steps = []
+        self._log(f"🎯 Resolving for goal: {goal.value}")
         
         if self.page:
             try:
@@ -372,19 +627,9 @@ class UrlResolver:
                     steps_taken=[f"Navigation failed: {e}"],
                 )
         
-        target_url = None
-        
-        if goal == TaskGoal.FIND_CART or goal == TaskGoal.FIND_CHECKOUT:
-            target_url = await self.find_cart_url()
-            steps.append(f"Searched for cart: {'found' if target_url else 'not found'}")
-            
-        elif goal == TaskGoal.FIND_CONTACT_FORM:
-            target_url = await self.find_contact_url()
-            steps.append(f"Searched for contact: {'found' if target_url else 'not found'}")
-            
-        elif goal == TaskGoal.FIND_LOGIN or goal == TaskGoal.FIND_REGISTER:
-            target_url = await self.find_login_url()
-            steps.append(f"Searched for login: {'found' if target_url else 'not found'}")
+        # Use the universal goal-based URL finder
+        target_url = await self.find_url_for_goal(goal)
+        steps.append(f"Searched for {goal.value}: {'found' if target_url else 'not found'}")
         
         if target_url:
             try:
@@ -432,10 +677,9 @@ class UrlResolver:
         goal = self.detect_goal(instruction)
         self._log(f"   Detected goal: {goal.value}")
         
-        # For specific goals (cart, contact, login), use specialized resolution
-        if goal in [TaskGoal.FIND_CART, TaskGoal.FIND_CHECKOUT, 
-                    TaskGoal.FIND_CONTACT_FORM, TaskGoal.FIND_LOGIN, 
-                    TaskGoal.FIND_REGISTER]:
+        # For specific goals (anything except GENERIC and EXTRACT_PRODUCTS), 
+        # use specialized resolution to find the right page
+        if goal not in [TaskGoal.GENERIC, TaskGoal.EXTRACT_PRODUCTS]:
             return await self.resolve_for_goal(url, goal)
         
         steps = []
