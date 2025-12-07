@@ -464,33 +464,63 @@ Return ONLY the number (1-5) of the best matching link, or 0 if none match well.
     async def try_direct_url_patterns(self, base_url: str, goal: TaskGoal) -> Optional[str]:
         """
         Try common URL patterns directly without parsing the page.
-        Fast fallback when link scanning fails.
+        Includes path patterns and subdomain patterns.
         """
-        patterns = {
-            TaskGoal.FIND_CONTACT_FORM: ["/kontakt", "/contact", "/contact-us", "/help", "/support"],
-            TaskGoal.FIND_CART: ["/koszyk", "/cart", "/basket", "/bag"],
-            TaskGoal.FIND_LOGIN: ["/login", "/logowanie", "/signin", "/account/login", "/konto"],
+        from urllib.parse import urlparse
+        
+        parsed = urlparse(base_url)
+        domain = parsed.netloc.replace('www.', '')
+        scheme = parsed.scheme or 'https'
+        
+        # Path patterns to try
+        path_patterns = {
+            TaskGoal.FIND_CONTACT_FORM: ["/kontakt", "/contact", "/contact-us", "/help", "/support", "/pomoc"],
+            TaskGoal.FIND_CART: ["/koszyk", "/cart", "/basket", "/bag", "/checkout"],
+            TaskGoal.FIND_LOGIN: ["/login", "/logowanie", "/signin", "/account/login", "/konto", "/zaloguj"],
             TaskGoal.FIND_REGISTER: ["/register", "/rejestracja", "/signup", "/account/create", "/zaloz-konto"],
-            TaskGoal.FIND_FAQ: ["/faq", "/help", "/pomoc", "/pytania", "/centrum-pomocy"],
+            TaskGoal.FIND_FAQ: ["/faq", "/help", "/pomoc", "/pytania", "/centrum-pomocy", "/faq.html"],
             TaskGoal.FIND_HELP: ["/help", "/pomoc", "/support", "/wsparcie", "/centrum-pomocy"],
-            TaskGoal.FIND_SHIPPING: ["/dostawa", "/shipping", "/delivery", "/wysylka", "/koszty-dostawy"],
+            TaskGoal.FIND_SHIPPING: [
+                "/dostawa", "/shipping", "/delivery", "/wysylka", "/koszty-dostawy",
+                "/informacje/dostawa", "/info/dostawa", "/lp,dostawa", "/s,dostawa",
+                "/cms/dostawa", "/strona/dostawa", "/page/shipping"
+            ],
             TaskGoal.FIND_RETURNS: ["/zwroty", "/returns", "/return-policy", "/reklamacje", "/odstapienie"],
-            TaskGoal.FIND_WARRANTY: ["/gwarancja", "/warranty", "/serwis"],
-            TaskGoal.FIND_TERMS: ["/regulamin", "/terms", "/warunki", "/zasady"],
+            TaskGoal.FIND_WARRANTY: ["/gwarancja", "/warranty", "/serwis", "/naprawa"],
+            TaskGoal.FIND_TERMS: ["/regulamin", "/terms", "/warunki", "/zasady", "/tos"],
             TaskGoal.FIND_PRIVACY: ["/privacy", "/prywatnosc", "/polityka-prywatnosci", "/rodo"],
             TaskGoal.FIND_ABOUT: ["/o-nas", "/about", "/about-us", "/firma", "/o-firmie"],
-            TaskGoal.FIND_CAREERS: ["/kariera", "/careers", "/praca", "/jobs", "/oferty-pracy"],
-            TaskGoal.FIND_BLOG: ["/blog", "/articles", "/artykuly", "/poradnik", "/aktualnosci"],
+            TaskGoal.FIND_CAREERS: ["/kariera", "/careers", "/praca", "/jobs", "/oferty-pracy", "/rekrutacja"],
+            TaskGoal.FIND_BLOG: ["/blog", "/articles", "/artykuly", "/poradnik", "/aktualnosci", "/news"],
             TaskGoal.FIND_STORES: ["/sklepy", "/stores", "/lokalizacje", "/salony", "/punkty-sprzedazy"],
             TaskGoal.FIND_ACCOUNT: ["/konto", "/account", "/moje-konto", "/profil", "/panel"],
         }
         
-        for pattern in patterns.get(goal, []):
-            test_url = base_url.rstrip("/") + pattern
+        # Subdomain patterns (for careers, help, etc.)
+        subdomain_patterns = {
+            TaskGoal.FIND_CAREERS: ["kariera", "careers", "praca", "jobs"],
+            TaskGoal.FIND_HELP: ["help", "pomoc", "support"],
+            TaskGoal.FIND_CONTACT_FORM: ["kontakt", "help", "pomoc"],
+        }
+        
+        # Try path patterns first
+        for pattern in path_patterns.get(goal, []):
+            test_url = f"{scheme}://{parsed.netloc.rstrip('/')}{pattern}"
             try:
                 response = await self.page.goto(test_url, timeout=5000, wait_until="domcontentloaded")
                 if response and response.status < 400:
                     logger.info(f"Direct URL pattern worked: {test_url}")
+                    return test_url
+            except Exception:
+                continue
+        
+        # Try subdomain patterns
+        for subdomain in subdomain_patterns.get(goal, []):
+            test_url = f"{scheme}://{subdomain}.{domain}"
+            try:
+                response = await self.page.goto(test_url, timeout=5000, wait_until="domcontentloaded")
+                if response and response.status < 400:
+                    logger.info(f"Subdomain pattern worked: {test_url}")
                     return test_url
             except Exception:
                 continue
