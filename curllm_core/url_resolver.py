@@ -21,8 +21,14 @@ import logging
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urljoin, urlparse, quote_plus
 
-# Import types from separate module
+# Import types and patterns from separate modules
 from .url_types import TaskGoal, PageMatchResult, ResolvedUrl
+from .url_patterns import (
+    SEARCH_SELECTORS, SEARCH_SUBMIT_SELECTORS,
+    CATEGORY_PATTERNS, CART_URL_PATTERNS, CONTACT_URL_PATTERNS, LOGIN_URL_PATTERNS,
+    GOAL_KEYWORDS, GOAL_URL_PATTERNS,
+    detect_goal_from_instruction,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -40,182 +46,6 @@ class UrlResolver:
     """
     
     # Common search input selectors
-    SEARCH_SELECTORS = [
-        'input[type="search"]',
-        'input[name="q"]',
-        'input[name="search"]',
-        'input[name="query"]',
-        'input[name="s"]',
-        'input[placeholder*="szukaj" i]',
-        'input[placeholder*="search" i]',
-        'input[placeholder*="wyszukaj" i]',
-        '#search',
-        '#searchbox',
-        '.search-input',
-        '.search-field',
-        '[data-testid="search-input"]',
-    ]
-    
-    # Common search button/submit selectors
-    SEARCH_SUBMIT_SELECTORS = [
-        'button[type="submit"]',
-        'input[type="submit"]',
-        '.search-button',
-        '.search-submit',
-        '[data-testid="search-button"]',
-        'button[aria-label*="search" i]',
-        'button[aria-label*="szukaj" i]',
-    ]
-    
-    # Category link patterns
-    CATEGORY_PATTERNS = [
-        r'/kategori[ae]/[\w-]+',
-        r'/category/[\w-]+',
-        r'/cat/[\w-]+',
-        r'/c/[\w-]+',
-        r'/products?/[\w-]+',
-        r'/produkty?/[\w-]+',
-    ]
-    
-    # Cart/checkout URL patterns
-    CART_URL_PATTERNS = [
-        r'/cart', r'/koszyk', r'/basket', r'/bag', r'/shopping-cart',
-        r'/checkout', r'/zamowienie', r'/order', r'/kasa',
-    ]
-    
-    # Contact page URL patterns  
-    CONTACT_URL_PATTERNS = [
-        r'/contact', r'/kontakt', r'/contact-us', r'/napisz-do-nas',
-        r'/support', r'/help', r'/pomoc', r'/wsparcie',
-    ]
-    
-    # Login page URL patterns
-    LOGIN_URL_PATTERNS = [
-        r'/login', r'/logowanie', r'/sign-in', r'/signin', r'/zaloguj',
-        r'/account', r'/konto', r'/my-account', r'/moje-konto',
-    ]
-    
-    # Goal detection keywords
-    GOAL_KEYWORDS = {
-        # Shopping
-        TaskGoal.FIND_CART: [
-            'koszyk', 'cart', 'basket', 'bag', 'dodaj do koszyka', 'add to cart',
-            'zakup', 'buy', 'purchase', 'kup'
-        ],
-        TaskGoal.FIND_CHECKOUT: [
-            'checkout', 'zamówienie', 'kasa', 'płatność', 'payment',
-            'finalizuj', 'złóż zamówienie', 'place order', 'zapłać'
-        ],
-        TaskGoal.FIND_WISHLIST: [
-            'wishlist', 'ulubione', 'favorites', 'schowek', 'zapisane',
-            'lista życzeń', 'save for later', 'polubione'
-        ],
-        TaskGoal.TRACK_ORDER: [
-            'śledzenie', 'tracking', 'status zamówienia', 'order status',
-            'gdzie jest', 'where is my', 'track order', 'sprawdź zamówienie'
-        ],
-        
-        # Account
-        TaskGoal.FIND_LOGIN: [
-            'zaloguj', 'login', 'sign in', 'logowanie'
-        ],
-        TaskGoal.FIND_REGISTER: [
-            'zarejestruj', 'register', 'sign up', 'rejestracja', 'załóż konto',
-            'create account', 'nowe konto'
-        ],
-        TaskGoal.FIND_ACCOUNT: [
-            'moje konto', 'my account', 'profil', 'profile', 'ustawienia konta',
-            'account settings', 'panel klienta'
-        ],
-        
-        # Communication
-        TaskGoal.FIND_CONTACT_FORM: [
-            'kontakt', 'contact', 'napisz do nas', 'write to us',
-            'formularz kontaktowy', 'contact form', 'zapytanie', 'inquiry'
-        ],
-        TaskGoal.FIND_NEWSLETTER: [
-            'newsletter', 'zapisz się', 'subscribe', 'subskrypcja',
-            'biuletyn', 'mailing', 'powiadomienia email'
-        ],
-        TaskGoal.FIND_CHAT: [
-            'chat', 'czat', 'live chat', 'rozmowa', 'konsultant',
-            'pomoc online', 'support chat'
-        ],
-        
-        # Information
-        TaskGoal.FIND_FAQ: [
-            'faq', 'pytania', 'questions', 'często zadawane',
-            'frequently asked', 'q&a', 'odpowiedzi'
-        ],
-        TaskGoal.FIND_HELP: [
-            'pomoc', 'help', 'support', 'wsparcie', 'centrum pomocy',
-            'help center', 'jak', 'how to'
-        ],
-        TaskGoal.FIND_ABOUT: [
-            'o nas', 'about', 'about us', 'kim jesteśmy', 'who we are',
-            'nasza historia', 'our story', 'o firmie'
-        ],
-        TaskGoal.FIND_SHIPPING: [
-            'dostawa', 'shipping', 'delivery', 'wysyłka', 'czas dostawy',
-            'koszty dostawy', 'shipping cost', 'metody dostawy'
-        ],
-        TaskGoal.FIND_RETURNS: [
-            'zwrot', 'return', 'returns', 'zwroty', 'reklamacja',
-            'wymiana', 'exchange', 'polityka zwrotów', 'return policy'
-        ],
-        TaskGoal.FIND_WARRANTY: [
-            'gwarancja', 'warranty', 'guarantee', 'rękojmia',
-            'warunki gwarancji', 'warranty terms', 'serwis'
-        ],
-        TaskGoal.FIND_PRICING: [
-            'cennik', 'pricing', 'prices', 'ceny', 'plany', 'plans',
-            'pakiety', 'packages', 'subscription', 'subskrypcja'
-        ],
-        TaskGoal.FIND_TERMS: [
-            'regulamin', 'terms', 'terms of service', 'warunki',
-            'terms and conditions', 'zasady', 'rules'
-        ],
-        TaskGoal.FIND_PRIVACY: [
-            'prywatność', 'privacy', 'privacy policy', 'polityka prywatności',
-            'rodo', 'gdpr', 'dane osobowe', 'cookies'
-        ],
-        
-        # Content
-        TaskGoal.FIND_BLOG: [
-            'blog', 'artykuły', 'articles', 'wpisy', 'posts',
-            'poradnik', 'guide', 'tips'
-        ],
-        TaskGoal.FIND_NEWS: [
-            'aktualności', 'news', 'nowości', 'what\'s new',
-            'ogłoszenia', 'announcements', 'wydarzenia'
-        ],
-        TaskGoal.FIND_DOWNLOADS: [
-            'pobierz', 'download', 'downloads', 'pliki', 'files',
-            'dokumenty', 'documents', 'materiały', 'resources'
-        ],
-        TaskGoal.FIND_RESOURCES: [
-            'zasoby', 'resources', 'materiały', 'dokumentacja',
-            'documentation', 'instrukcja', 'manual', 'tutorial'
-        ],
-        
-        # Other
-        TaskGoal.FIND_CAREERS: [
-            'kariera', 'careers', 'praca', 'jobs', 'oferty pracy',
-            'job openings', 'rekrutacja', 'hiring', 'dołącz do nas'
-        ],
-        TaskGoal.FIND_STORES: [
-            'sklepy', 'stores', 'lokalizacje', 'locations', 'znajdź sklep',
-            'store locator', 'punkty sprzedaży', 'gdzie kupić', 'salony'
-        ],
-        TaskGoal.FIND_SOCIAL: [
-            'social', 'facebook', 'instagram', 'twitter', 'linkedin',
-            'youtube', 'tiktok', 'społeczność', 'obserwuj nas', 'follow us'
-        ],
-        TaskGoal.FIND_COMPARE: [
-            'porównaj', 'compare', 'porównanie', 'comparison',
-            'zestawienie', 'versus', 'vs', 'różnice'
-        ],
-    }
     
     def __init__(self, page=None, llm=None, run_logger=None):
         """
@@ -235,7 +65,7 @@ class UrlResolver:
         instr_lower = instruction.lower()
         
         scores = {}
-        for goal, keywords in self.GOAL_KEYWORDS.items():
+        for goal, keywords in GOAL_KEYWORDS.items():
             score = sum(1 for kw in keywords if kw in instr_lower)
             if score > 0:
                 scores[goal] = score
@@ -996,7 +826,7 @@ Search term:"""
         try:
             # Find search input
             search_input = None
-            for selector in self.SEARCH_SELECTORS:
+            for selector in SEARCH_SELECTORS:
                 try:
                     el = await self.page.query_selector(selector)
                     if el and await el.is_visible():
@@ -1027,7 +857,7 @@ Search term:"""
             
             # Try clicking search button if Enter didn't work
             if not submitted:
-                for selector in self.SEARCH_SUBMIT_SELECTORS:
+                for selector in SEARCH_SUBMIT_SELECTORS:
                     try:
                         btn = await self.page.query_selector(selector)
                         if btn and await btn.is_visible():
