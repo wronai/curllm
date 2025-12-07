@@ -91,7 +91,8 @@ GOAL_KEYWORDS = {
     
     # Account
     TaskGoal.FIND_LOGIN: [
-        'zaloguj', 'login', 'sign in', 'logowanie'
+        'zaloguj', 'login', 'sign in', 'logowanie', 'moje konto',
+        'my account', 'konto', 'zalogować'
     ],
     TaskGoal.FIND_REGISTER: [
         'zarejestruj', 'register', 'sign up', 'rejestracja', 'załóż konto',
@@ -105,7 +106,9 @@ GOAL_KEYWORDS = {
     # Communication
     TaskGoal.FIND_CONTACT_FORM: [
         'kontakt', 'contact', 'napisz do nas', 'write to us',
-        'formularz kontaktowy', 'contact form', 'zapytanie', 'inquiry'
+        'formularz kontaktowy', 'contact form', 'zapytanie', 'inquiry',
+        'wiadomość', 'message', 'obsługa klienta', 'customer service',
+        'dział obsługi', 'support', 'skontaktuj'
     ],
     TaskGoal.FIND_NEWSLETTER: [
         'newsletter', 'zapisz się', 'subscribe', 'subskrypcja',

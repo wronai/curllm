@@ -15,9 +15,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from curllm_core.url_resolver import UrlResolver, TaskGoal
-from curllm_core.browser_setup import setup_browser
-from curllm_core.stealth import StealthConfig
-
+from browser_helper import create_browser, close_browser
 
 # Realne przykłady - szukanie informacji
 EXAMPLES = [
@@ -80,8 +78,6 @@ EXAMPLES = [
         "expected_keywords": ["regulamin", "terms", "warunki"]
     },
 ]
-
-
 async def run_example(example: dict):
     """Run single example"""
     print(f"\n{'='*60}")
@@ -91,12 +87,13 @@ async def run_example(example: dict):
     print(f"   Cel: {example['goal'].value}")
     print(f"{'='*60}")
     
+    playwright = None
     browser = None
     try:
-        browser, context = await setup_browser(stealth_mode=True, headless=True)
-        page = await context.new_page()
-        stealth = StealthConfig()
-        await stealth.apply_to_context(context)
+        playwright, browser, context, page = await create_browser(headless=True, stealth_mode=True)
+        
+        
+        
         
         resolver = UrlResolver(page=page, llm=None)
         result = await resolver.resolve_for_goal(example['url'], example['goal'])
@@ -114,22 +111,16 @@ async def run_example(example: dict):
         else:
             print(f"   ⚠️ URL nie zawiera oczekiwanych słów kluczowych")
         
-        await page.close()
-        await context.close()
-        await browser.close()
+        await close_browser(playwright, browser, context, page)
+        
+        
         
         return result.success
         
     except Exception as e:
         print(f"   ❌ Błąd: {e}")
-        if browser:
-            try:
-                await browser.close()
-            except:
-                pass
+        await close_browser(playwright, browser)
         return False
-
-
 async def main():
     print("📋 URL Resolver - Przykłady szukania informacji")
     print("   (FAQ, zwroty, dostawa, gwarancja, regulamin)")
@@ -143,7 +134,5 @@ async def main():
     print(f"\n{'='*60}")
     print(f"📊 Podsumowanie: {successes}/{len(EXAMPLES)} udanych")
     print(f"{'='*60}")
-
-
 if __name__ == "__main__":
     asyncio.run(main())

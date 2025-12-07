@@ -734,92 +734,98 @@ class Orchestrator:
     
     def _save_log_with_package(self, result: OrchestratorResult, log_path: str) -> str:
         """Save using curllm_logs package"""
-        from curllm_logs import LogSession, create_session
-        
-        # Create session
-        session = create_session(session_type="orchestrator", log_dir=self.config.log_dir)
-        session.session_id = self.run_id
-        
-        # Command info
-        escaped_cmd = result.command.replace('"', '\\"')
-        url = result.parsed.get_url() if result.parsed else None
-        
-        session.command = CommandInfo(
-            raw_command=result.command,
-            cli_format=f'curllm "{escaped_cmd}"',
-            traditional_format=f'curllm "{url}" -d "{escaped_cmd}"' if url else None,
-            target_url=url,
-            target_domain=result.parsed.target_domain if result.parsed else None,
-            instruction=result.command,
-            goal=result.parsed.primary_goal.value if result.parsed else None,
-            email=result.parsed.form_data.email if result.parsed else None,
-            name=result.parsed.form_data.name if result.parsed else None,
-            phone=result.parsed.form_data.phone if result.parsed else None,
-            message=result.parsed.form_data.message if result.parsed else None,
-            parse_confidence=result.parsed.confidence if result.parsed else 0,
-        )
-        
-        # Environment info
-        session.environment = EnvironmentInfo(
-            headless=self.config.headless,
-            stealth_mode=self.config.stealth_mode,
-        )
-        
-        # Plan steps
-        if result.plan:
-            session.plan_steps = [f"{s.step_type.value}: {s.description}" for s in result.plan.steps]
-        
-        # Step results
-        for sr in result.step_results:
-            step_log = StepLog(
-                index=sr.step_index,
-                step_type=sr.step_type,
-                description=sr.step_type,
-                status="completed" if sr.success else "failed",
-                duration_ms=sr.duration_ms,
-                error_message=sr.error,
-                screenshot_after=sr.screenshot_path,
+        try:
+            from curllm_logs import LogSession, create_session
+            
+            # Create session
+            session = create_session(session_type="orchestrator", log_dir=self.config.log_dir)
+            session.session_id = self.run_id
+            
+            # Command info
+            escaped_cmd = result.command.replace('"', '\\"')
+            url = result.parsed.get_url() if result.parsed else None
+            
+            session.command = CommandInfo(
+                raw_command=result.command,
+                cli_format=f'curllm "{escaped_cmd}"',
+                traditional_format=f'curllm "{url}" -d "{escaped_cmd}"' if url else None,
+                target_url=url,
+                target_domain=result.parsed.target_domain if result.parsed else None,
+                instruction=result.command,
+                goal=result.parsed.primary_goal.value if result.parsed else None,
+                email=result.parsed.form_data.email if result.parsed else None,
+                name=result.parsed.form_data.name if result.parsed else None,
+                phone=result.parsed.form_data.phone if result.parsed else None,
+                message=result.parsed.form_data.message if result.parsed else None,
+                parse_confidence=result.parsed.confidence if result.parsed else 0,
             )
-            session.add_step(step_log)
-        
-        # Add screenshots from manager
-        if self.screenshot_manager:
-            for ss in self.screenshot_manager.screenshots:
-                session.screenshots.append(ss)
-        
-        # Add visited URLs
-        if result.final_url:
-            session.add_url(result.final_url)
-        
-        # Raw log entries
-        from curllm_logs.log_entry import LogEntry as LogEntryClass
-        for log_line in self.run_log:
-            session.entries.append(LogEntryClass(
-                timestamp=datetime.now(),
-                level=LogLevel.INFO,
-                message=log_line
-            ))
-        
-        # Result
-        session.result = ResultInfo(
-            success=result.success,
-            final_url=result.final_url,
-            duration_ms=result.duration_ms,
-            steps_total=len(result.step_results),
-            steps_completed=sum(1 for sr in result.step_results if sr.success),
-            steps_failed=sum(1 for sr in result.step_results if not sr.success),
-            extracted_data=result.extracted_data,
-            error_message=result.error,
-        )
-        
-        session.finish(result.success, result.error)
-        
-        # Write using MarkdownLogWriter
-        writer = MarkdownLogWriter(include_raw_log=True, include_images=True)
-        writer.write(session, log_path)
-        
-        logger.info(f"Log saved: {log_path}")
-        return log_path
+            
+            # Environment info
+            session.environment = EnvironmentInfo(
+                headless=self.config.headless,
+                stealth_mode=self.config.stealth_mode,
+            )
+            
+            # Plan steps
+            if result.plan:
+                session.plan_steps = [f"{s.step_type.value}: {s.description}" for s in result.plan.steps]
+            
+            # Step results
+            for sr in result.step_results:
+                step_log = StepLog(
+                    index=sr.step_index,
+                    step_type=sr.step_type,
+                    description=sr.step_type,
+                    status="completed" if sr.success else "failed",
+                    duration_ms=sr.duration_ms,
+                    error_message=sr.error,
+                    screenshot_after=sr.screenshot_path,
+                )
+                session.add_step(step_log)
+            
+            # Add screenshots from manager
+            if self.screenshot_manager:
+                for ss in self.screenshot_manager.screenshots:
+                    session.screenshots.append(ss)
+            
+            # Add visited URLs
+            if result.final_url:
+                session.add_url(result.final_url)
+            
+            # Raw log entries
+            from curllm_logs.log_entry import LogEntry as LogEntryClass
+            for log_line in self.run_log:
+                session.entries.append(LogEntryClass(
+                    timestamp=datetime.now(),
+                    level=LogLevel.INFO,
+                    message=log_line
+                ))
+            
+            # Result
+            session.result = ResultInfo(
+                success=result.success,
+                final_url=result.final_url,
+                duration_ms=result.duration_ms,
+                steps_total=len(result.step_results),
+                steps_completed=sum(1 for sr in result.step_results if sr.success),
+                steps_failed=sum(1 for sr in result.step_results if not sr.success),
+                extracted_data=result.extracted_data,
+                error_message=result.error,
+            )
+            
+            session.finish(result.success, result.error)
+            
+            # Write using MarkdownLogWriter
+            writer = MarkdownLogWriter(include_raw_log=True, include_images=True)
+            writer.write(session, log_path)
+            
+            logger.info(f"Log saved: {log_path}")
+            return log_path
+            
+        except Exception as e:
+            logger.error(f"Failed to save log with package: {e}")
+            # Fall back to legacy
+            return self._save_log_legacy(result, log_path)
     
     def _save_log_legacy(self, result: OrchestratorResult, log_path: str) -> str:
         """Legacy log saving (fallback when package not available)"""

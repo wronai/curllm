@@ -126,41 +126,99 @@ class CommandParser:
         r'#\s*(\d+)',
     ]
     
-    # Goal keywords mapping
+    # Goal keywords mapping - expanded for better detection
     GOAL_KEYWORDS = {
+        # Communication
         TaskGoal.FIND_CONTACT_FORM: [
             'kontakt', 'contact', 'formularz', 'form', 'napisz', 'wyślij', 'wiadomość',
-            'zapytanie', 'inquiry', 'message', 'skontaktuj'
+            'zapytanie', 'inquiry', 'message', 'skontaktuj', 'obsługa klienta',
+            'customer service', 'support', 'dział obsługi', 'biuro obsługi'
         ],
+        
+        # Shopping
         TaskGoal.FIND_CART: [
-            'koszyk', 'cart', 'basket', 'dodaj do koszyka', 'add to cart'
+            'koszyk', 'cart', 'basket', 'dodaj do koszyka', 'add to cart', 'bag'
         ],
         TaskGoal.FIND_CHECKOUT: [
-            'checkout', 'kasa', 'zamówienie', 'zapłać', 'płatność', 'finalizuj'
+            'checkout', 'kasa', 'zamówienie', 'zapłać', 'płatność', 'finalizuj',
+            'przejdź do płatności', 'złóż zamówienie', 'place order'
         ],
-        TaskGoal.EXTRACT_PRODUCTS: [
-            'znajdź', 'szukaj', 'wyszukaj', 'produkty', 'products',
-            'wylistuj', 'pokaż', 'lista'
+        
+        # Account
+        TaskGoal.FIND_LOGIN: [
+            'zaloguj', 'login', 'logowanie', 'sign in', 'moje konto', 'my account',
+            'konto', 'account', 'zalogować', 'logować się'
         ],
+        TaskGoal.FIND_REGISTER: [
+            'zarejestruj', 'register', 'załóż konto', 'rejestracja', 'nowe konto',
+            'create account', 'sign up', 'założyć konto'
+        ],
+        TaskGoal.FIND_ACCOUNT: [
+            'moje zamówienia', 'historia zamówień', 'order history', 'profil',
+            'ustawienia konta', 'account settings'
+        ],
+        
+        # Information
+        TaskGoal.FIND_SHIPPING: [
+            'dostawa', 'shipping', 'wysyłka', 'delivery', 'koszty dostawy',
+            'czas dostawy', 'metody wysyłki', 'transport', 'kurier'
+        ],
+        TaskGoal.FIND_RETURNS: [
+            'zwrot', 'return', 'reklamacja', 'wymiana', 'zwrócić produkt',
+            'polityka zwrotów', 'return policy', 'zwroty', 'odstąpienie'
+        ],
+        TaskGoal.FIND_FAQ: [
+            'faq', 'pytania', 'często zadawane', 'questions', 'q&a'
+        ],
+        TaskGoal.FIND_HELP: [
+            'pomoc', 'help', 'wsparcie', 'support', 'jak', 'how to',
+            'centrum pomocy', 'help center'
+        ],
+        TaskGoal.FIND_WARRANTY: [
+            'gwarancja', 'warranty', 'serwis', 'naprawa', 'guarantee'
+        ],
+        TaskGoal.FIND_TERMS: [
+            'regulamin', 'terms', 'warunki', 'zasady', 'rules', 'tos'
+        ],
+        TaskGoal.FIND_PRIVACY: [
+            'prywatność', 'privacy', 'rodo', 'gdpr', 'cookies', 'dane osobowe'
+        ],
+        TaskGoal.FIND_ABOUT: [
+            'o nas', 'about', 'about us', 'kim jesteśmy', 'o firmie', 'historia'
+        ],
+        
+        # Pricing
         TaskGoal.FIND_PRICING: [
             'cena', 'ceny', 'cennik', 'prices', 'pricing', 'price list',
             'ile kosztuje', 'koszt', 'wycena', 'opłaty', 'tariff', 'rates',
-            'ceny usług', 'price list'
+            'ceny usług', 'pakiety', 'plans', 'subskrypcja'
         ],
-        TaskGoal.FIND_LOGIN: [
-            'zaloguj', 'login', 'logowanie', 'sign in'
+        
+        # Content
+        TaskGoal.FIND_BLOG: [
+            'blog', 'artykuły', 'articles', 'poradnik', 'guide', 'porady',
+            'tips', 'wpisy', 'posts', 'aktualności'
         ],
-        TaskGoal.FIND_REGISTER: [
-            'zarejestruj', 'register', 'załóż konto', 'rejestracja'
+        TaskGoal.FIND_NEWS: [
+            'nowości', 'news', 'aktualności', 'ogłoszenia', 'what\'s new'
         ],
-        TaskGoal.FIND_RETURNS: [
-            'zwrot', 'return', 'reklamacja', 'wymiana'
+        TaskGoal.FIND_DOWNLOADS: [
+            'pobierz', 'download', 'pliki', 'dokumenty', 'files', 'materiały'
         ],
-        TaskGoal.FIND_FAQ: [
-            'faq', 'pytania', 'pomoc', 'help'
+        
+        # Other
+        TaskGoal.FIND_CAREERS: [
+            'kariera', 'careers', 'praca', 'jobs', 'oferty pracy', 'rekrutacja',
+            'hiring', 'dołącz do nas', 'oferty rekrutacyjne', 'szukam pracy'
         ],
-        TaskGoal.FIND_SHIPPING: [
-            'dostawa', 'shipping', 'wysyłka', 'delivery'
+        TaskGoal.FIND_STORES: [
+            'sklepy', 'stores', 'lokalizacje', 'locations', 'znajdź sklep',
+            'punkty sprzedaży', 'salony'
+        ],
+        
+        # Products - lower priority so other goals match first
+        TaskGoal.EXTRACT_PRODUCTS: [
+            'produkty', 'products', 'wylistuj', 'lista produktów'
         ],
     }
     
@@ -290,11 +348,28 @@ class CommandParser:
         return data
     
     def _detect_goal(self, text_lower: str) -> Tuple[TaskGoal, float]:
-        """Detect primary goal from text"""
+        """Detect primary goal from text with fuzzy matching"""
         scores = {}
         
+        # Normalize text - remove polish accents for matching
+        text_normalized = self._normalize_polish(text_lower)
+        
         for goal, keywords in self.GOAL_KEYWORDS.items():
-            score = sum(1 for kw in keywords if kw in text_lower)
+            score = 0
+            for kw in keywords:
+                kw_normalized = self._normalize_polish(kw.lower())
+                # Exact match
+                if kw in text_lower:
+                    score += 2
+                # Normalized match (handles accents)
+                elif kw_normalized in text_normalized:
+                    score += 1.5
+                # Stem match (zalogować → zaloguj)
+                elif len(kw) >= 4 and kw[:4] in text_lower:
+                    score += 1
+                # Word stem in text
+                elif len(kw) >= 5 and any(kw[:5] in word for word in text_lower.split()):
+                    score += 0.8
             if score > 0:
                 scores[goal] = score
         
@@ -305,9 +380,19 @@ class CommandParser:
         max_score = scores[best_goal]
         
         # Normalize confidence
-        confidence = min(0.95, 0.5 + (max_score * 0.15))
+        confidence = min(0.95, 0.5 + (max_score * 0.1))
         
         return best_goal, confidence
+    
+    def _normalize_polish(self, text: str) -> str:
+        """Normalize Polish characters for matching"""
+        replacements = {
+            'ą': 'a', 'ć': 'c', 'ę': 'e', 'ł': 'l', 'ń': 'n',
+            'ó': 'o', 'ś': 's', 'ź': 'z', 'ż': 'z'
+        }
+        for pl, ascii in replacements.items():
+            text = text.replace(pl, ascii)
+        return text
     
     def _extract_message(self, text: str) -> Optional[str]:
         """Extract message content from instruction"""

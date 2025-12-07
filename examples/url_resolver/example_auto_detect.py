@@ -16,9 +16,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from curllm_core.url_resolver import UrlResolver
-from curllm_core.browser_setup import setup_browser
-from curllm_core.stealth import StealthConfig
-
+from browser_helper import create_browser, close_browser
 
 # Przykłady z naturalnym językiem - bez podawania TaskGoal
 EXAMPLES = [
@@ -84,8 +82,6 @@ EXAMPLES = [
         "description": "Kariera → strona z ofertami pracy"
     },
 ]
-
-
 async def run_example(example: dict):
     """Run single example with automatic goal detection"""
     print(f"\n{'='*70}")
@@ -94,12 +90,13 @@ async def run_example(example: dict):
     print(f"   Instrukcja: \"{example['instruction']}\"")
     print(f"{'='*70}")
     
+    playwright = None
     browser = None
     try:
-        browser, context = await setup_browser(stealth_mode=True, headless=True)
-        page = await context.new_page()
-        stealth = StealthConfig()
-        await stealth.apply_to_context(context)
+        playwright, browser, context, page = await create_browser(headless=True, stealth_mode=True)
+        
+        
+        
         
         resolver = UrlResolver(page=page, llm=None)
         
@@ -115,22 +112,16 @@ async def run_example(example: dict):
             print(f"   📍 Nawigacja: {result.original_url}")
             print(f"              → {result.resolved_url}")
         
-        await page.close()
-        await context.close()
-        await browser.close()
+        await close_browser(playwright, browser, context, page)
+        
+        
         
         return result.success
         
     except Exception as e:
         print(f"   ❌ Błąd: {e}")
-        if browser:
-            try:
-                await browser.close()
-            except:
-                pass
+        await close_browser(playwright, browser)
         return False
-
-
 async def main():
     print("🎯 URL Resolver - Automatyczne wykrywanie intencji")
     print("   System sam rozpoznaje co user chce osiągnąć")
@@ -147,7 +138,5 @@ async def main():
     print(f"📊 PODSUMOWANIE")
     print(f"   Udanych: {successes}/{total} ({successes/total*100:.0f}%)")
     print(f"{'='*70}")
-
-
 if __name__ == "__main__":
     asyncio.run(main())

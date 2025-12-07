@@ -18,11 +18,8 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from curllm_core.url_resolver import UrlResolver, resolve_url
-from curllm_core.browser_setup import setup_browser
-from curllm_core.stealth import StealthConfig
-
-
+from curllm_core.url_resolver import UrlResolver
+from browser_helper import create_browser, close_browser
 # Realne przykłady - strony główne sklepów
 EXAMPLES = [
     {
@@ -50,8 +47,6 @@ EXAMPLES = [
         "expected": "Powinien znaleźć kategorię TV 55\""
     },
 ]
-
-
 async def run_example(example: dict):
     """Run single example"""
     print(f"\n{'='*60}")
@@ -61,12 +56,11 @@ async def run_example(example: dict):
     print(f"   Oczekiwane: {example['expected']}")
     print(f"{'='*60}")
     
+    playwright = None
+    playwright = None
     browser = None
     try:
-        browser, context = await setup_browser(stealth_mode=True, headless=True)
-        page = await context.new_page()
-        stealth = StealthConfig()
-        await stealth.apply_to_context(context)
+        playwright, browser, context, page = await create_browser(headless=True, stealth_mode=True)
         
         resolver = UrlResolver(page=page, llm=None)
         result = await resolver.resolve(example['url'], example['instruction'])
@@ -83,22 +77,13 @@ async def run_example(example: dict):
             print(f"   Znaleziono produktów: {result.page_match.found_items}")
             print(f"   Pewność dopasowania: {result.page_match.confidence:.0%}")
         
-        await page.close()
-        await context.close()
-        await browser.close()
-        
+        await close_browser(playwright, browser, context, page)
         return result.success
         
     except Exception as e:
         print(f"   ❌ Błąd: {e}")
-        if browser:
-            try:
-                await browser.close()
-            except:
-                pass
+        await close_browser(playwright, browser)
         return False
-
-
 async def main():
     print("🔍 URL Resolver - Przykłady szukania produktów")
     print("=" * 60)
@@ -111,7 +96,5 @@ async def main():
     print(f"\n{'='*60}")
     print(f"📊 Podsumowanie: {successes}/{len(EXAMPLES)} udanych")
     print(f"{'='*60}")
-
-
 if __name__ == "__main__":
     asyncio.run(main())

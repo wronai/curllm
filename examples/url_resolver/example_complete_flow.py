@@ -32,9 +32,7 @@ import re
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from curllm_core.url_resolver import UrlResolver, TaskGoal
-from curllm_core.browser_setup import setup_browser
-from curllm_core.stealth import StealthConfig
-
+from browser_helper import create_browser, close_browser
 
 # Kompleksowe przykłady - pełne polecenia
 EXAMPLES = [
@@ -90,8 +88,6 @@ EXAMPLES = [
         ]
     },
 ]
-
-
 def parse_command(command: str) -> dict:
     """
     Parsuje polecenie użytkownika i wyciąga:
@@ -184,8 +180,6 @@ def parse_command(command: str) -> dict:
         'message': message,
         'original_command': command
     }
-
-
 async def execute_command(command: str, dry_run: bool = True):
     """
     Wykonuje kompleksowe polecenie:
@@ -233,12 +227,13 @@ async def execute_command(command: str, dry_run: bool = True):
         return True
     
     # Rzeczywiste wykonanie
+    playwright = None
     browser = None
     try:
         browser, context = await setup_browser(stealth_mode=True, headless=False)  # headless=False żeby widzieć
-        page = await context.new_page()
-        stealth = StealthConfig()
-        await stealth.apply_to_context(context)
+        
+        
+        
         
         # Krok 1: Użyj URL Resolver
         print(f"\n🔍 Krok 1: Szukam formularza kontaktowego...")
@@ -280,22 +275,16 @@ async def execute_command(command: str, dry_run: bool = True):
             # Tu można dodać logikę wypełniania formularza
             # używając curllm_core.executor lub streamware
             
-        await page.close()
-        await context.close()
-        await browser.close()
+        await close_browser(playwright, browser, context, page)
+        
+        
         
         return result.success
         
     except Exception as e:
         print(f"   ❌ Błąd: {e}")
-        if browser:
-            try:
-                await browser.close()
-            except:
-                pass
+        await close_browser(playwright, browser)
         return False
-
-
 async def main():
     print("="*70)
     print("🚀 CURLLM - Kompleksowe polecenia")
@@ -342,7 +331,5 @@ async def main():
     
     if choice.lower() != 'q' and choice:
         await execute_command(choice, dry_run=True)
-
-
 if __name__ == "__main__":
     asyncio.run(main())

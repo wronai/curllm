@@ -61,12 +61,34 @@ class UrlResolver:
         self.run_logger = run_logger
     
     def detect_goal(self, instruction: str) -> TaskGoal:
-        """Detect user's goal from instruction"""
+        """Detect user's goal from instruction with fuzzy matching"""
         instr_lower = instruction.lower()
+        instr_normalized = self._normalize_polish(instr_lower)
         
         scores = {}
         for goal, keywords in GOAL_KEYWORDS.items():
-            score = sum(1 for kw in keywords if kw in instr_lower)
+            score = 0
+            for kw in keywords:
+                kw_lower = kw.lower()
+                kw_normalized = self._normalize_polish(kw_lower)
+                
+                # Multi-word phrases need stricter matching
+                is_phrase = ' ' in kw_lower
+                
+                # Exact match (highest score)
+                if kw_lower in instr_lower:
+                    score += 3 if is_phrase else 2
+                # Normalized match (handles accents)
+                elif kw_normalized in instr_normalized:
+                    score += 2.5 if is_phrase else 1.5
+                # For single words only: stem matching
+                elif not is_phrase:
+                    # Stem match (zalogować → zaloguj)
+                    if len(kw) >= 5 and kw_lower[:5] in instr_lower:
+                        score += 1
+                    # Word stem in text
+                    elif len(kw) >= 6 and any(kw_lower[:6] in word for word in instr_lower.split()):
+                        score += 0.8
             if score > 0:
                 scores[goal] = score
         
@@ -75,6 +97,16 @@ class UrlResolver:
             return best_goal
         
         return TaskGoal.GENERIC
+    
+    def _normalize_polish(self, text: str) -> str:
+        """Normalize Polish characters for matching"""
+        replacements = {
+            'ą': 'a', 'ć': 'c', 'ę': 'e', 'ł': 'l', 'ń': 'n',
+            'ó': 'o', 'ś': 's', 'ź': 'z', 'ż': 'z'
+        }
+        for pl, ascii in replacements.items():
+            text = text.replace(pl, ascii)
+        return text
     
     async def find_cart_url(self) -> Optional[str]:
         """Find cart/checkout URL on current page"""
@@ -450,6 +482,13 @@ Respond with just the href value of the best matching link, or "none" if no matc
         
         # Use the universal goal-based URL finder
         target_url = await self.find_url_for_goal(goal)
+        
+        # If not found, try LLM-guided search
+        if not target_url:
+            target_url = await self._try_llm_resolver(goal, url)
+            if target_url:
+                steps.append(f"LLM resolver found {goal.value}")
+        
         steps.append(f"Searched for {goal.value}: {'found' if target_url else 'not found'}")
         
         if target_url:
@@ -966,6 +1005,34 @@ Search term:"""
             except Exception as e:
                 logger.debug(f"Sitemap fetch failed: {e}")
                 continue
+        
+        return None
+    
+    async def _try_llm_resolver(self, goal: TaskGoal, original_url: str) -> Optional[str]:
+        """
+        Try the LLM-guided resolver for finding links.
+        Uses intelligent heuristics + optional LLM for better matching.
+        """
+        try:
+            from .url_resolver_llm import LLMUrlResolver
+            
+            llm_resolver = LLMUrlResolver(self.page, self.llm)
+            
+            # First try intelligent link scanning
+            candidate = await llm_resolver.find_url_for_goal(goal, goal.value)
+            if candidate and candidate.score > 0.5:
+                self._log(f"LLM resolver found: {candidate.url} (score: {candidate.score:.1f})")
+                return candidate.url
+            
+            # If that fails, try direct URL patterns
+            from urllib.parse import urlparse
+            base_url = f"{urlparse(original_url).scheme}://{urlparse(original_url).netloc}"
+            direct_url = await llm_resolver.try_direct_url_patterns(base_url, goal)
+            if direct_url:
+                return direct_url
+            
+        except Exception as e:
+            logger.debug(f"LLM resolver failed: {e}")
         
         return None
     
