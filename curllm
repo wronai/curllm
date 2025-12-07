@@ -990,6 +990,73 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Function to check if input is a natural language command (not a URL)
+is_natural_language_command() {
+    local input="$1"
+    
+    # If it starts with http:// or https://, it's a URL
+    if [[ "$input" =~ ^https?:// ]]; then
+        return 1
+    fi
+    
+    # If it looks like a domain (xxx.yyy), it might be a URL
+    if [[ "$input" =~ ^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+        return 1
+    fi
+    
+    # Check for Polish/English natural language patterns
+    local patterns=(
+        "wejdź" "wejdz" "otwórz" "otworz" "przejdź" "przejdz"
+        "znajdź" "znajdz" "wyślij" "wyslij" "wypełnij" "wypelnij"
+        "napisz" "zaloguj" "zarejestruj" "dodaj" "usuń" "usun"
+        "pobierz" "sprawdź" "sprawdz" "kliknij" "wyszukaj"
+        "go to" "open" "find" "send" "fill" "submit" "click" "search"
+        "login" "register" "download" "check"
+    )
+    
+    local input_lower=$(echo "$input" | tr '[:upper:]' '[:lower:]')
+    
+    for pattern in "${patterns[@]}"; do
+        if [[ "$input_lower" == *"$pattern"* ]]; then
+            return 0
+        fi
+    done
+    
+    # If input contains spaces and doesn't look like a URL, treat as NL
+    if [[ "$input" == *" "* ]] && [[ ! "$input" =~ ^[a-zA-Z0-9./-]+$ ]]; then
+        return 0
+    fi
+    
+    return 1
+}
+
+# Function to run orchestrator for natural language commands
+run_orchestrator() {
+    local command="$1"
+    
+    # Find script directory
+    SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+    SCRIPT_DIR="$( dirname "${SCRIPT_PATH}" )"
+    
+    echo -e "${BLUE}🚀 Detected natural language command. Using Smart Orchestrator...${NC}"
+    
+    # Build orchestrator arguments
+    local ORCH_ARGS=()
+    
+    if [ "$STEALTH_MODE" != "true" ]; then
+        ORCH_ARGS+=("--no-stealth")
+    fi
+    
+    if [ "$VISUAL_MODE" = "true" ]; then
+        ORCH_ARGS+=("--visible")
+    fi
+    
+    # Run the orchestrator
+    cd "$SCRIPT_DIR"
+    python3 -m curllm_core.cli_orchestrator "${ORCH_ARGS[@]}" "$command"
+    return $?
+}
+
 # Main execution
 main() {
     # Check if URL or instruction is provided
@@ -997,6 +1064,12 @@ main() {
         echo -e "${RED}Error: URL or instruction required${NC}"
         echo "Use 'curllm --help' for usage information"
         exit 1
+    fi
+    
+    # Check if this is a natural language command
+    if is_natural_language_command "$URL"; then
+        run_orchestrator "$URL"
+        exit $?
     fi
     
     # Check services before running

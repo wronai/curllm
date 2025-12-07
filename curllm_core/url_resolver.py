@@ -8,10 +8,11 @@ navigates to the correct page when:
 - Products/data need to be found via search or category navigation
 
 Strategies:
-1. Page Content Analysis - Check if current page matches intent
-2. Search Navigation - Use site search to find relevant content
-3. Category Navigation - Find and navigate to relevant category
-4. Sitemap Analysis - Parse sitemap for relevant URLs
+1. LLM Analysis - Use LLM to understand page and find relevant links (when available)
+2. Heuristic Matching - Statistical keyword matching for link finding
+3. Page Content Analysis - Check if current page matches intent
+4. Search Navigation - Use site search to find relevant content
+5. Category Navigation - Find and navigate to relevant category
 """
 
 import re
@@ -417,65 +418,131 @@ class UrlResolver:
         text_keywords: List[str]
     ) -> Optional[str]:
         """
-        Generic URL finder using href patterns and text keywords.
+        Generic URL finder using LLM (when available) or heuristic matching.
+        
+        When LLM is available:
+        - Analyzes all links on page
+        - Uses keywords as semantic hints
+        - Makes intelligent decision based on context
+        
+        When LLM not available:
+        - Uses statistical keyword matching
+        - Scores links by keyword frequency
+        - Returns best match
         
         Args:
-            href_patterns: CSS selectors with href patterns
-            text_keywords: Keywords to search in link text
+            href_patterns: Hint patterns (not hardcoded selectors)
+            text_keywords: Keywords describing the target link
         """
         if not self.page:
             return None
         
         try:
-            # Convert to JSON-safe format
-            patterns_json = json.dumps(href_patterns)
-            keywords_json = json.dumps(text_keywords)
-            
-            found_url = await self.page.evaluate(f"""
-                () => {{
-                    const patterns = {patterns_json};
-                    const keywords = {keywords_json};
-                    
-                    // Try href patterns first
-                    for (const sel of patterns) {{
-                        try {{
-                            const el = document.querySelector(sel);
-                            if (el) {{
-                                const href = el.getAttribute('href') || el.closest('a')?.getAttribute('href');
-                                if (href && !href.startsWith('javascript:') && !href.startsWith('#')) {{
-                                    return href;
-                                }}
-                            }}
-                        }} catch (e) {{}}
-                    }}
-                    
-                    // Try by link text
+            # Get all links from page for analysis
+            links_data = await self.page.evaluate("""
+                () => {
                     const links = Array.from(document.querySelectorAll('a[href]'));
-                    for (const kw of keywords) {{
-                        const found = links.find(a => {{
-                            const text = (a.innerText || '').toLowerCase();
-                            const href = (a.getAttribute('href') || '').toLowerCase();
-                            return text.includes(kw.toLowerCase()) || href.includes(kw.toLowerCase());
-                        }});
-                        if (found) {{
-                            const href = found.getAttribute('href');
-                            if (href && !href.startsWith('javascript:') && !href.startsWith('#')) {{
-                                return href;
-                            }}
-                        }}
-                    }}
-                    
-                    return null;
-                }}
+                    return links
+                        .filter(a => a.offsetParent !== null)  // visible only
+                        .slice(0, 100)  // limit
+                        .map(a => ({
+                            text: (a.innerText || '').trim().slice(0, 100),
+                            href: a.getAttribute('href') || '',
+                            ariaLabel: a.getAttribute('aria-label') || '',
+                            title: a.getAttribute('title') || ''
+                        }))
+                        .filter(l => l.href && !l.href.startsWith('javascript:') && !l.href.startsWith('#'));
+                }
             """)
             
-            if found_url:
-                if found_url.startswith('/'):
-                    found_url = urljoin(self.page.url, found_url)
-                return found_url
+            if not links_data:
+                return None
+            
+            # Use LLM for intelligent link finding when available
+            if self.llm:
+                found_url = await self._llm_find_link(links_data, text_keywords)
+                if found_url:
+                    if found_url.startswith('/'):
+                        found_url = urljoin(self.page.url, found_url)
+                    return found_url
+            
+            # Heuristic fallback: score links by keyword matching
+            scored_links = []
+            for link in links_data:
+                score = 0
+                searchable = (
+                    link.get('text', '').lower() + ' ' +
+                    link.get('href', '').lower() + ' ' +
+                    link.get('ariaLabel', '').lower() + ' ' +
+                    link.get('title', '').lower()
+                )
+                
+                for kw in text_keywords:
+                    kw_lower = kw.lower()
+                    if kw_lower in searchable:
+                        score += 1
+                        # Boost for exact text match
+                        if link.get('text', '').lower().strip() == kw_lower:
+                            score += 2
+                
+                if score > 0:
+                    scored_links.append((score, link))
+            
+            # Sort by score and return best match
+            scored_links.sort(key=lambda x: x[0], reverse=True)
+            
+            if scored_links:
+                best_link = scored_links[0][1]
+                href = best_link.get('href', '')
+                if href.startswith('/'):
+                    href = urljoin(self.page.url, href)
+                self._log(f"Found link via heuristic: {href} (score: {scored_links[0][0]})")
+                return href
                 
         except Exception as e:
             logger.debug(f"Generic URL search failed: {e}")
+        
+        return None
+    
+    async def _llm_find_link(
+        self,
+        links_data: List[Dict],
+        keywords: List[str]
+    ) -> Optional[str]:
+        """Use LLM to find the best matching link"""
+        if not self.llm:
+            return None
+        
+        try:
+            prompt = f"""Analyze these links and find the one that best matches the purpose: {', '.join(keywords)}
+
+Links on page:
+{json.dumps(links_data[:30], indent=2, ensure_ascii=False)}
+
+Find the link that matches the purpose "{', '.join(keywords)}".
+Respond with just the href value of the best matching link, or "none" if no match.
+"""
+            
+            if hasattr(self.llm, 'ainvoke'):
+                response = await self.llm.ainvoke(prompt)
+                result = response.content if hasattr(response, 'content') else str(response)
+            elif hasattr(self.llm, 'invoke'):
+                response = self.llm.invoke(prompt)
+                result = response.content if hasattr(response, 'content') else str(response)
+            else:
+                return None
+            
+            result = result.strip().strip('"').strip("'")
+            
+            if result and result.lower() != "none":
+                # Validate that the result is actually one of the links
+                for link in links_data:
+                    if link.get('href', '') == result or result in link.get('href', ''):
+                        self._log(f"Found link via LLM: {result}")
+                        return result
+                        
+        except Exception as e:
+            logger.debug(f"LLM link finding failed: {e}")
         
         return None
     
