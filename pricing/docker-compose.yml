@@ -1,0 +1,70 @@
+# Price Comparator - Docker Compose Configuration
+# 
+# Usage:
+#   docker compose up --build
+#   # or for detached mode:
+#   docker compose up -d --build
+#
+# Then open: http://localhost:8080
+
+version: '3.8'
+
+services:
+  price-comparator:
+    build:
+      context: ..
+      dockerfile: pricing/Dockerfile
+    container_name: curllm-price-comparator
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      # LLM Configuration
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - LLM_MODEL=${LLM_MODEL:-llama3.2}
+      - LLM_PROVIDER=${LLM_PROVIDER:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      
+      # Comparator settings
+      - MAX_CONCURRENT_URLS=${MAX_CONCURRENT_URLS:-5}
+      - EXTRACTION_TIMEOUT=${EXTRACTION_TIMEOUT:-120}
+      
+      # Flask settings
+      - PORT=8080
+      - DEBUG=${DEBUG:-false}
+      
+      # Playwright settings
+      - PLAYWRIGHT_CHROMIUM_ARGS=--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage
+    
+    # Access host network for Ollama (if running locally)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    
+    # Shared memory for Chrome
+    shm_size: '2gb'
+    
+    # Volume for persistent data (optional)
+    volumes:
+      - comparator-data:/app/data
+      - comparator-screenshots:/app/screenshots
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    
+    restart: unless-stopped
+
+volumes:
+  comparator-data:
+  comparator-screenshots:
+
+networks:
+  default:
+    name: curllm-pricing-network
