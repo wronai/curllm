@@ -386,6 +386,8 @@ async def generate_extraction_strategy(
     """
     LLM generates complete extraction strategy based on page and instruction.
     
+    Uses LLM heuristics discovery for dynamic pattern detection.
+    
     Returns:
         {
             "container_selector": str,
@@ -400,6 +402,18 @@ async def generate_extraction_strategy(
             }
         }
     """
+    # Discover dynamic heuristics first
+    discovered_patterns = {}
+    try:
+        from curllm_core.llm_heuristics import LLMHeuristicsDiscovery
+        discovery = LLMHeuristicsDiscovery(page, llm, run_logger)
+        discovered_patterns = await discovery.build_dynamic_selectors()
+        if run_logger:
+            run_logger.log_text(f"🔍 Discovered URL patterns: {discovered_patterns.get('discovered_patterns', {}).get('links', [])[:3]}")
+    except Exception as e:
+        if run_logger:
+            run_logger.log_text(f"⚠️ Heuristics discovery skipped: {e}")
+    
     # Get page overview
     overview = await page.evaluate("""
         () => {
@@ -438,6 +452,15 @@ async def generate_extraction_strategy(
         }
     """)
     
+    # Include discovered patterns in prompt
+    patterns_info = ""
+    if discovered_patterns:
+        dp = discovered_patterns.get('discovered_patterns', {})
+        if dp.get('links'):
+            patterns_info += f"\nDISCOVERED URL PATTERNS: {dp['links'][:4]}"
+        if dp.get('price_classes'):
+            patterns_info += f"\nDISCOVERED PRICE CLASSES: {dp['price_classes'][:3]}"
+    
     prompt = f"""Create a complete extraction strategy for this page.
 
 USER INSTRUCTION: "{instruction}"
@@ -446,6 +469,7 @@ PAGE INFO:
 - Title: {overview.get('title', '')}
 - URL: {overview.get('url', '')}
 - H1: {overview.get('h1', '')}
+{patterns_info}
 
 POTENTIAL CONTAINERS:
 """

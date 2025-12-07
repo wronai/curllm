@@ -9,7 +9,7 @@ Extract product data (names, prices, images) from e-commerce sites.
 
 ```bash
 # CLI
-curllm "https://ceneo.pl" -d "Extract all products with prices"
+curllm curllm --stealth "https://ceneo.pl" -d "Extract all products with prices"
 
 # Python
 python examples/extraction/products/extract_products.py

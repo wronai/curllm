@@ -76,6 +76,13 @@ class Config:
     
     # Atomic actions: break complex tasks into simpler sub-tasks
     atomic_actions_enabled: bool = os.getenv("CURLLM_ATOMIC_ACTIONS", "true").lower() in ["true", "1", "yes"]
+    
+    # DSL System - Strategy-based extraction with knowledge base
+    dsl_enabled: bool = os.getenv("CURLLM_DSL_ENABLED", "true").lower() in ["true", "1", "yes"]
+    dsl_directory: str = os.getenv("CURLLM_DSL_DIR", "dsl")
+    dsl_knowledge_db: str = os.getenv("CURLLM_DSL_KNOWLEDGE_DB", "dsl/knowledge.db")
+    dsl_auto_save: bool = os.getenv("CURLLM_DSL_AUTO_SAVE", "true").lower() in ["true", "1", "yes"]
+    dsl_max_fallbacks: int = int(os.getenv("CURLLM_DSL_MAX_FALLBACKS", "3"))
 
     def __post_init__(self):
         self.screenshot_dir.mkdir(parents=True, exist_ok=True)

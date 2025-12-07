@@ -1023,7 +1023,52 @@ async def run_task(
     except Exception:
         prev_ctx = None
 
-    # Try LLM-guided extractor first (LLM makes atomic decisions)
+    # Try DSL Executor FIRST (uses knowledge base for best strategy)
+    if config.dsl_enabled and ("product" in lower_instr or "produkt" in lower_instr or "extract" in lower_instr):
+        if run_logger:
+            run_logger.log_text("📋 DSL Executor enabled - using knowledge base for optimal strategy")
+        try:
+            from .dsl import DSLExecutor
+            
+            dsl_executor = DSLExecutor(
+                page=page,
+                llm_client=executor.llm,
+                run_logger=run_logger,
+                kb_path=config.dsl_knowledge_db,
+                dsl_dir=config.dsl_directory
+            )
+            
+            dsl_result = await dsl_executor.execute(
+                url=url or page.url,
+                instruction=instruction,
+                max_fallbacks=config.dsl_max_fallbacks
+            )
+            
+            if dsl_result.success and dsl_result.data:
+                if run_logger:
+                    run_logger.log_text(f"✅ DSL Executor succeeded - algorithm: {dsl_result.algorithm_used}")
+                    run_logger.log_text(f"   Items: {len(dsl_result.data) if isinstance(dsl_result.data, list) else 1}")
+                    run_logger.log_text(f"   Validation score: {dsl_result.validation_score:.2f}")
+                    if dsl_result.fallbacks_tried:
+                        run_logger.log_text(f"   Fallbacks tried: {dsl_result.fallbacks_tried}")
+                
+                result["data"] = {
+                    "items": dsl_result.data if isinstance(dsl_result.data, list) else [dsl_result.data],
+                    "count": len(dsl_result.data) if isinstance(dsl_result.data, list) else 1,
+                    "algorithm": dsl_result.algorithm_used,
+                    "validation_score": dsl_result.validation_score,
+                    "selector": dsl_result.strategy_used.selector if dsl_result.strategy_used else None
+                }
+                await page.close()
+                return result
+            else:
+                if run_logger:
+                    run_logger.log_text(f"⚠️ DSL Executor: {'; '.join(dsl_result.issues[:3]) if dsl_result.issues else 'No data'}")
+        except Exception as e:
+            if run_logger:
+                run_logger.log_text(f"⚠️ DSL Executor failed: {e}")
+
+    # Try LLM-guided extractor (LLM makes atomic decisions)
     if config.llm_guided_extractor_enabled and ("product" in lower_instr or "produkt" in lower_instr):
         if run_logger:
             run_logger.log_text("🤖 LLM-Guided Extractor enabled - LLM makes decisions at each atomic step")

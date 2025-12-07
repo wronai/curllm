@@ -72,6 +72,13 @@ def get_all_config_variables() -> Dict[str, Any]:
         "CURLLM_PROGRESSIVE_CONTEXT": config.progressive_context_enabled,
         "CURLLM_PROGRESSIVE_CONTEXT_INITIAL_SIZE": config.progressive_context_initial_size,
         "CURLLM_LLM_GUIDED_EXTRACTOR": config.llm_guided_extractor_enabled,
+        
+        # DSL System
+        "CURLLM_DSL_ENABLED": config.dsl_enabled,
+        "CURLLM_DSL_DIR": config.dsl_directory,
+        "CURLLM_DSL_KNOWLEDGE_DB": config.dsl_knowledge_db,
+        "CURLLM_DSL_AUTO_SAVE": config.dsl_auto_save,
+        "CURLLM_DSL_MAX_FALLBACKS": config.dsl_max_fallbacks,
     }
     
     return config_map
