@@ -1,0 +1,106 @@
+#!/bin/bash
+#============================================================================
+# curllm-smart - Smart Browser Automation with Orchestrator
+# Handles complex natural language commands
+#============================================================================
+
+# Get script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Load .env if present
+if [ -f "$SCRIPT_DIR/.env" ]; then
+    set -a
+    . "$SCRIPT_DIR/.env"
+    set +a
+fi
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+# Help
+show_help() {
+    echo "curllm-smart - Smart Browser Automation"
+    echo ""
+    echo "Usage:"
+    echo "  curllm-smart \"Your natural language command\""
+    echo ""
+    echo "Options:"
+    echo "  --dry-run     Parse and plan only, don't execute"
+    echo "  --visible     Show browser window"
+    echo "  --parse-only  Only show parsed command"
+    echo "  --help        Show this help"
+    echo ""
+    echo "Examples:"
+    echo "  curllm-smart \"Wejdź na prototypowanie.pl i wyślij formularz kontaktowy\""
+    echo "  curllm-smart \"Otwórz morele.net i znajdź RAM DDR5\""
+    echo "  curllm-smart --dry-run \"Przejdź do x-kom.pl i dodaj laptop do koszyka\""
+    echo ""
+}
+
+# Check if command is complex (natural language)
+is_complex_command() {
+    local cmd="$1"
+    # Check for common NL patterns
+    if [[ "$cmd" =~ (wejdź|otwórz|przejdź|znajdź|wyślij|wypełnij|napisz|zaloguj|zarejestruj) ]]; then
+        return 0
+    fi
+    return 1
+}
+
+# Main
+main() {
+    local DRY_RUN=""
+    local VISIBLE=""
+    local PARSE_ONLY=""
+    local COMMAND=""
+    
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --dry-run)
+                DRY_RUN="--dry-run"
+                shift
+                ;;
+            --visible)
+                VISIBLE="--visible"
+                shift
+                ;;
+            --parse-only)
+                PARSE_ONLY="--parse-only"
+                shift
+                ;;
+            --help|-h)
+                show_help
+                exit 0
+                ;;
+            *)
+                COMMAND="$1"
+                shift
+                ;;
+        esac
+    done
+    
+    if [ -z "$COMMAND" ]; then
+        show_help
+        exit 1
+    fi
+    
+    # Check if it's a complex command
+    if is_complex_command "$COMMAND"; then
+        echo -e "${BLUE}🚀 Using Smart Orchestrator...${NC}"
+        
+        # Use orchestrator
+        cd "$SCRIPT_DIR"
+        python3 -m curllm_core.cli_orchestrator $DRY_RUN $VISIBLE $PARSE_ONLY "$COMMAND"
+    else
+        # Fallback to regular curllm
+        echo -e "${YELLOW}Using standard curllm...${NC}"
+        "$SCRIPT_DIR/curllm" "$@"
+    fi
+}
+
+main "$@"

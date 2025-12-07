@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 from curllm_core.url_resolver import UrlResolver
 from curllm_core.browser_setup import setup_browser
-from curllm_core.stealth import apply_stealth
+from curllm_core.stealth import StealthConfig
 
 
 # Przykłady z naturalnym językiem - bez podawania TaskGoal
@@ -98,7 +98,8 @@ async def run_example(example: dict):
     try:
         browser, context = await setup_browser(stealth_mode=True, headless=True)
         page = await context.new_page()
-        await apply_stealth(page)
+        stealth = StealthConfig()
+        await stealth.apply_to_context(context)
         
         resolver = UrlResolver(page=page, llm=None)
         
