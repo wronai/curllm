@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Price Comparator - curllm</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏷️</text></svg>">
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <script>tailwind.config = { corePlugins: { preflight: true } }</script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .result-card {
+            transition: all 0.3s ease;
+        }
+        .result-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <!-- Header -->
+        <header class="text-center mb-10">
+            <div class="flex items-center justify-center gap-3 mb-4">
+                <i data-lucide="shopping-cart" class="w-10 h-10 text-blue-600"></i>
+                <h1 class="text-4xl font-bold text-gray-800">Price Comparator</h1>
+            </div>
+            <p class="text-gray-600 text-lg">Porównuj ceny i parametry produktów z wielu sklepów internetowych</p>
+            <p class="text-gray-500 text-sm mt-2">Powered by <span class="font-mono text-blue-600">curllm</span></p>
+        </header>
+
+        <!-- Main Form -->
+        <div class="bg-white rounded-2xl shadow-xl p-8 mb-8">
+            <form id="compareForm" class="space-y-6">
+                <!-- URLs Section -->
+                <div>
+                    <label class="flex items-center gap-2 text-lg font-semibold text-gray-700 mb-3">
+                        <i data-lucide="link" class="w-5 h-5"></i>
+                        Adresy URL produktów (jeden URL na linię)
+                    </label>
+                    <textarea id="urlsTextarea" rows="8"
+                              placeholder="Wklej URL-e produktów, jeden na linię...
+
+https://allegro.pl/oferta/produkt-1
+https://sklep.pl/produkt-2
+https://morele.net/produkt-3"
+                              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition resize-y font-mono text-sm"></textarea>
+                    <p class="text-gray-500 text-sm mt-2">
+                        <span id="urlCount">0</span> URL-i do przetworzenia
+                    </p>
+                </div>
+
+                <!-- Extraction Prompt -->
+                <div>
+                    <label class="flex items-center gap-2 text-lg font-semibold text-gray-700 mb-3">
+                        <i data-lucide="file-text" class="w-5 h-5"></i>
+                        Prompt ekstrakcji (dla każdego URL)
+                    </label>
+                    <textarea id="extractionPrompt" rows="4" 
+                              placeholder="Opisz jakie dane chcesz wyciągnąć z każdej strony produktowej...
+
+Przykład: Wyciągnij nazwę produktu, cenę, specyfikacje techniczne, dostępność i oceny użytkowników."
+                              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition resize-y">Wyciągnij następujące informacje o produkcie:
+- Nazwa produktu
+- Cena (z walutą)
+- Specyfikacje techniczne (parametry)
+- Dostępność
+- Ocena użytkowników
+- Główne cechy/zalety</textarea>
+                </div>
+
+                <!-- Comparison Prompt -->
+                <div>
+                    <label class="flex items-center gap-2 text-lg font-semibold text-gray-700 mb-3">
+                        <i data-lucide="git-compare" class="w-5 h-5"></i>
+                        Prompt porównawczy (analiza wszystkich wyników)
+                    </label>
+                    <textarea id="comparisonPrompt" rows="4"
+                              placeholder="Opisz jak chcesz porównać zebrane dane...
+
+Przykład: Porównaj ceny i parametry produktów, wskaż najlepszą ofertę cenową i najlepszy stosunek jakości do ceny."
+                              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition resize-y">Porównaj wszystkie znalezione produkty. Przeanalizuj:
+1. Różnice w cenach między sklepami
+2. Różnice w specyfikacjach/parametrach
+3. Stosunek jakości do ceny
+4. Wskaż najlepszą ofertę cenową
+5. Wskaż najlepszy produkt pod względem parametrów
+6. Daj końcową rekomendację zakupową</textarea>
+                </div>
+
+                <!-- Options -->
+                <div class="flex items-center gap-6">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="stealthMode" checked 
+                               class="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                        <span class="text-gray-700">Tryb stealth (omijanie blokad)</span>
+                    </label>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" id="submitBtn"
+                        class="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-lg font-semibold rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all transform hover:scale-[1.02] flex items-center justify-center gap-3">
+                    <i data-lucide="search" class="w-6 h-6"></i>
+                    Porównaj produkty
+                </button>
+            </form>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading" class="hidden text-center py-12">
+            <div class="loader mx-auto mb-4"></div>
+            <p class="text-gray-600 text-lg" id="loadingText">Pobieranie danych ze sklepów...</p>
+            <p class="text-gray-500 text-sm mt-2">To może potrwać kilka minut w zależności od liczby URL-i</p>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results" class="hidden space-y-8 fade-in">
+            <!-- Extraction Results -->
+            <div class="bg-white rounded-2xl shadow-xl p-8">
+                <h2 class="flex items-center gap-3 text-2xl font-bold text-gray-800 mb-6">
+                    <i data-lucide="database" class="w-7 h-7 text-green-600"></i>
+                    Wyniki ekstrakcji z poszczególnych sklepów
+                </h2>
+                <div id="extractionResults" class="space-y-4">
+                    <!-- Results will be inserted here -->
+                </div>
+            </div>
+
+            <!-- Comparison Analysis -->
+            <div class="bg-white rounded-2xl shadow-xl p-8">
+                <h2 class="flex items-center gap-3 text-2xl font-bold text-gray-800 mb-6">
+                    <i data-lucide="bar-chart-3" class="w-7 h-7 text-blue-600"></i>
+                    Analiza porównawcza
+                </h2>
+                <div id="comparisonAnalysis" class="prose max-w-none">
+                    <!-- Analysis will be inserted here -->
+                </div>
+            </div>
+
+            <!-- Summary Table -->
+            <div class="bg-white rounded-2xl shadow-xl p-8">
+                <h2 class="flex items-center gap-3 text-2xl font-bold text-gray-800 mb-6">
+                    <i data-lucide="table" class="w-7 h-7 text-purple-600"></i>
+                    Tabela porównawcza
+                </h2>
+                <div id="summaryTable" class="overflow-x-auto">
+                    <!-- Table will be inserted here -->
+                </div>
+            </div>
+
+            <!-- Best Price Banner -->
+            <div id="bestPriceBanner" class="hidden bg-gradient-to-r from-green-500 to-emerald-500 rounded-2xl shadow-xl p-6 text-white">
+                <div class="flex items-center gap-4">
+                    <i data-lucide="trophy" class="w-12 h-12"></i>
+                    <div>
+                        <h3 class="text-xl font-bold">Najlepsza cena!</h3>
+                        <p id="bestPriceInfo" class="text-lg opacity-90"></p>
+                        <a id="bestPriceLink" href="#" target="_blank" 
+                           class="inline-flex items-center gap-2 mt-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition">
+                            Przejdź do oferty
+                            <i data-lucide="external-link" class="w-4 h-4"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error State -->
+        <div id="error" class="hidden bg-red-50 border border-red-200 rounded-2xl p-8 text-center">
+            <i data-lucide="alert-circle" class="w-16 h-16 text-red-500 mx-auto mb-4"></i>
+            <h3 class="text-xl font-bold text-red-700 mb-2">Wystąpił błąd</h3>
+            <p id="errorMessage" class="text-red-600"></p>
+            <button onclick="resetForm()" class="mt-4 px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
+                Spróbuj ponownie
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        function getUrlsFromTextarea() {
+            const textarea = document.getElementById('urlsTextarea');
+            return textarea.value
+                .split('\n')
+                .map(line => line.trim())
+                .filter(line => line && line.startsWith('http'));
+        }
+
+        function updateUrlCount() {
+            const urls = getUrlsFromTextarea();
+            document.getElementById('urlCount').textContent = urls.length;
+        }
+
+        // Update count on textarea input
+        document.getElementById('urlsTextarea').addEventListener('input', updateUrlCount);
+
+        function resetForm() {
+            document.getElementById('results').classList.add('hidden');
+            document.getElementById('error').classList.add('hidden');
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('submitBtn').disabled = false;
+        }
+
+        function showLoading(text = 'Pobieranie danych ze sklepów...') {
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('loadingText').textContent = text;
+            document.getElementById('results').classList.add('hidden');
+            document.getElementById('error').classList.add('hidden');
+            document.getElementById('submitBtn').disabled = true;
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('submitBtn').disabled = false;
+        }
+
+        function showError(message) {
+            hideLoading();
+            document.getElementById('error').classList.remove('hidden');
+            document.getElementById('errorMessage').textContent = message;
+        }
+
+        function renderExtractionResults(results) {
+            const container = document.getElementById('extractionResults');
+            container.innerHTML = '';
+
+            results.forEach((result, index) => {
+                const card = document.createElement('div');
+                card.className = `result-card border rounded-xl p-6 ${result.success ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`;
+                
+                const icon = result.success ? 'check-circle' : 'x-circle';
+                const iconColor = result.success ? 'text-green-600' : 'text-red-600';
+                
+                let dataHtml = '';
+                if (result.success && result.data) {
+                    dataHtml = `
+                        <details class="mt-4">
+                            <summary class="cursor-pointer text-blue-600 hover:text-blue-800 font-medium">
+                                Pokaż szczegóły danych
+                            </summary>
+                            <pre class="mt-3 p-4 bg-gray-800 text-green-400 rounded-lg overflow-x-auto text-sm">${JSON.stringify(result.data, null, 2)}</pre>
+                        </details>
+                    `;
+                } else if (result.error) {
+                    dataHtml = `<p class="text-red-600 mt-2">${result.error}</p>`;
+                }
+
+                card.innerHTML = `
+                    <div class="flex items-start gap-4">
+                        <i data-lucide="${icon}" class="w-6 h-6 ${iconColor} flex-shrink-0 mt-1"></i>
+                        <div class="flex-1">
+                            <h4 class="font-bold text-gray-800">${result.store_name}</h4>
+                            <a href="${result.url}" target="_blank" class="text-blue-600 hover:underline text-sm break-all">${result.url}</a>
+                            ${dataHtml}
+                        </div>
+                    </div>
+                `;
+
+                container.appendChild(card);
+            });
+
+            lucide.createIcons();
+        }
+
+        function renderComparisonAnalysis(analysis) {
+            const container = document.getElementById('comparisonAnalysis');
+            // Convert newlines to paragraphs
+            const paragraphs = analysis.split('\n').filter(p => p.trim());
+            container.innerHTML = paragraphs.map(p => `<p class="mb-3 text-gray-700">${p}</p>`).join('');
+        }
+
+        function renderSummaryTable(data) {
+            const container = document.getElementById('summaryTable');
+            
+            if (!data || data.length === 0) {
+                container.innerHTML = '<p class="text-gray-500">Brak danych do wyświetlenia tabeli porównawczej.</p>';
+                return;
+            }
+
+            const table = document.createElement('table');
+            table.className = 'w-full border-collapse';
+
+            // Headers
+            const headers = ['Sklep', 'Produkt', 'Cena', 'Dostępność', 'Ocena', 'Główne cechy'];
+            const thead = document.createElement('thead');
+            thead.innerHTML = `
+                <tr class="bg-gray-100">
+                    ${headers.map(h => `<th class="px-4 py-3 text-left font-semibold text-gray-700 border-b">${h}</th>`).join('')}
+                </tr>
+            `;
+            table.appendChild(thead);
+
+            // Body
+            const tbody = document.createElement('tbody');
+            data.forEach((row, index) => {
+                const features = Array.isArray(row.key_features) ? row.key_features.join(', ') : (row.key_features || '-');
+                const tr = document.createElement('tr');
+                tr.className = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+                tr.innerHTML = `
+                    <td class="px-4 py-3 border-b">
+                        <a href="${row.url || '#'}" target="_blank" class="text-blue-600 hover:underline font-medium">${row.store || '-'}</a>
+                    </td>
+                    <td class="px-4 py-3 border-b">${row.product_name || '-'}</td>
+                    <td class="px-4 py-3 border-b font-bold text-green-700">${row.price || '-'} ${row.currency || ''}</td>
+                    <td class="px-4 py-3 border-b">${row.availability || '-'}</td>
+                    <td class="px-4 py-3 border-b">${row.rating || '-'}</td>
+                    <td class="px-4 py-3 border-b text-sm text-gray-600">${features}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+
+            container.innerHTML = '';
+            container.appendChild(table);
+        }
+
+        function renderBestPrice(bestPrice) {
+            const banner = document.getElementById('bestPriceBanner');
+            const info = document.getElementById('bestPriceInfo');
+            const link = document.getElementById('bestPriceLink');
+
+            if (bestPrice && bestPrice.store && bestPrice.price) {
+                info.textContent = `${bestPrice.store}: ${bestPrice.price}`;
+                if (bestPrice.url) {
+                    link.href = bestPrice.url;
+                    link.classList.remove('hidden');
+                } else {
+                    link.classList.add('hidden');
+                }
+                banner.classList.remove('hidden');
+                lucide.createIcons();
+            } else {
+                banner.classList.add('hidden');
+            }
+        }
+
+        document.getElementById('compareForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Collect URLs
+            const urlInputs = document.querySelectorAll('input[name="urls[]"]');
+            const urls = Array.from(urlInputs)
+                .map(input => input.value.trim())
+                .filter(url => url);
+
+            if (urls.length === 0) {
+                showError('Proszę podać przynajmniej jeden URL produktu.');
+                return;
+            }
+
+            const extractionPrompt = document.getElementById('extractionPrompt').value.trim();
+            const comparisonPrompt = document.getElementById('comparisonPrompt').value.trim();
+            const stealth = document.getElementById('stealthMode').checked;
+
+            if (!extractionPrompt) {
+                showError('Proszę podać prompt ekstrakcji.');
+                return;
+            }
+
+            showLoading(`Pobieranie danych z ${urls.length} sklepów...`);
+
+            try {
+                const response = await fetch('/api/compare', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        urls,
+                        extraction_prompt: extractionPrompt,
+                        comparison_prompt: comparisonPrompt || 'Porównaj ceny i parametry produktów ze wszystkich sklepów.',
+                        stealth
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok || data.error) {
+                    throw new Error(data.error || 'Unknown error occurred');
+                }
+
+                hideLoading();
+
+                // Render results
+                if (data.extraction_results) {
+                    renderExtractionResults(data.extraction_results);
+                }
+
+                if (data.comparison) {
+                    if (data.comparison.analysis) {
+                        renderComparisonAnalysis(data.comparison.analysis);
+                    }
+                    if (data.comparison.summary_table) {
+                        renderSummaryTable(data.comparison.summary_table);
+                    }
+                    if (data.comparison.best_price) {
+                        renderBestPrice(data.comparison.best_price);
+                    }
+                }
+
+                document.getElementById('results').classList.remove('hidden');
+
+            } catch (error) {
+                showError(error.message || 'Wystąpił nieoczekiwany błąd.');
+            }
+        });
+
+        // Initialize
+        updateRemoveButtons();
+    </script>
+</body>
+</html>
