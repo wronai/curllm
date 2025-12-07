@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass
 
 from .url_types import TaskGoal
+from . import dom_helpers
 
 logger = logging.getLogger(__name__)
 
@@ -214,16 +215,68 @@ Return ONLY valid JSON, no explanation."""
     async def _find_candidates(self, criteria: Dict[str, Any]) -> List[LinkCandidate]:
         """
         Use atomic DOM functions to find link candidates.
-        This is the fast, local scanning part.
+        Uses dom_helpers module for efficient, reusable operations.
         """
-        candidates = []
-        
-        # Atomic function: Extract all links with context
-        links_data = await self._atomic_extract_links()
-        
         keywords = criteria.get("keywords", [])
         url_patterns = criteria.get("url_patterns", [])
         section_priority = criteria.get("section_priority", [])
+        
+        candidates = []
+        
+        # Use atomic dom_helpers for multi-strategy link finding
+        try:
+            # Strategy 1: Find by text keywords
+            text_matches = await dom_helpers.find_links_by_text(self.page, keywords)
+            for link in text_matches[:5]:
+                candidates.append(LinkCandidate(
+                    url=link.url,
+                    text=link.text[:100],
+                    score=link.score * 2.0 + (1.0 if link.location in section_priority else 0),
+                    context=link.context[:200],
+                    location=link.location,
+                    reason=f"text match"
+                ))
+            
+            # Strategy 2: Find by URL patterns
+            url_matches = await dom_helpers.find_links_by_url_pattern(self.page, url_patterns)
+            for link in url_matches[:5]:
+                candidates.append(LinkCandidate(
+                    url=link.url,
+                    text=link.text[:100],
+                    score=link.score * 3.0 + (1.0 if link.location in section_priority else 0),
+                    context=link.context[:200],
+                    location=link.location,
+                    reason=f"URL pattern"
+                ))
+            
+            # Strategy 3: Find by aria labels
+            aria_matches = await dom_helpers.find_links_by_aria(self.page, keywords)
+            for link in aria_matches[:3]:
+                candidates.append(LinkCandidate(
+                    url=link.url,
+                    text=link.text[:100],
+                    score=link.score * 1.5 + (1.0 if link.location in section_priority else 0),
+                    context=link.context[:200],
+                    location=link.location,
+                    reason=f"aria-label"
+                ))
+            
+            # Deduplicate by URL
+            seen = set()
+            unique = []
+            for c in sorted(candidates, key=lambda x: x.score, reverse=True):
+                if c.url not in seen:
+                    seen.add(c.url)
+                    unique.append(c)
+            
+            if unique:
+                return unique[:10]
+                
+        except Exception as e:
+            logger.debug(f"dom_helpers failed, using fallback: {e}")
+        
+        # Fallback to legacy extraction
+        links_data = await self._atomic_extract_links()
         
         for link in links_data:
             score = 0.0
