@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Optional
 from enum import Enum
 
 from .command_parser import ParsedCommand, FormData
-from .url_resolver import TaskGoal
+from .url_types import TaskGoal
 
 logger = logging.getLogger(__name__)
 
@@ -224,6 +224,7 @@ class TaskPlanner:
             TaskGoal.FIND_LOGIN: "login_form",
             TaskGoal.FIND_REGISTER: "register_form",
             TaskGoal.EXTRACT_PRODUCTS: "product_list",
+            TaskGoal.FIND_PRICING: "pricing_info",
             TaskGoal.FIND_FAQ: "faq_content",
             TaskGoal.FIND_RETURNS: "returns_info",
         }
@@ -243,6 +244,9 @@ class TaskPlanner:
         
         elif goal == TaskGoal.EXTRACT_PRODUCTS:
             self._add_extraction_steps(plan, parsed, analyze_step)
+        
+        elif goal == TaskGoal.FIND_PRICING:
+            self._add_pricing_steps(plan, parsed, analyze_step)
         
         elif goal in [TaskGoal.FIND_LOGIN, TaskGoal.FIND_REGISTER]:
             self._add_auth_steps(plan, parsed, analyze_step)
@@ -419,6 +423,24 @@ class TaskPlanner:
         )
         
         plan.expected_outcome = "products_extracted"
+    
+    def _add_pricing_steps(
+        self,
+        plan: TaskPlan,
+        parsed: ParsedCommand,
+        after_step: int
+    ):
+        """Add steps for pricing/price list extraction"""
+        
+        # Extract pricing information
+        plan.add_step(
+            StepType.EXTRACT,
+            params={"type": "pricing"},
+            description="Extract pricing data",
+            depends_on=[after_step]
+        )
+        
+        plan.expected_outcome = "pricing_extracted"
     
     def _add_auth_steps(
         self,

@@ -27,9 +27,22 @@ from pathlib import Path
 
 from .command_parser import CommandParser, ParsedCommand
 from .task_planner import TaskPlanner, TaskPlan, TaskStep, StepType, StepStatus
-from .url_resolver import UrlResolver, TaskGoal
+from .url_resolver import UrlResolver
+from .url_types import TaskGoal
 from .stealth import StealthConfig
 from .llm_element_finder import LLMElementFinder
+
+# Import logging package
+try:
+    from curllm_logs import (
+        LogSession, LogConfig, MarkdownLogWriter, create_session,
+        CommandInfo, EnvironmentInfo, ResultInfo, StepLog, LogLevel,
+        ScreenshotManager, ScreenshotInfo
+    )
+    HAS_LOG_PACKAGE = True
+except ImportError:
+    HAS_LOG_PACKAGE = False
+    ScreenshotManager = None
 
 logger = logging.getLogger(__name__)
 
@@ -69,8 +82,10 @@ class OrchestratorConfig:
     timeout_seconds: int = 120
     screenshot_on_error: bool = True
     screenshot_on_success: bool = True
+    screenshot_each_step: bool = False  # Capture after each step
     log_to_file: bool = True
     log_dir: str = "logs"
+    screenshot_dir: str = "screenshots"
     dry_run: bool = False  # Parse and plan only, don't execute
 
 
@@ -102,6 +117,7 @@ class Orchestrator:
         self.page = None
         self.resolver = None
         self.element_finder = None  # LLMElementFinder instance
+        self.screenshot_manager = None  # ScreenshotManager from curllm_logs
         self.run_log = []
         self.run_id = None
     
@@ -247,6 +263,15 @@ class Orchestrator:
         
         self.resolver = UrlResolver(self.page, llm=self.llm)
         self.element_finder = LLMElementFinder(llm=self.llm, page=self.page)
+        
+        # Initialize screenshot manager from curllm_logs
+        if HAS_LOG_PACKAGE and ScreenshotManager:
+            self.screenshot_manager = ScreenshotManager(
+                base_dir=self.config.screenshot_dir,
+                session_id=self.run_id,
+                domain="unknown"  # Will be updated after parsing
+            )
+        
         self._log("info", f"Browser ready (LLM: {'enabled' if self.llm else 'heuristic mode'})")
     
     async def _cleanup(self):
@@ -294,6 +319,18 @@ class Orchestrator:
                 step_result.data = data
                 step.status = StepStatus.COMPLETED
                 
+                # Capture screenshot if configured
+                if self.config.screenshot_each_step and self.screenshot_manager:
+                    try:
+                        ss = await self.screenshot_manager.capture(
+                            self.page, i, step.step_type.value,
+                            description=step.description
+                        )
+                        if ss:
+                            step_result.screenshot_path = ss.path
+                    except Exception:
+                        pass
+                
                 self._log("success", f"  ✅ {step.description}")
                 
             except Exception as e:
@@ -302,6 +339,15 @@ class Orchestrator:
                 step.error = str(e)
                 
                 self._log("error", f"  ❌ {step.description}: {e}")
+                
+                # Capture error screenshot
+                if self.config.screenshot_on_error and self.screenshot_manager:
+                    try:
+                        ss = await self.screenshot_manager.capture_error(self.page, i, str(e))
+                        if ss:
+                            step_result.screenshot_path = ss.path
+                    except Exception:
+                        pass
                 
                 # Try fallback
                 if step.fallback:
@@ -570,6 +616,58 @@ class Orchestrator:
                 """)
                 return cart
             
+            elif extract_type == "pricing":
+                # Extract pricing/service price information
+                pricing = await self.page.evaluate("""
+                    () => {
+                        const priceRegex = /\\d+[,.]?\\d*\\s*(zł|PLN|EUR|USD|€|\\$|)/gi;
+                        const results = [];
+                        
+                        // Look for pricing tables, cards, or lists
+                        const selectors = [
+                            '[class*="price"]',
+                            '[class*="cennik"]',
+                            '[class*="pricing"]',
+                            '[class*="plan"]',
+                            '[class*="package"]',
+                            '[class*="offer"]',
+                            '[class*="service"]',
+                            'table tr',
+                            '.card',
+                            'li',
+                        ];
+                        
+                        for (const sel of selectors) {
+                            document.querySelectorAll(sel).forEach(el => {
+                                if (el.offsetParent === null) return; // not visible
+                                
+                                const text = el.innerText.trim();
+                                const prices = text.match(priceRegex);
+                                
+                                if (prices && text.length < 500) {
+                                    results.push({
+                                        text: text.replace(/\\s+/g, ' ').slice(0, 300),
+                                        prices: prices,
+                                        element: el.tagName.toLowerCase()
+                                    });
+                                }
+                            });
+                            
+                            if (results.length >= 20) break;
+                        }
+                        
+                        // Deduplicate by text
+                        const seen = new Set();
+                        return results.filter(r => {
+                            const key = r.text.slice(0, 50);
+                            if (seen.has(key)) return false;
+                            seen.add(key);
+                            return true;
+                        }).slice(0, 20);
+                    }
+                """)
+                return {"pricing": pricing, "count": len(pricing), "method": "intelligent"}
+            
             else:
                 content = await self.page.evaluate("() => document.body.innerText.slice(0, 5000)")
                 return {"content": content}
@@ -625,67 +723,183 @@ class Orchestrator:
             logger.info(message)
     
     def _save_log(self, result: OrchestratorResult) -> str:
-        """Save run log to markdown file"""
+        """Save run log using the curllm_logs package"""
         os.makedirs(self.config.log_dir, exist_ok=True)
         log_path = os.path.join(self.config.log_dir, f"run-{self.run_id}.md")
         
+        if HAS_LOG_PACKAGE:
+            return self._save_log_with_package(result, log_path)
+        else:
+            return self._save_log_legacy(result, log_path)
+    
+    def _save_log_with_package(self, result: OrchestratorResult, log_path: str) -> str:
+        """Save using curllm_logs package"""
+        from curllm_logs import LogSession, create_session
+        
+        # Create session
+        session = create_session(session_type="orchestrator", log_dir=self.config.log_dir)
+        session.session_id = self.run_id
+        
+        # Command info
+        escaped_cmd = result.command.replace('"', '\\"')
+        url = result.parsed.get_url() if result.parsed else None
+        
+        session.command = CommandInfo(
+            raw_command=result.command,
+            cli_format=f'curllm "{escaped_cmd}"',
+            traditional_format=f'curllm "{url}" -d "{escaped_cmd}"' if url else None,
+            target_url=url,
+            target_domain=result.parsed.target_domain if result.parsed else None,
+            instruction=result.command,
+            goal=result.parsed.primary_goal.value if result.parsed else None,
+            email=result.parsed.form_data.email if result.parsed else None,
+            name=result.parsed.form_data.name if result.parsed else None,
+            phone=result.parsed.form_data.phone if result.parsed else None,
+            message=result.parsed.form_data.message if result.parsed else None,
+            parse_confidence=result.parsed.confidence if result.parsed else 0,
+        )
+        
+        # Environment info
+        session.environment = EnvironmentInfo(
+            headless=self.config.headless,
+            stealth_mode=self.config.stealth_mode,
+        )
+        
+        # Plan steps
+        if result.plan:
+            session.plan_steps = [f"{s.step_type.value}: {s.description}" for s in result.plan.steps]
+        
+        # Step results
+        for sr in result.step_results:
+            step_log = StepLog(
+                index=sr.step_index,
+                step_type=sr.step_type,
+                description=sr.step_type,
+                status="completed" if sr.success else "failed",
+                duration_ms=sr.duration_ms,
+                error_message=sr.error,
+                screenshot_after=sr.screenshot_path,
+            )
+            session.add_step(step_log)
+        
+        # Add screenshots from manager
+        if self.screenshot_manager:
+            for ss in self.screenshot_manager.screenshots:
+                session.screenshots.append(ss)
+        
+        # Add visited URLs
+        if result.final_url:
+            session.add_url(result.final_url)
+        
+        # Raw log entries
+        from curllm_logs.log_entry import LogEntry as LogEntryClass
+        for log_line in self.run_log:
+            session.entries.append(LogEntryClass(
+                timestamp=datetime.now(),
+                level=LogLevel.INFO,
+                message=log_line
+            ))
+        
+        # Result
+        session.result = ResultInfo(
+            success=result.success,
+            final_url=result.final_url,
+            duration_ms=result.duration_ms,
+            steps_total=len(result.step_results),
+            steps_completed=sum(1 for sr in result.step_results if sr.success),
+            steps_failed=sum(1 for sr in result.step_results if not sr.success),
+            extracted_data=result.extracted_data,
+            error_message=result.error,
+        )
+        
+        session.finish(result.success, result.error)
+        
+        # Write using MarkdownLogWriter
+        writer = MarkdownLogWriter(include_raw_log=True, include_images=True)
+        writer.write(session, log_path)
+        
+        logger.info(f"Log saved: {log_path}")
+        return log_path
+    
+    def _save_log_legacy(self, result: OrchestratorResult, log_path: str) -> str:
+        """Legacy log saving (fallback when package not available)"""
         with open(log_path, "w") as f:
-            f.write(f"# Orchestrator Run: {self.run_id}\n\n")
+            f.write(f"# curllm Run Log ({self.run_id})\n\n")
+            f.write(f"**Type:** orchestrator\n")
             f.write(f"**Status:** {'✅ SUCCESS' if result.success else '❌ FAILED'}\n")
             f.write(f"**Duration:** {result.duration_ms}ms\n\n")
+            f.write("---\n\n")
             
-            # Full CLI command
-            f.write("## CLI Command\n")
+            # CLI command
             escaped_cmd = result.command.replace('"', '\\"')
+            f.write("## Command\n\n")
+            f.write("### CLI Command\n")
             f.write(f"```bash\ncurllm \"{escaped_cmd}\"\n```\n\n")
             
-            # Show equivalent traditional format
+            # Traditional format
             if result.parsed and result.parsed.target_domain:
                 url = result.parsed.get_url()
-                f.write("## Equivalent Traditional Format\n")
+                f.write("### Traditional Format\n")
                 f.write(f"```bash\ncurllm \"{url}\" -d \"{escaped_cmd}\"\n```\n\n")
-                f.write(f"- **URL**: {url}\n")
-                f.write(f"- **Instruction**: {result.command}\n\n")
+                f.write(f"- **URL:** {url}\n")
+                f.write(f"- **Instruction:** {result.command}\n\n")
             
+            # Parsed info
             if result.parsed:
-                f.write("## Parsed\n")
+                f.write("## Parsed\n\n")
                 f.write(f"- **Domain:** {result.parsed.target_domain}\n")
                 f.write(f"- **Goal:** {result.parsed.primary_goal.value}\n")
-                f.write(f"- **Email:** {result.parsed.form_data.email}\n")
-                f.write(f"- **Name:** {result.parsed.form_data.name}\n")
-                f.write(f"- **Confidence:** {result.parsed.confidence:.0%}\n\n")
+                f.write(f"- **Confidence:** {result.parsed.confidence:.0%}\n")
+                if result.parsed.form_data.email:
+                    f.write(f"\n### Form Data\n")
+                    f.write(f"- **Email:** {result.parsed.form_data.email}\n")
+                if result.parsed.form_data.name:
+                    f.write(f"- **Name:** {result.parsed.form_data.name}\n")
+                f.write("\n")
             
+            # Plan
             if result.plan:
-                f.write("## Plan\n")
+                f.write("## Plan\n\n")
                 for i, step in enumerate(result.plan.steps):
                     status = "✅" if step.status == StepStatus.COMPLETED else "❌" if step.status == StepStatus.FAILED else "⏳"
                     f.write(f"{i+1}. {status} {step.step_type.value}: {step.description}\n")
                 f.write("\n")
             
-            # Step execution times
+            # Step execution table
             if result.step_results:
-                f.write("## Step Execution Times\n")
-                f.write("| Step | Description | Duration | Status |\n")
-                f.write("|------|-------------|----------|--------|\n")
+                f.write("## Step Execution\n\n")
+                f.write("| # | Step | Duration | Method | Confidence | Status |\n")
+                f.write("|---|------|----------|--------|------------|--------|\n")
                 for sr in result.step_results:
                     status = "✅" if sr.success else "❌"
-                    f.write(f"| {sr.step_index + 1} | {sr.step_type} | {sr.duration_ms}ms | {status} |\n")
+                    f.write(f"| {sr.step_index + 1} | {sr.step_type} | {sr.duration_ms}ms | - | - | {status} |\n")
                 f.write("\n")
             
             # Final URL
             if result.final_url:
-                f.write(f"## Final URL\n`{result.final_url}`\n\n")
+                f.write("## Navigation\n\n")
+                f.write(f"**Final URL:** `{result.final_url}`\n\n")
             
-            f.write("## Execution Log\n")
+            # Result
+            f.write("## Result\n\n")
+            f.write(f"**Status:** {'✅ SUCCESS' if result.success else '❌ FAILED'}\n")
+            f.write(f"**Duration:** {result.duration_ms}ms\n")
+            completed = sum(1 for sr in result.step_results if sr.success)
+            f.write(f"**Steps:** {completed}/{len(result.step_results)} completed\n\n")
+            
+            if result.error:
+                f.write("### Error\n")
+                f.write(f"```\n{result.error}\n```\n\n")
+            
+            if result.extracted_data:
+                f.write("### Extracted Data\n")
+                f.write(f"```json\n{json.dumps(result.extracted_data, indent=2, ensure_ascii=False)}\n```\n\n")
+            
+            # Raw execution log
+            f.write("## Execution Log\n\n")
             f.write("```\n")
             f.write("\n".join(self.run_log))
             f.write("\n```\n")
-            
-            if result.error:
-                f.write(f"\n## Error\n```\n{result.error}\n```\n")
-            
-            if result.extracted_data:
-                f.write(f"\n## Extracted Data\n```json\n{json.dumps(result.extracted_data, indent=2, ensure_ascii=False)}\n```\n")
         
         logger.info(f"Log saved: {log_path}")
         return log_path

@@ -55,4 +55,4 @@ script-files = ["curllm"]
 py-modules = ["curllm_server", "bql_parser", "curllm_web"]
 
 [tool.setuptools.packages.find]
-include = ["curllm_core*", "functions*"]
+include = ["curllm_core*", "curllm_logs*", "functions*"]

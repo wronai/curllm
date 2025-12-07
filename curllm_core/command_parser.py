@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
-from .url_resolver import TaskGoal
+from .url_types import TaskGoal
 
 logger = logging.getLogger(__name__)
 
@@ -139,8 +139,13 @@ class CommandParser:
             'checkout', 'kasa', 'zamówienie', 'zapłać', 'płatność', 'finalizuj'
         ],
         TaskGoal.EXTRACT_PRODUCTS: [
-            'znajdź', 'szukaj', 'wyszukaj', 'produkty', 'products', 'ceny', 'prices',
+            'znajdź', 'szukaj', 'wyszukaj', 'produkty', 'products',
             'wylistuj', 'pokaż', 'lista'
+        ],
+        TaskGoal.FIND_PRICING: [
+            'cena', 'ceny', 'cennik', 'prices', 'pricing', 'price list',
+            'ile kosztuje', 'koszt', 'wycena', 'opłaty', 'tariff', 'rates',
+            'ceny usług', 'price list'
         ],
         TaskGoal.FIND_LOGIN: [
             'zaloguj', 'login', 'logowanie', 'sign in'
