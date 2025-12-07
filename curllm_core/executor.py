@@ -421,10 +421,35 @@ class CurllmExecutor:
             except Exception:
                 pass
             
+            # Log the final result to the run log
+            run_logger.log_text("\n## Final Result\n")
+            
+            # Log extracted data summary
+            final_data = result.get("data")
+            if final_data:
+                if isinstance(final_data, dict):
+                    if "specifications" in final_data:
+                        run_logger.log_text(f"**Extracted Specifications:** {final_data.get('count', 0)} parameters")
+                        run_logger.log_code("json", json.dumps(final_data.get("specifications", {}), indent=2, ensure_ascii=False))
+                    elif "items" in final_data:
+                        run_logger.log_text(f"**Extracted Items:** {final_data.get('count', 0)} items")
+                        run_logger.log_code("json", json.dumps(final_data.get("items", [])[:5], indent=2, ensure_ascii=False))
+                        if final_data.get("count", 0) > 5:
+                            run_logger.log_text(f"... and {final_data.get('count', 0) - 5} more items")
+                    else:
+                        run_logger.log_code("json", json.dumps(final_data, indent=2, ensure_ascii=False)[:2000])
+                elif isinstance(final_data, list):
+                    run_logger.log_text(f"**Extracted Items:** {len(final_data)} items")
+                    run_logger.log_code("json", json.dumps(final_data[:5], indent=2, ensure_ascii=False))
+            
+            # Log full result JSON
+            run_logger.log_text("\n### Full Response JSON\n")
+            run_logger.log_code("json", json.dumps(res, indent=2, ensure_ascii=False, default=str))
+            
             if success:
-                run_logger.log_text(f"✅ Run finished successfully: {reason}")
+                run_logger.log_text(f"\n✅ Run finished successfully: {reason}")
             else:
-                run_logger.log_text(f"❌ Run finished with failure: {reason}")
+                run_logger.log_text(f"\n❌ Run finished with failure: {reason}")
             
             return res
 

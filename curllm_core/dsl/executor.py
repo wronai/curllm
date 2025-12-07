@@ -870,19 +870,31 @@ class DSLExecutor:
                                 }
                             }
                             
-                            // Try alternating label/value divs
-                            const children = container.querySelectorAll('div, span, p');
-                            for (let i = 0; i < children.length - 1; i++) {
-                                const keyEl = children[i];
-                                const valEl = children[i + 1];
-                                const key = keyEl.textContent?.trim();
-                                const val = valEl.textContent?.trim();
-                                if (key && val && key.length < 50 && val.length < 200 && key !== val) {
-                                    // Check if key looks like a label
-                                    const keyLower = key.toLowerCase();
-                                    if (techKeywords.some(kw => keyLower.includes(kw))) {
+                            // Try elements with exactly 2 children (label + value pattern)
+                            const rows = container.querySelectorAll('[class*="row"], [class*="item"], [class*="param"], div > div');
+                            for (const row of rows) {
+                                const children = Array.from(row.children);
+                                if (children.length === 2) {
+                                    const key = children[0].textContent?.trim();
+                                    const val = children[1].textContent?.trim();
+                                    if (key && val && key.length < 50 && val.length < 200 && key !== val) {
                                         specs[key] = val;
-                                        i++; // Skip the value element
+                                    }
+                                }
+                            }
+                            
+                            // Also try span pairs within each container row
+                            const paramRows = container.querySelectorAll('div, li, p');
+                            for (const row of paramRows) {
+                                const spans = row.querySelectorAll(':scope > span, :scope > strong, :scope > b, :scope > em');
+                                if (spans.length >= 2) {
+                                    const key = spans[0].textContent?.trim();
+                                    const val = spans[1].textContent?.trim();
+                                    if (key && val && key.length < 50 && val.length < 200 && key !== val) {
+                                        const keyLower = key.toLowerCase();
+                                        if (techKeywords.some(kw => keyLower.includes(kw))) {
+                                            specs[key] = val;
+                                        }
                                     }
                                 }
                             }
@@ -890,13 +902,15 @@ class DSLExecutor:
                     }
                 }
                 
-                // 3. Look for text with colon separator in any spec-like container
+                // 3. Look for key-value pairs in text content
                 const specContainers = document.querySelectorAll(
                     '.specifications, .params, .tech-specs, .product-params, [class*="param"], [class*="spec"]'
                 );
                 for (const container of specContainers) {
                     const text = container.textContent || '';
-                    const lines = text.split('\\n');
+                    const lines = text.split('\\n').map(l => l.trim()).filter(l => l.length > 0);
+                    
+                    // First, try colon-separated format within single lines
                     for (const line of lines) {
                         const colonIndex = line.indexOf(':');
                         if (colonIndex > 0 && colonIndex < 50) {
@@ -904,6 +918,28 @@ class DSLExecutor:
                             const value = line.substring(colonIndex + 1).trim();
                             if (key && value && value.length < 200 && !specs[key]) {
                                 specs[key] = value;
+                            }
+                        }
+                    }
+                    
+                    // Then try alternating lines pattern (key on one line, value on next)
+                    // This is common in specs tables without proper HTML structure
+                    for (let i = 0; i < lines.length - 1; i++) {
+                        const potentialKey = lines[i];
+                        const potentialValue = lines[i + 1];
+                        
+                        // Check if it looks like a key-value pair
+                        const keyLower = potentialKey.toLowerCase();
+                        const isKeyTechnical = techKeywords.some(kw => keyLower.includes(kw));
+                        const valueLooksLikeValue = /[\\d\\.\\-\\+\\/°]/.test(potentialValue) || 
+                                                    potentialValue.length < potentialKey.length;
+                        
+                        if (isKeyTechnical && valueLooksLikeValue && 
+                            potentialKey.length < 50 && potentialValue.length < 200 &&
+                            !potentialKey.includes(potentialValue) && !potentialValue.includes(potentialKey)) {
+                            if (!specs[potentialKey]) {
+                                specs[potentialKey] = potentialValue;
+                                i++; // Skip the value line
                             }
                         }
                     }

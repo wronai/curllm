@@ -54,6 +54,9 @@ EXPORT_HTML=false
 EXPORT_XML=false
 EXPORT_CSV=false
 EXPORT_XLS=false
+EXPORT_YAML=false
+EXPORT_JSON=false
+EXPORT_MD=false
 VERBOSE=false
 VISUAL_MODE=false
 STEALTH_MODE=false
@@ -90,10 +93,16 @@ AUTOMATION OPTIONS:
                           - file:/path/to/list.txt | /path/to/list.txt
                           - http://user:pass@host:port[,http://host2:port]
     --session ID          Persist cookies under this session id
-    --html                 Export response data (auto-detected table) to HTML file
-    --xml                  Export response data (auto-detected table) to XML file
-    --csv                  Export response data (auto-detected table) to CSV file
-    --xls|--excel          Export response data to an Excel-compatible .xls (HTML table)
+    --html                 Export response data to HTML file
+    --xml                  Export response data to XML file
+    --csv                  Export response data to CSV file
+    --xls|--excel          Export response data to Excel-compatible .xls
+    --yaml|--yml           Export response data to YAML file
+    --json                 Export response data to pretty-printed JSON
+    --md|--markdown        Export response data to Markdown table
+    
+    Note: Format is auto-detected from -o filename extension:
+          products.yaml, products.html, products.csv, etc.
     
 SERVICE OPTIONS:
     --start-services, --start    Start required services (Ollama, API server)
@@ -674,19 +683,29 @@ need_jq() {
 
 # Detect an array of rows to tabulate. Prefer common keys under .result or root.
 # If an array of scalars is found, convert to objects with a single 'value' column.
+# Also handles specifications (dict) format for technical specs.
 json_select_rows() {
     jq -r '
       def first_array(s): limit(1; s | .. | arrays);
+      def dict_to_array: if type == "object" then [to_entries[] | {key: .key, value: .value}] else . end;
       def pick:
         . as $root
         | ($root.result? // $root) as $b
         | (
-            $b.articles?
-            // (try ($b.page.links) catch null)
-            // $b.products? // $b.items? // $b.links? // $b.data? // $b.emails? // $b.phones?
-            // (try ($root.page.links) catch null)
-            // first_array($b)
-            // first_array($root)
+            # Handle specifications (dict format) - convert to array of key-value pairs
+            if ($b.specifications? | type) == "object" then
+              $b.specifications | dict_to_array
+            elif ($b.result?.specifications? | type) == "object" then
+              $b.result.specifications | dict_to_array
+            else
+              # Standard array formats
+              $b.articles?
+              // (try ($b.page.links) catch null)
+              // $b.products? // $b.items? // $b.links? // $b.data? // $b.emails? // $b.phones?
+              // (try ($root.page.links) catch null)
+              // first_array($b)
+              // first_array($root)
+            end
           );
       def to_objects($arr):
         if ($arr|type=="array" and ($arr|length>0) and (($arr[0]|type)!="object"))
@@ -764,6 +783,148 @@ export_xls() {
     export_html "$outfile"
 }
 
+export_yaml() {
+    local outfile="$1"; shift || true
+    need_jq || return 1
+    
+    # Try using Python for proper YAML output
+    if command -v python3 > /dev/null 2>&1; then
+        printf '%s' "$RESPONSE" | json_select_rows | python3 -c "
+import sys, json
+try:
+    import yaml
+    data = json.load(sys.stdin)
+    # Handle specifications format (dict)
+    if isinstance(data, dict):
+        print(yaml.dump(data, allow_unicode=True, default_flow_style=False, sort_keys=False))
+    else:
+        print(yaml.dump({'items': data}, allow_unicode=True, default_flow_style=False, sort_keys=False))
+except ImportError:
+    # Fallback without pyyaml
+    data = json.load(sys.stdin)
+    def to_yaml(obj, indent=0):
+        prefix = '  ' * indent
+        if isinstance(obj, dict):
+            lines = []
+            for k, v in obj.items():
+                if isinstance(v, (dict, list)):
+                    lines.append(f'{prefix}{k}:')
+                    lines.append(to_yaml(v, indent + 1))
+                else:
+                    lines.append(f'{prefix}{k}: {json.dumps(v, ensure_ascii=False)}')
+            return '\n'.join(lines)
+        elif isinstance(obj, list):
+            lines = []
+            for item in obj:
+                item_yaml = to_yaml(item, indent + 1)
+                lines.append(f'{prefix}- ' + item_yaml.lstrip())
+            return '\n'.join(lines)
+        else:
+            return f'{prefix}{json.dumps(obj, ensure_ascii=False)}'
+    print(to_yaml(data))
+" > "$outfile"
+    else
+        # Fallback to jq-based conversion
+        printf '%s' "$RESPONSE" | json_select_rows | jq -r '
+          def to_yaml:
+            to_entries | map("  " + .key + ": " + (.value | @json)) | join("\n");
+          . as $rows | ($rows | to_entries | map(
+            "- # item " + (.key | tostring) + "\n" + (.value | to_yaml)
+          ) | join("\n"))
+        ' > "$outfile"
+    fi
+    echo -e "${GREEN}✓ YAML exported to${NC} $outfile" 1>&2
+}
+
+export_json() {
+    local outfile="$1"; shift || true
+    need_jq || return 1
+    # Pretty-print JSON data
+    printf '%s' "$RESPONSE" | json_select_rows | jq '.' > "$outfile"
+    echo -e "${GREEN}✓ JSON exported to${NC} $outfile" 1>&2
+}
+
+export_markdown() {
+    local outfile="$1"; shift || true
+    need_jq || return 1
+    # Create markdown table using Python for reliability
+    if command -v python3 > /dev/null 2>&1; then
+        printf '%s' "$RESPONSE" | json_select_rows | python3 -c "
+import sys, json
+from datetime import datetime
+
+data = json.load(sys.stdin)
+if isinstance(data, dict) and not isinstance(data, list):
+    # Handle specs/dict format
+    print('# curllm export\n')
+    print('| Key | Value |')
+    print('| --- | --- |')
+    for k, v in data.items():
+        print(f'| {k} | {v} |')
+else:
+    # Handle list of items
+    if not data:
+        print('# curllm export\n\nNo data.')
+        sys.exit(0)
+    
+    # Get all keys
+    keys = []
+    for item in data:
+        if isinstance(item, dict):
+            for k in item.keys():
+                if k not in keys:
+                    keys.append(k)
+    
+    print('# curllm export\n')
+    print('| ' + ' | '.join(keys) + ' |')
+    print('| ' + ' | '.join(['---'] * len(keys)) + ' |')
+    
+    for item in data:
+        if isinstance(item, dict):
+            values = [str(item.get(k, '')) for k in keys]
+            print('| ' + ' | '.join(values) + ' |')
+
+print(f'\n_Generated: {datetime.now()}_')
+" > "$outfile"
+    else
+        # Fallback to jq
+        local table
+        if ! table=$(printf '%s' "$RESPONSE" | json_select_rows | jq -r '
+          def headers: (map(keys) | add | unique);
+          . as $rows | ($rows | headers) as $h
+          | ("| " + ($h | join(" | ")) + " |"),
+            ("| " + ($h | map("---") | join(" | ")) + " |"),
+            ($rows[] | "| " + ([ $h[] as $k | (.[$k] // "") | tostring ] | join(" | ")) + " |")
+        '); then
+            echo -e "${RED}Failed to generate Markdown export.${NC}" 1>&2
+            return 1
+        fi
+        {
+            echo "# curllm export"
+            echo ""
+            echo "$table"
+            echo ""
+            echo "_Generated: $(date)_"
+        } > "$outfile"
+    fi
+    echo -e "${GREEN}✓ Markdown exported to${NC} $outfile" 1>&2
+}
+
+# Detect format from output file extension
+detect_format_from_extension() {
+    local file="$1"
+    case "${file##*.}" in
+        yaml|yml) echo "yaml" ;;
+        json) echo "json" ;;
+        html|htm) echo "html" ;;
+        xml) echo "xml" ;;
+        csv) echo "csv" ;;
+        xls|xlsx) echo "xls" ;;
+        md|markdown) echo "md" ;;
+        *) echo "json" ;;
+    esac
+}
+
 ## Argument parsing (after functions are defined so function calls work)
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -813,6 +974,12 @@ while [[ $# -gt 0 ]]; do
             EXPORT_CSV=true; shift;;
         --xls|--excel)
             EXPORT_XLS=true; shift;;
+        --yaml|--yml)
+            EXPORT_YAML=true; shift;;
+        --json)
+            EXPORT_JSON=true; shift;;
+        --md|--markdown)
+            EXPORT_MD=true; shift;;
         -h|--help)
             show_help;;
         --version)
@@ -961,9 +1128,29 @@ EOF
 
     # Export handling
     HAS_EXPORT=false
-    if [ "$EXPORT_HTML" = true ] || [ "$EXPORT_XML" = true ] || [ "$EXPORT_CSV" = true ] || [ "$EXPORT_XLS" = true ]; then
+    if [ "$EXPORT_HTML" = true ] || [ "$EXPORT_XML" = true ] || [ "$EXPORT_CSV" = true ] || \
+       [ "$EXPORT_XLS" = true ] || [ "$EXPORT_YAML" = true ] || [ "$EXPORT_JSON" = true ] || \
+       [ "$EXPORT_MD" = true ]; then
         HAS_EXPORT=true
     fi
+    
+    # Auto-detect format from output file extension if no explicit format flag
+    if [ "$HAS_EXPORT" = false ] && [ -n "$OUTPUT_FILE" ]; then
+        DETECTED_FORMAT=$(detect_format_from_extension "$OUTPUT_FILE")
+        case "$DETECTED_FORMAT" in
+            yaml) EXPORT_YAML=true; HAS_EXPORT=true ;;
+            json) EXPORT_JSON=true; HAS_EXPORT=true ;;
+            html) EXPORT_HTML=true; HAS_EXPORT=true ;;
+            xml) EXPORT_XML=true; HAS_EXPORT=true ;;
+            csv) EXPORT_CSV=true; HAS_EXPORT=true ;;
+            xls) EXPORT_XLS=true; HAS_EXPORT=true ;;
+            md) EXPORT_MD=true; HAS_EXPORT=true ;;
+        esac
+        if [ "$HAS_EXPORT" = true ]; then
+            { echo -e "${BLUE}Auto-detected format: $DETECTED_FORMAT${NC}"; } 1>&2
+        fi
+    fi
+    
     if [ "$HAS_EXPORT" = true ]; then
         # Determine output filenames
         TS=$(date +%Y%m%d-%H%M%S)
@@ -983,8 +1170,20 @@ EOF
             OUT_XLS=${OUTPUT_FILE:-curllm_export_${TS}.xls}
             export_xls "$OUT_XLS"
         fi
+        if [ "$EXPORT_YAML" = true ]; then
+            OUT_YAML=${OUTPUT_FILE:-curllm_export_${TS}.yaml}
+            export_yaml "$OUT_YAML"
+        fi
+        if [ "$EXPORT_JSON" = true ]; then
+            OUT_JSON=${OUTPUT_FILE:-curllm_export_${TS}.json}
+            export_json "$OUT_JSON"
+        fi
+        if [ "$EXPORT_MD" = true ]; then
+            OUT_MD=${OUTPUT_FILE:-curllm_export_${TS}.md}
+            export_markdown "$OUT_MD"
+        fi
     else
-        # Save JSON to file if requested and no export flags were used
+        # Save raw JSON to file if requested and no export flags were used
         if [ -n "$OUTPUT_FILE" ]; then
             echo "$RESPONSE" > "$OUTPUT_FILE"
             { echo -e "${GREEN}Output saved to: $OUTPUT_FILE${NC}"; } 1>&2
