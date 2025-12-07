@@ -1,0 +1,40 @@
+# Bulk Form Filler - Docker Compose Configuration
+#
+# Usage:
+#   docker compose up --build
+#
+# Then open: http://localhost:8081
+
+version: '3.8'
+
+services:
+  form-filler:
+    build:
+      context: ..
+      dockerfile: forms/Dockerfile
+    container_name: curllm-form-filler
+    ports:
+      - "${PORT:-8081}:8081"
+    environment:
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - LLM_MODEL=${LLM_MODEL:-llama3.2}
+      - LLM_PROVIDER=${LLM_PROVIDER:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - MAX_CONCURRENT_FORMS=${MAX_CONCURRENT_FORMS:-3}
+      - FORM_TIMEOUT=${FORM_TIMEOUT:-60}
+      - PORT=8081
+      - DEBUG=${DEBUG:-false}
+      - PLAYWRIGHT_CHROMIUM_ARGS=--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    shm_size: '2gb'
+    volumes:
+      - form-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  form-data:
+
+networks:
+  default:
+    name: curllm-forms-network

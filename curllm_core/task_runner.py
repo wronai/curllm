@@ -503,6 +503,12 @@ async def _execute_tool(executor, page, instruction: str, tool_name: str, args: 
         
         # Form fill (full orchestration)
         if tn == "form.fill":
+            # Check if form filling is disabled (for extraction-only tasks)
+            if runtime.get("no_form_fill", False):
+                if run_logger:
+                    run_logger.log_text("⚠️ Form fill disabled by no_form_fill=True (extraction mode)")
+                return {"form_fill": {"submitted": False, "skipped": True, "reason": "Form fill disabled for extraction task"}}
+            
             try:
                 # Check if LLM orchestrator should be used
                 use_llm_orchestrator = runtime.get("llm_form_orchestrator", False) or \
@@ -918,8 +924,15 @@ async def _maybe_articles_no_click(executor, instruction: str, page, run_logger,
     return False
 
 
-async def _finalize_fallback(executor, instruction: str, url: Optional[str], page, run_logger, result: Dict[str, Any], domain_dir: Optional[str] = None) -> None:
+async def _finalize_fallback(executor, instruction: str, url: Optional[str], page, run_logger, result: Dict[str, Any], domain_dir: Optional[str] = None, runtime: Optional[Dict[str, Any]] = None) -> None:
+    runtime = runtime or {}
     try:
+        # Skip form fill fallback if disabled
+        if runtime.get("no_form_fill", False):
+            if run_logger:
+                run_logger.log_text("Skipping form fill fallback (no_form_fill=True)")
+            return
+        
         lower_instr2 = (instruction or "").lower()
         if any(k in lower_instr2 for k in ["form", "formularz", "fill", "wypełnij", "wypelnij", "submit"]):
             try:
@@ -1363,7 +1376,7 @@ async def run_task(
             logger.warning("Honeypot detected, skipping field")
 
     if result.get("data") is None:
-        await _finalize_fallback(executor, instruction, url, page, run_logger, result, domain_dir)
+        await _finalize_fallback(executor, instruction, url, page, run_logger, result, domain_dir, runtime)
 
     await page.close()
     return result

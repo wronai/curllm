@@ -104,19 +104,69 @@ class PriceComparator:
         try:
             logger.info(f"Extracting from: {url}")
             
+            # Wrap user prompt with extraction-only instructions
+            # Use JSON format to pass runtime params including no_form_fill
+            extraction_task = f"""Przeanalizuj zawartość strony i pobierz dane produktów.
+
+ZADANIE:
+{prompt}
+
+INSTRUKCJE:
+- Odczytaj widoczną zawartość strony
+- Zidentyfikuj produkty, ceny, opisy na stronie
+- Zwróć dane w strukturze JSON
+- Dla listy produktów - pobierz dane każdego produktu z listy
+- NIE klikaj w przyciski ani linki
+- Odpowiedz TYLKO danymi JSON
+"""
+            
+            # Use JSON instruction format to pass no_form_fill runtime param
+            extraction_instruction = json.dumps({
+                "instruction": extraction_task,
+                "params": {
+                    "no_form_fill": True,
+                    "no_click": True,
+                    "fastpath": False,
+                    "include_dom_html": True,
+                }
+            })
+            
             result = await self.executor.execute_workflow(
-                instruction=prompt,
+                instruction=extraction_instruction,
                 url=url,
                 stealth_mode=stealth,
                 visual_mode=False,
                 use_bql=False,
             )
             
+            # Check for form_fill false positive errors
+            # curllm sometimes detects forms on pages and tries to fill them
+            result_data = result.get("result")
+            is_form_fill_error = False
+            
+            if isinstance(result_data, dict):
+                # Check if this is a form_fill error (false positive on extraction)
+                if "form_fill" in result_data or "form" in str(result_data).lower():
+                    error_info = result_data.get("error", {})
+                    if isinstance(error_info, dict) and error_info.get("type") == "form_fill_failed":
+                        is_form_fill_error = True
+                    elif result_data.get("form_fill", {}).get("submitted") is False:
+                        is_form_fill_error = True
+            
+            if is_form_fill_error:
+                # This was a form detection false positive - treat as extraction failure
+                # and return empty data instead of error
+                return ExtractionResult(
+                    url=url,
+                    success=False,
+                    error="Strona zawiera formularze - ekstrakcja produktów nie powiodła się. Spróbuj podać URL bezpośrednio do strony produktu.",
+                )
+            
             if result.get("success"):
                 return ExtractionResult(
                     url=url,
                     success=True,
-                    data=result.get("result"),
+                    data=result_data,
                 )
             else:
                 return ExtractionResult(
