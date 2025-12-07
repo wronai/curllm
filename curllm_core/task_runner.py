@@ -1024,7 +1024,8 @@ async def run_task(
         prev_ctx = None
 
     # Try DSL Executor FIRST (uses knowledge base for best strategy)
-    if config.dsl_enabled and ("product" in lower_instr or "produkt" in lower_instr or "extract" in lower_instr):
+    dsl_keywords = ['product', 'produkt', 'extract', 'spec', 'parametr', 'techniczne', 'dane']
+    if config.dsl_enabled and any(kw in lower_instr for kw in dsl_keywords):
         if run_logger:
             run_logger.log_text("📋 DSL Executor enabled - using knowledge base for optimal strategy")
         try:

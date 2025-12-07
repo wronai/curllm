@@ -61,6 +61,8 @@ class DSLExecutor:
         'fallback_table': '_execute_fallback_table',
         'fallback_links': '_execute_fallback_links',
         'form_fill': '_execute_form_fill',
+        'specs_table': '_execute_specs_table',
+        'dl_pairs': '_execute_dl_pairs',
     }
     
     def __init__(
@@ -231,16 +233,34 @@ class DSLExecutor:
         """Detect task type from instruction."""
         instruction_lower = instruction.lower()
         
+        # Form filling
         if any(kw in instruction_lower for kw in ['fill', 'wypełnij', 'form', 'formularz', 'submit']):
             return 'fill_form'
-        elif any(kw in instruction_lower for kw in ['product', 'produkt', 'price', 'cena', 'extract']):
+        
+        # Technical specifications / parameters (BEFORE products check)
+        if any(kw in instruction_lower for kw in [
+            'specification', 'specyfikac', 'parametr', 'technical', 'techniczne',
+            'dane techniczne', 'spec table', 'tabela', 'parameters'
+        ]):
+            return 'extract_specs'
+        
+        # Products (generic extraction with prices)
+        if any(kw in instruction_lower for kw in ['product', 'produkt', 'price', 'cena']):
             return 'extract_products'
-        elif any(kw in instruction_lower for kw in ['link', 'url', 'href']):
+        
+        # Links
+        if any(kw in instruction_lower for kw in ['link', 'url', 'href']):
             return 'extract_links'
-        elif any(kw in instruction_lower for kw in ['screenshot', 'zrzut']):
+        
+        # Screenshot
+        if any(kw in instruction_lower for kw in ['screenshot', 'zrzut']):
             return 'screenshot'
-        else:
+        
+        # Generic extraction
+        if 'extract' in instruction_lower:
             return 'extract'
+        
+        return 'extract'
     
     async def _get_strategy(
         self, 
@@ -353,26 +373,32 @@ class DSLExecutor:
     ) -> List[str]:
         """Get algorithm execution order based on strategy and KB."""
         
-        # If strategy specifies algorithm, use it first
         algorithms = []
         
-        if strategy.algorithm and strategy.algorithm != "auto":
-            algorithms.append(strategy.algorithm)
-        
-        # Add fallbacks from strategy
-        algorithms.extend(strategy.fallback_algorithms)
-        
-        # Add KB suggestions
-        kb_suggestions = self.kb.suggest_algorithms(url, task)
-        for alg in kb_suggestions:
-            if alg not in algorithms:
-                algorithms.append(alg)
-        
-        # Ensure at least default algorithms
-        defaults = ['statistical_containers', 'pattern_detection', 'fallback_links']
-        for alg in defaults:
-            if alg not in algorithms:
-                algorithms.append(alg)
+        # Task-specific defaults come FIRST for specialized tasks
+        if task == 'extract_specs':
+            algorithms = ['specs_table', 'dl_pairs', 'fallback_table', 'llm_guided']
+        elif task == 'fill_form':
+            algorithms = ['form_fill']
+        else:
+            # For generic extraction, use strategy and KB
+            if strategy.algorithm and strategy.algorithm != "auto":
+                algorithms.append(strategy.algorithm)
+            
+            # Add fallbacks from strategy
+            algorithms.extend(strategy.fallback_algorithms)
+            
+            # Add KB suggestions
+            kb_suggestions = self.kb.suggest_algorithms(url, task)
+            for alg in kb_suggestions:
+                if alg not in algorithms:
+                    algorithms.append(alg)
+            
+            # Add default product extraction algorithms
+            defaults = ['statistical_containers', 'pattern_detection', 'fallback_links']
+            for alg in defaults:
+                if alg not in algorithms:
+                    algorithms.append(alg)
         
         return algorithms
     
@@ -702,3 +728,144 @@ class DSLExecutor:
             "fields": field_selectors,
             "maxItems": max_items
         })
+    
+    async def _execute_specs_table(
+        self,
+        url: str,
+        instruction: str,
+        strategy: DSLStrategy
+    ) -> Optional[Dict]:
+        """Extract specifications from HTML tables."""
+        
+        result = await self.page.evaluate("""
+            () => {
+                const specs = {};
+                
+                // Look for specification tables
+                const selectors = [
+                    'table.specifications',
+                    'table.params',
+                    'table.technical',
+                    '.specifications table',
+                    '.params table',
+                    '.product-params table',
+                    '.tech-specs table',
+                    '#specifications table',
+                    '#params table',
+                    'table'  // fallback
+                ];
+                
+                let table = null;
+                for (const sel of selectors) {
+                    const tables = document.querySelectorAll(sel);
+                    for (const t of tables) {
+                        // Check if table has key-value structure
+                        const rows = t.querySelectorAll('tr');
+                        if (rows.length >= 3) {
+                            const firstRow = rows[0];
+                            const cells = firstRow.querySelectorAll('td, th');
+                            if (cells.length >= 2) {
+                                table = t;
+                                break;
+                            }
+                        }
+                    }
+                    if (table) break;
+                }
+                
+                if (!table) return null;
+                
+                // Extract key-value pairs
+                const rows = table.querySelectorAll('tr');
+                for (const row of rows) {
+                    const cells = row.querySelectorAll('td, th');
+                    if (cells.length >= 2) {
+                        const key = cells[0].textContent?.trim();
+                        const value = cells[1].textContent?.trim();
+                        if (key && value && key.length < 100) {
+                            specs[key] = value;
+                        }
+                    }
+                }
+                
+                return Object.keys(specs).length > 0 ? specs : null;
+            }
+        """)
+        
+        if result:
+            strategy.selector = "table.specifications, table.params, table"
+        
+        return result
+    
+    async def _execute_dl_pairs(
+        self,
+        url: str,
+        instruction: str,
+        strategy: DSLStrategy
+    ) -> Optional[Dict]:
+        """Extract specifications from dl/dt/dd elements."""
+        
+        result = await self.page.evaluate("""
+            () => {
+                const specs = {};
+                
+                // Look for definition lists
+                const dlLists = document.querySelectorAll('dl');
+                
+                for (const dl of dlLists) {
+                    const dts = dl.querySelectorAll('dt');
+                    const dds = dl.querySelectorAll('dd');
+                    
+                    for (let i = 0; i < Math.min(dts.length, dds.length); i++) {
+                        const key = dts[i].textContent?.trim();
+                        const value = dds[i].textContent?.trim();
+                        if (key && value && key.length < 100) {
+                            specs[key] = value;
+                        }
+                    }
+                }
+                
+                // Also look for label-value pairs in divs
+                const labelPatterns = [
+                    '.param-label + .param-value',
+                    '.spec-label + .spec-value',
+                    '.label + .value',
+                    '[class*="param"] > span:first-child',
+                ];
+                
+                for (const pattern of labelPatterns) {
+                    try {
+                        const pairs = document.querySelectorAll(pattern);
+                        // Handle as needed
+                    } catch (e) {}
+                }
+                
+                // Look for text with colon separator in spec containers
+                const specContainers = document.querySelectorAll(
+                    '.specifications, .params, .tech-specs, .product-params, [class*="param"], [class*="spec"]'
+                );
+                
+                for (const container of specContainers) {
+                    const text = container.textContent || '';
+                    const lines = text.split('\\n');
+                    
+                    for (const line of lines) {
+                        const colonIndex = line.indexOf(':');
+                        if (colonIndex > 0 && colonIndex < 50) {
+                            const key = line.substring(0, colonIndex).trim();
+                            const value = line.substring(colonIndex + 1).trim();
+                            if (key && value && !specs[key]) {
+                                specs[key] = value;
+                            }
+                        }
+                    }
+                }
+                
+                return Object.keys(specs).length > 0 ? specs : null;
+            }
+        """)
+        
+        if result:
+            strategy.selector = "dl, .specifications, .params"
+        
+        return result

@@ -1,0 +1,16 @@
+url_pattern: '*www.soselectronic.com/*'
+task: extract_specs
+algorithm: statistical_containers
+selector: div.article-product__container
+fields:
+  name: div.article-product__info-title
+  url: a[href]
+  image: img
+expected_fields:
+- name
+- price
+- url
+metadata:
+  success_rate: 1.0
+  use_count: 1
+  last_used: '2025-12-07T12:16:19.943713'
