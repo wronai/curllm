@@ -367,12 +367,20 @@ class CurllmExecutor:
                     logger.warning(f"Error closing Playwright resources: {e}")
 
             # Validation pass (LLM) before finalizing (always when enabled)
+            # Skip for specs data (dict with non-product keys like 'specifications')
             try:
                 final_data = result.get("data")
                 if config.validation_enabled and final_data is not None:
-                    v = await validate_with_llm(self.llm, instruction, final_data, run_logger)
-                    if v is not None:
-                        result["data"] = v
+                    # Skip LLM validation for specs - it's already validated by DSL
+                    is_specs_data = (
+                        isinstance(final_data, dict) and 
+                        ('specifications' in final_data or 
+                         (not any(k in final_data for k in ['items', 'products', 'links'])))
+                    )
+                    if not is_specs_data:
+                        v = await validate_with_llm(self.llm, instruction, final_data, run_logger)
+                        if v is not None:
+                            result["data"] = v
             except Exception:
                 pass
 

@@ -1048,18 +1048,32 @@ async def run_task(
             if dsl_result.success and dsl_result.data:
                 if run_logger:
                     run_logger.log_text(f"✅ DSL Executor succeeded - algorithm: {dsl_result.algorithm_used}")
-                    run_logger.log_text(f"   Items: {len(dsl_result.data) if isinstance(dsl_result.data, list) else 1}")
+                    if isinstance(dsl_result.data, dict) and not any(k in dsl_result.data for k in ['name', 'url', 'price']):
+                        run_logger.log_text(f"   Specs: {len(dsl_result.data)} parameters")
+                    else:
+                        run_logger.log_text(f"   Items: {len(dsl_result.data) if isinstance(dsl_result.data, list) else 1}")
                     run_logger.log_text(f"   Validation score: {dsl_result.validation_score:.2f}")
                     if dsl_result.fallbacks_tried:
                         run_logger.log_text(f"   Fallbacks tried: {dsl_result.fallbacks_tried}")
                 
-                result["data"] = {
-                    "items": dsl_result.data if isinstance(dsl_result.data, list) else [dsl_result.data],
-                    "count": len(dsl_result.data) if isinstance(dsl_result.data, list) else 1,
-                    "algorithm": dsl_result.algorithm_used,
-                    "validation_score": dsl_result.validation_score,
-                    "selector": dsl_result.strategy_used.selector if dsl_result.strategy_used else None
-                }
+                # Check if it's a specs extraction (dict with key-value pairs)
+                is_specs = isinstance(dsl_result.data, dict) and not any(k in dsl_result.data for k in ['name', 'url', 'price'])
+                
+                if is_specs:
+                    result["data"] = {
+                        "specifications": dsl_result.data,
+                        "count": len(dsl_result.data),
+                        "algorithm": dsl_result.algorithm_used,
+                        "validation_score": dsl_result.validation_score,
+                    }
+                else:
+                    result["data"] = {
+                        "items": dsl_result.data if isinstance(dsl_result.data, list) else [dsl_result.data],
+                        "count": len(dsl_result.data) if isinstance(dsl_result.data, list) else 1,
+                        "algorithm": dsl_result.algorithm_used,
+                        "validation_score": dsl_result.validation_score,
+                        "selector": dsl_result.strategy_used.selector if dsl_result.strategy_used else None
+                    }
                 await page.close()
                 return result
             else:

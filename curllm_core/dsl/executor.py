@@ -741,54 +741,70 @@ class DSLExecutor:
             () => {
                 const specs = {};
                 
-                // Look for specification tables
-                const selectors = [
-                    'table.specifications',
-                    'table.params',
-                    'table.technical',
-                    '.specifications table',
-                    '.params table',
-                    '.product-params table',
-                    '.tech-specs table',
-                    '#specifications table',
-                    '#params table',
-                    'table'  // fallback
+                // Technical parameter keywords to identify specs tables
+                const techKeywords = [
+                    'voltage', 'current', 'pressure', 'temperature', 'power',
+                    'napięcie', 'prąd', 'ciśnienie', 'temperatura', 'moc',
+                    'output', 'input', 'accuracy', 'range', 'type', 'size',
+                    'wyjście', 'wejście', 'dokładność', 'zakres', 'typ',
+                    'supply', 'operating', 'max', 'min'
                 ];
                 
-                let table = null;
-                for (const sel of selectors) {
-                    const tables = document.querySelectorAll(sel);
-                    for (const t of tables) {
-                        // Check if table has key-value structure
-                        const rows = t.querySelectorAll('tr');
-                        if (rows.length >= 3) {
-                            const firstRow = rows[0];
-                            const cells = firstRow.querySelectorAll('td, th');
-                            if (cells.length >= 2) {
-                                table = t;
-                                break;
-                            }
-                        }
+                // Look for specification tables - prioritize by content
+                const allTables = document.querySelectorAll('table');
+                let bestTable = null;
+                let bestScore = 0;
+                
+                for (const t of allTables) {
+                    const text = (t.textContent || '').toLowerCase();
+                    let score = 0;
+                    
+                    // Score based on technical keywords
+                    for (const kw of techKeywords) {
+                        if (text.includes(kw)) score += 10;
                     }
-                    if (table) break;
+                    
+                    // Bonus for class names
+                    const className = (t.className || '').toLowerCase();
+                    if (className.includes('spec') || className.includes('param') || className.includes('tech')) {
+                        score += 50;
+                    }
+                    
+                    // Bonus for having many rows (more specs)
+                    const rows = t.querySelectorAll('tr');
+                    if (rows.length >= 5) score += 20;
+                    if (rows.length >= 10) score += 30;
+                    
+                    // Must have key-value structure
+                    const firstRow = rows[0];
+                    if (firstRow) {
+                        const cells = firstRow.querySelectorAll('td, th');
+                        if (cells.length >= 2) score += 10;
+                    }
+                    
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestTable = t;
+                    }
                 }
                 
-                if (!table) return null;
+                // Require at least 50 score (means technical keywords found)
+                if (!bestTable || bestScore < 50) return null;
                 
                 // Extract key-value pairs
-                const rows = table.querySelectorAll('tr');
+                const rows = bestTable.querySelectorAll('tr');
                 for (const row of rows) {
                     const cells = row.querySelectorAll('td, th');
                     if (cells.length >= 2) {
                         const key = cells[0].textContent?.trim();
                         const value = cells[1].textContent?.trim();
-                        if (key && value && key.length < 100) {
+                        if (key && value && key.length < 100 && value.length < 500) {
                             specs[key] = value;
                         }
                     }
                 }
                 
-                return Object.keys(specs).length > 0 ? specs : null;
+                return Object.keys(specs).length >= 3 ? specs : null;
             }
         """)
         
@@ -803,19 +819,20 @@ class DSLExecutor:
         instruction: str,
         strategy: DSLStrategy
     ) -> Optional[Dict]:
-        """Extract specifications from dl/dt/dd elements."""
+        """Extract specifications from dl/dt/dd elements and div structures."""
         
         result = await self.page.evaluate("""
             () => {
                 const specs = {};
+                const techKeywords = ['voltage', 'current', 'pressure', 'temperature', 'output',
+                    'napięcie', 'ciśnienie', 'temperatura', 'wyjście', 'supply', 'operating',
+                    'producent', 'seria', 'type', 'accuracy', 'range', 'size', 'case'];
                 
-                // Look for definition lists
+                // 1. Look for definition lists
                 const dlLists = document.querySelectorAll('dl');
-                
                 for (const dl of dlLists) {
                     const dts = dl.querySelectorAll('dt');
                     const dds = dl.querySelectorAll('dd');
-                    
                     for (let i = 0; i < Math.min(dts.length, dds.length); i++) {
                         const key = dts[i].textContent?.trim();
                         const value = dds[i].textContent?.trim();
@@ -825,43 +842,79 @@ class DSLExecutor:
                     }
                 }
                 
-                // Also look for label-value pairs in divs
-                const labelPatterns = [
-                    '.param-label + .param-value',
-                    '.spec-label + .spec-value',
-                    '.label + .value',
-                    '[class*="param"] > span:first-child',
-                ];
-                
-                for (const pattern of labelPatterns) {
-                    try {
-                        const pairs = document.querySelectorAll(pattern);
-                        // Handle as needed
-                    } catch (e) {}
+                // 2. Look for "Techniczne parametry" section or similar headers
+                const specHeaders = document.querySelectorAll('h2, h3, h4, .title, [class*="param"], [class*="spec"]');
+                for (const header of specHeaders) {
+                    const headerText = (header.textContent || '').toLowerCase();
+                    if (headerText.includes('parametr') || headerText.includes('techniczne') || 
+                        headerText.includes('specification') || headerText.includes('specs')) {
+                        
+                        // Find the next sibling container with specs
+                        let container = header.nextElementSibling;
+                        if (!container) container = header.parentElement;
+                        
+                        if (container) {
+                            // Try to find table in container
+                            const table = container.querySelector('table') || container.closest('table');
+                            if (table) {
+                                const rows = table.querySelectorAll('tr');
+                                for (const row of rows) {
+                                    const cells = row.querySelectorAll('td, th');
+                                    if (cells.length >= 2) {
+                                        const key = cells[0].textContent?.trim();
+                                        const value = cells[1].textContent?.trim();
+                                        if (key && value && key.length < 100) {
+                                            specs[key] = value;
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // Try alternating label/value divs
+                            const children = container.querySelectorAll('div, span, p');
+                            for (let i = 0; i < children.length - 1; i++) {
+                                const keyEl = children[i];
+                                const valEl = children[i + 1];
+                                const key = keyEl.textContent?.trim();
+                                const val = valEl.textContent?.trim();
+                                if (key && val && key.length < 50 && val.length < 200 && key !== val) {
+                                    // Check if key looks like a label
+                                    const keyLower = key.toLowerCase();
+                                    if (techKeywords.some(kw => keyLower.includes(kw))) {
+                                        specs[key] = val;
+                                        i++; // Skip the value element
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
                 
-                // Look for text with colon separator in spec containers
+                // 3. Look for text with colon separator in any spec-like container
                 const specContainers = document.querySelectorAll(
                     '.specifications, .params, .tech-specs, .product-params, [class*="param"], [class*="spec"]'
                 );
-                
                 for (const container of specContainers) {
                     const text = container.textContent || '';
                     const lines = text.split('\\n');
-                    
                     for (const line of lines) {
                         const colonIndex = line.indexOf(':');
                         if (colonIndex > 0 && colonIndex < 50) {
                             const key = line.substring(0, colonIndex).trim();
                             const value = line.substring(colonIndex + 1).trim();
-                            if (key && value && !specs[key]) {
+                            if (key && value && value.length < 200 && !specs[key]) {
                                 specs[key] = value;
                             }
                         }
                     }
                 }
                 
-                return Object.keys(specs).length > 0 ? specs : null;
+                // Only return if we found technical specs (not just basic info)
+                const foundTech = Object.keys(specs).some(k => 
+                    techKeywords.some(kw => k.toLowerCase().includes(kw))
+                );
+                
+                return (Object.keys(specs).length >= 5 && foundTech) ? specs : null;
             }
         """)
         
