@@ -277,6 +277,20 @@ class DynamicContainerDetector:
                 // Skip if mostly cart/navigation elements
                 if (cartElements > elements.length / 2) continue;
                 
+                // CRITICAL: Detect CSS/script content in sample text
+                const hasCurlyBraces = sampleText.indexOf('{{') >= 0 || sampleText.indexOf('}}') >= 0;
+                const hasCssKeywords = sampleText.includes('color:') || sampleText.includes('font-size:') || 
+                                       sampleText.includes('margin:') || sampleText.includes('padding:') ||
+                                       sampleText.includes('@media') || sampleText.includes('position:');
+                const hasCssPattern = /\.[a-zA-Z_-]+\s*\{{/.test(sampleText);
+                const isCssContent = hasCurlyBraces || hasCssKeywords || hasCssPattern;
+                const isScriptContent = sampleText.includes('function') || 
+                                        sampleText.includes('var ') ||
+                                        /\bif\s*\(/.test(sampleText);
+                
+                // Skip CSS/script containers entirely
+                if (isCssContent || isScriptContent) continue;
+                
                 // Calculate product score (higher = more likely to be product container)
                 let productScore = 0;
                 if (priceCount > 0) productScore += 30;
@@ -285,6 +299,11 @@ class DynamicContainerDetector:
                 if (elements.length >= 5) productScore += 10;
                 // Penalty for cart-like elements
                 productScore -= cartElements * 20;
+                
+                // Bonus for elements with product-like text (names, brands, specs)
+                const hasProductText = /[A-Z][a-z]+\s+[A-Z0-9]/.test(sampleText) ||
+                                       /\d+\s*(GB|TB|GHz|MHz|W|mAh|mm|cm|kg)/i.test(sampleText);
+                if (hasProductText) productScore += 25;
                 
                 candidates.push({{
                     selector: `.${{className}}`,
@@ -338,7 +357,7 @@ class DynamicContainerDetector:
         Priority:
         1. LLM validated + high statistical score
         2. High statistical score (if LLM unavailable)
-        3. REJECT if LLM found no valid containers
+        3. Fallback to statistical if LLM rejected all but strong indicators exist
         """
         
         if not statistical_candidates:
@@ -350,10 +369,25 @@ class DynamicContainerDetector:
             validated = llm_validation.get('validated', [])
             valid_count = sum(1 for v in validated if v.get('is_valid', True))
             
-            # If LLM rejected ALL candidates, respect that
+            # If LLM rejected ALL candidates, check for strong product indicators
             if valid_count == 0 and len(validated) > 0:
-                self._log("⚠️ LLM rejected all candidates - no valid product containers found")
-                return None  # Respect LLM's decision
+                # Check if any candidate has strong product indicators
+                # (product links, high product score, has price images, etc.)
+                strong_candidates = [
+                    c for c in statistical_candidates
+                    if (c.get('has_product_links') or c.get('product_score', 0) >= 50 or 
+                        (c.get('has_price') and c.get('has_link') and c.get('count', 0) >= 5))
+                ]
+                
+                if strong_candidates:
+                    self._log("⚠️ LLM rejected all candidates but strong product indicators found - using statistical fallback")
+                    best = strong_candidates[0]
+                    best['combined_confidence'] = best.get('statistical_score', 0) / 100 * 0.7  # Lower confidence
+                    best['fallback_reason'] = 'statistical_override'
+                    return best
+                else:
+                    self._log("⚠️ LLM rejected all candidates - no valid product containers found")
+                    return None  # Respect LLM's decision
             
             # If LLM approved at least one, use its recommendation
             if llm_validation.get('recommended'):

@@ -89,36 +89,43 @@ PAGE CONTEXT: {page_context[:500] if page_context else "Not provided"}
 CONTAINER CANDIDATES:
 {candidates_summary}
 
+IMPORTANT CONSIDERATIONS:
+- Many Polish e-commerce sites (like gral.pl, morele.net, x-kom.pl) use IMAGE-BASED prices (prices rendered as images, not text)
+- Products may have product names and links even if prices are not visible in text
+- Table-based layouts are common in older Polish shops
+- If a container has product links (URLs ending in _12345.html or containing product IDs), it's likely a product container
+- Look for product indicators: model names, brands, specifications (GB, GHz, etc.)
+
 Your task:
-1. For each candidate, analyze the sample text
+1. For each candidate, analyze the sample text AND consider structural indicators
 2. Determine if it represents:
-   - **product**: Actual product with name, price, description
-   - **navigation**: Menu items, links, cart, account
+   - **product**: Container with product name/link (price may be in image)
+   - **navigation**: Menu items, links to categories, cart, account
    - **marketing**: Banners, promotions, ads
    - **carousel_wrapper**: Container wrapping products but not products themselves
    - **other**: Generic content
 
 3. Score confidence (0.0-1.0) based on:
-   - Semantic content quality
-   - Presence of product-like features
-   - Consistency across samples
-   - Absence of navigation/marketing noise
+   - Presence of product-like features (names, links, specs)
+   - Product links with numeric IDs
+   - Brand names, model numbers, technical specs
+   - BE LENIENT: if in doubt and has product links, mark as valid
 
-4. Provide reasoning for each decision
+4. PREFER to mark as valid if the candidate has product links
 
 Respond with JSON:
 {{
   "validated": [
     {{
       "selector": "<selector>",
-      "is_valid": <true if product container>,
+      "is_valid": <true if product container - BE LENIENT>,
       "confidence": <0.0-1.0>,
       "reasoning": "<why valid or invalid>",
       "category": "<product|navigation|marketing|carousel_wrapper|other>",
       "concerns": ["<any red flags>"]
     }}
   ],
-  "recommended_selector": "<best container selector>",
+  "recommended_selector": "<best container selector or first valid one>",
   "overall_reasoning": "<explanation of recommendation>"
 }}
 
@@ -241,14 +248,28 @@ JSON only:"""
         for i, candidate in enumerate(candidates[:10]):  # Top 10 only
             selector = candidate.get('selector', 'unknown')
             count = candidate.get('count', 0)
-            sample = candidate.get('sample_text', '')[:200]  # Truncate
-            score = candidate.get('score', 0)
+            sample = candidate.get('sample_text', '')[:300]  # More context
+            score = candidate.get('statistical_score', candidate.get('score', 0))
+            has_price = candidate.get('has_price', False)
+            has_link = candidate.get('has_link', False)
+            has_image = candidate.get('has_image', False)
+            has_product_links = candidate.get('has_product_links', False)
+            avg_text_len = candidate.get('avg_text_length', 0)
+            
+            # Warn about potential CSS/script content
+            content_warning = ""
+            if '{' in sample and ':' in sample and '}' in sample:
+                content_warning = " ⚠️ CONTAINS CSS STYLE CONTENT - LIKELY NOT A PRODUCT"
+            elif 'function' in sample or 'var ' in sample:
+                content_warning = " ⚠️ CONTAINS SCRIPT CONTENT - LIKELY NOT A PRODUCT"
             
             formatted.append(f"""
 Candidate {i+1}:
   Selector: {selector}
   Count: {count} elements
-  Algorithmic Score: {score:.1f}
+  Has Price: {has_price} | Has Link: {has_link} | Has Image: {has_image} | Product Links: {has_product_links}
+  Avg Text Length: {avg_text_len:.0f} chars
+  Statistical Score: {score:.1f}{content_warning}
   Sample Text: "{sample}"
 """)
         
@@ -324,18 +345,34 @@ class StatisticalContainerRanker:
         optimal_depths = dom_stats.get("optimal_depths", {})
         class_patterns = dom_stats.get("class_patterns", {})
         
+        import re
+        
         # Score each candidate
         for candidate in candidates:
             score = 0.0
+            sample_text = candidate.get('sample_text', '')
             
-            # 1. Count score (normalized)
+            # CRITICAL: Check for CSS/script content in sample_text
+            has_css_keywords = 'color:' in sample_text or 'font-size:' in sample_text or \
+                              'margin:' in sample_text or 'padding:' in sample_text or \
+                              'position:' in sample_text or 'background:' in sample_text
+            has_css_pattern = bool(re.search(r'\.[a-zA-Z_-]+\s*\{', sample_text))
+            is_css = has_css_keywords or has_css_pattern or '@media' in sample_text
+            is_script = 'function' in sample_text or 'var ' in sample_text or \
+                        bool(re.search(r'\bif\s*\(', sample_text))
+            
+            if is_css or is_script:
+                candidate['statistical_score'] = -100  # Heavy penalty
+                continue  # Skip further scoring
+            
+            # 1. Count score (normalized) - reduced weight
             counts = [c.get('count', 0) for c in candidates]
             if counts:
                 max_count = max(counts)
                 min_count = min(counts)
                 if max_count > min_count:
                     normalized_count = (candidate.get('count', 0) - min_count) / (max_count - min_count)
-                    score += normalized_count * 30
+                    score += normalized_count * 15  # Reduced from 30
             
             # 2. Feature completeness (has_price + has_link + has_image)
             completeness = sum([
@@ -363,6 +400,19 @@ class StatisticalContainerRanker:
                         mean_freq = class_patterns.get('mean_frequency', 1)
                         normalized_freq = min(freq_map[first_class] / mean_freq, 2.0)  # Cap at 2x
                         score += normalized_freq * 10
+            
+            # 5. Product text indicators bonus
+            has_product_text = bool(re.search(r'[A-Z][a-z]+\s+[A-Z0-9]', sample_text)) or \
+                               bool(re.search(r'\d+\s*(GB|TB|GHz|MHz|W|mAh|mm|cm|kg)', sample_text, re.I))
+            if has_product_text:
+                score += 25
+            
+            # 6. Reasonable text length (not too long = likely wrapper)
+            avg_length = candidate.get('avg_text_length', 0)
+            if 50 < avg_length < 500:  # Product-like length
+                score += 15
+            elif avg_length > 2000:  # Too long = probably wrapper
+                score -= 20
             
             candidate['statistical_score'] = score
         

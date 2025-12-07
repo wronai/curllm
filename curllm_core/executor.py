@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 from .config import config
 from .logger import RunLogger
 from .llm_factory import setup_llm as setup_llm_factory
+from .llm_config import LLMConfig
 from .agent_factory import create_agent as create_agent_factory
 from .vision import VisionAnalyzer
 from .captcha import CaptchaSolver
@@ -52,14 +53,38 @@ def _should_validate(instruction: Optional[str], data: Optional[Any]) -> bool:
 
 class CurllmExecutor:
     """Main browser automation executor with LLM support"""
-    def __init__(self):
-        self.llm = self._setup_llm()
+    def __init__(self, llm_config: Optional[LLMConfig] = None):
+        """
+        Initialize executor.
+        
+        Args:
+            llm_config: Optional LLMConfig for multi-provider LLM support.
+                       If not provided, uses environment/config defaults.
+                       
+        Example:
+            # Local Ollama (default)
+            executor = CurllmExecutor()
+            
+            # OpenAI
+            executor = CurllmExecutor(LLMConfig(provider="openai/gpt-4o-mini"))
+            
+            # Anthropic
+            executor = CurllmExecutor(LLMConfig(provider="anthropic/claude-3-haiku-20240307"))
+            
+            # Gemini
+            executor = CurllmExecutor(LLMConfig(provider="gemini/gemini-2.0-flash"))
+            
+            # Groq (fast cloud Llama)
+            executor = CurllmExecutor(LLMConfig(provider="groq/llama3-70b-8192"))
+        """
+        self._llm_config = llm_config
+        self.llm = self._setup_llm(llm_config)
         self.vision_analyzer = VisionAnalyzer()
         self.captcha_solver = CaptchaSolver()
         self.stealth_config = StealthConfig()
 
-    def _setup_llm(self) -> Any:
-        return setup_llm_factory()
+    def _setup_llm(self, llm_config: Optional[LLMConfig] = None) -> Any:
+        return setup_llm_factory(llm_config)
 
     async def execute_workflow(
         self,

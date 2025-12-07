@@ -134,8 +134,16 @@ class IterativeExtractor:
                     const href = link.href || '';
                     const pathname = link.pathname || '';
                     
-                    // Pattern 1: /12345 or _12345 (numeric product IDs)
+                    // Pattern 1: /12345 or _12345 (numeric product IDs with .html)
                     if (/[_\\/]\\d{3,}\\.html?$/i.test(pathname)) {
+                        productLinks++;
+                    }
+                    // Pattern 1b: /123456789 (pure numeric ID, 6+ digits - ceneo.pl style)
+                    else if (/^\\/\\d{6,}$/.test(pathname)) {
+                        productLinks++;
+                    }
+                    // Pattern 1c: /offers/ID/ID (ceneo.pl offer links)
+                    else if (/^\\/offers\\/\\d+\\/\\d+/.test(pathname)) {
                         productLinks++;
                     }
                     // Pattern 2: /product/ or /produkt/ in URL
@@ -144,6 +152,14 @@ class IterativeExtractor:
                     }
                     // Pattern 3: Name+Product+Name_ID.html (gral.pl style)
                     else if (/[A-Za-z]+\\+[A-Za-z]+.*_\\d+\\.html$/i.test(pathname)) {
+                        productLinks++;
+                    }
+                    // Pattern 4: ;123456 (ceneo.pl style - semicolon + numeric ID)
+                    else if (/;\\d{4,}/.test(pathname)) {
+                        productLinks++;
+                    }
+                    // Pattern 5: /p/123456 or /i/123456 (common e-commerce pattern)
+                    else if (/\\/[pi]\\/\\d+/i.test(pathname)) {
                         productLinks++;
                     }
                 }
@@ -181,13 +197,38 @@ class IterativeExtractor:
                 indicators.has_list_structure = Object.values(classCount).some(count => count >= 5);
                 
                 // Check for REAL product containers (price + name together)
+                // Use dynamic link patterns - discovered from page structure
                 let realProductContainers = 0;
-                const potentialProducts = document.querySelectorAll('[class*="product"], [class*="item"], [class*="card"], table tr');
+                const potentialProducts = document.querySelectorAll('[class*="product"], [class*="item"], [class*="card"], [class*="box"], table tr');
+                
+                // Dynamic link check - analyze actual URL patterns on page
+                const checkProductLink = (el) => {
+                    const links = el.querySelectorAll('a[href]');
+                    for (const link of links) {
+                        const href = link.href || '';
+                        // Check for common product URL patterns dynamically
+                        if (/\\/[pi]\\/|product|produkt|item|towar|\\.html$|_\\d{4,}|[/]\\d{4,}/.test(href)) {
+                            return true;
+                        }
+                    }
+                    return false;
+                };
+                
+                // Dynamic price image check
+                const checkPriceImage = (el) => {
+                    const imgs = el.querySelectorAll('img');
+                    for (const img of imgs) {
+                        const src = img.src || '';
+                        if (/cb_|cena|price|_c\\d|_p\\d/i.test(src)) return true;
+                    }
+                    return false;
+                };
+                
                 for (const el of potentialProducts) {
                     const text = el.textContent || '';
                     const hasName = text.length > 20 && text.length < 500;
-                    const hasLink = el.querySelector('a[href*=".html"], a[href*="product"], a[href*="produkt"]');
-                    const hasPriceInEl = /\\d+[,.]\\d{2}/.test(text) || el.querySelector('img[src*="cb_"], img[src*="cena"]');
+                    const hasLink = checkProductLink(el);
+                    const hasPriceInEl = /\\d+[,.]\\d{2}/.test(text) || checkPriceImage(el);
                     if (hasName && hasLink && hasPriceInEl) {
                         realProductContainers++;
                     }
@@ -731,6 +772,110 @@ class IterativeExtractor:
         
         return None
     
+    async def _try_fallback_extraction(self, max_items: int, price_limit: Optional[float]) -> Dict[str, Any]:
+        """
+        Fallback extraction for table-based layouts (common in Polish e-commerce)
+        
+        This handles sites like gral.pl that use table layouts and image-based prices.
+        """
+        self._log("Fallback Extraction", "Trying table-based and link-based extraction...")
+        
+        result = await self.page.evaluate(f"""
+            () => {{
+                const products = [];
+                const priceLimit = {price_limit or 'null'};
+                const maxItems = {max_items};
+                
+                // Strategy 1: Find elements with product links (URLs ending in _12345.html)
+                const productLinks = Array.from(document.querySelectorAll('a[href]'))
+                    .filter(a => {{
+                        const href = a.href || '';
+                        // Match gral.pl style links: Name_12345.html
+                        return /[A-Za-z]+.*_\\d+\\.html$/i.test(href) ||
+                               /[_\\/]\\d{{4,}}\\.html?$/i.test(href);
+                    }});
+                
+                // Group links by finding their common parent that contains product info
+                const seenUrls = new Set();
+                const seenNames = new Set();
+                
+                for (const link of productLinks) {{
+                    if (products.length >= maxItems) break;
+                    
+                    const href = link.href;
+                    if (seenUrls.has(href)) continue;
+                    seenUrls.add(href);
+                    
+                    // Find the product container - go up until we find one with price indicators
+                    let container = link;
+                    for (let i = 0; i < 5 && container; i++) {{
+                        const text = container.textContent || '';
+                        const hasPrice = container.querySelector('img[src*="cb_"], img[src*="cn_"], img[src*="cena"]') ||
+                                        /\\d+[,.]\\d{{2}}\\s*(?:zł|PLN)/i.test(text);
+                        if (hasPrice && text.length > 30 && text.length < 1000) {{
+                            break;
+                        }}
+                        container = container.parentElement;
+                    }}
+                    
+                    if (!container) continue;
+                    
+                    // Extract name from link or container
+                    let name = (link.textContent || link.title || '').trim();
+                    if (!name || name.length < 5) {{
+                        // Try to find name in container
+                        const textNodes = Array.from(container.querySelectorAll('*'))
+                            .map(el => (el.textContent || '').trim())
+                            .filter(t => t.length > 10 && t.length < 150);
+                        if (textNodes.length > 0) {{
+                            name = textNodes[0];
+                        }}
+                    }}
+                    
+                    // Skip if name already seen (duplicate)
+                    if (seenNames.has(name)) continue;
+                    seenNames.add(name);
+                    
+                    // Extract price from text or look for price images
+                    let price = null;
+                    const containerText = container.textContent || '';
+                    const priceMatch = containerText.match(/(\\d+[\\s\\d]*(?:[,.]\\d{{2}})?)\\s*(?:zł|PLN)/i);
+                    if (priceMatch) {{
+                        price = parseFloat(priceMatch[1].replace(/\\s/g, '').replace(',', '.'));
+                    }}
+                    
+                    // Skip if price exceeds limit
+                    if (priceLimit && price && price > priceLimit) {{
+                        continue;
+                    }}
+                    
+                    // Get image
+                    const img = container.querySelector('img[src]:not([src*="cb_"]):not([src*="cn_"])');
+                    const image = img ? img.src : null;
+                    
+                    products.push({{
+                        name: name,
+                        price: price,
+                        url: href,
+                        image: image,
+                        extraction_method: 'fallback_link_based'
+                    }});
+                }}
+                
+                return products;
+            }}
+        """)
+        
+        if result and len(result) > 0:
+            self._log("Fallback Extraction Results", {"count": len(result)})
+            return {
+                "products": result,
+                "extraction_method": "fallback_table_based",
+                "metadata": self.state
+            }
+        
+        return {"products": [], "reason": "Fallback extraction found no products"}
+    
     async def run(self, max_items: int = 50) -> Dict[str, Any]:
         """
         Run full iterative extraction pipeline
@@ -784,6 +929,17 @@ class IterativeExtractor:
         containers = await self.detect_container_structure(quick_check["page_type"])
         
         if not containers.get("best"):
+            # Fallback: try table-based or generic extraction if page has products
+            real_products = quick_check.get("real_product_containers", 0)
+            if real_products >= 3:
+                if self.run_logger:
+                    self.run_logger.log_text(f"⚠️ Container detection failed but {real_products} products detected - trying fallback extraction")
+                
+                # Try table-based fallback for Polish e-commerce sites
+                fallback_result = await self._try_fallback_extraction(max_items, price_limit)
+                if fallback_result.get("products"):
+                    return fallback_result
+            
             return {
                 "products": [],
                 "reason": "No product containers found",

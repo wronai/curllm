@@ -82,35 +82,107 @@ JSON:"""
         """
         Step 1: LLM decides which container selector to use
         
-        Small atomic question: "What selector contains product items?"
+        DYNAMIC: Find elements with ACTUAL prices, not guessed selectors
         """
-        self._log("Step 1: Identify Container Selector", "Asking LLM...")
+        self._log("Step 1: Identify Container Selector", "Analyzing DOM for price-containing elements...")
         
-        # Get sample HTML structure - NO REGEX, just raw data for LLM
-        sample_html = await self.page.evaluate("""
+        # Find elements that contain ACTUAL price patterns - LLM will analyze these
+        sample_elements = await self.page.evaluate("""
             () => {
-                const body = document.body;
-                // Get first 50 elements with classes
-                const elements = Array.from(document.querySelectorAll('[class]')).slice(0, 50);
-                return elements.map(el => ({
-                    tag: el.tagName.toLowerCase(),
-                    classes: el.className,
-                    text: (el.innerText || '').substring(0, 200),
-                    hasLink: !!el.querySelector('a[href]'),
-                    textLength: (el.innerText || '').length
-                }));
+                const pricePattern = /\\d+[\\d\\s]*[,.]?\\d*\\s*(?:zł|PLN|€|\\$|USD|EUR)/i;
+                const candidates = [];
+                const seenClasses = new Set();
+                
+                // Find elements with prices
+                const allElements = document.querySelectorAll('*');
+                for (const el of allElements) {
+                    const text = (el.innerText || '').trim();
+                    const className = typeof el.className === 'string' ? el.className : '';
+                    const firstClass = className.split(' ')[0];
+                    
+                    // Skip if no class or already seen
+                    if (!firstClass || seenClasses.has(firstClass)) continue;
+                    if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(firstClass)) continue;
+                    
+                    // Skip if looks like CSS/script content
+                    if (text.includes('{') && text.includes(':') && text.includes('}')) continue;
+                    if (text.includes('function') || text.includes('var ')) continue;
+                    
+                    // Check if has price
+                    const hasPrice = pricePattern.test(text);
+                    const hasLink = el.querySelector('a[href]') !== null;
+                    const textLength = text.length;
+                    
+                    // Only consider elements with prices and reasonable text
+                    if (hasPrice && textLength > 20 && textLength < 1000) {
+                        // Count siblings with same class
+                        const siblings = document.querySelectorAll('.' + firstClass);
+                        if (siblings.length >= 3) {
+                            seenClasses.add(firstClass);
+                            candidates.push({
+                                selector: '.' + firstClass,
+                                count: siblings.length,
+                                sample_text: text.substring(0, 300),
+                                has_price: true,
+                                has_link: hasLink,
+                                text_length: textLength
+                            });
+                        }
+                    }
+                    
+                    if (candidates.length >= 10) break;
+                }
+                
+                return candidates;
             }
         """)
         
+        if not sample_elements:
+            self._log("No price-containing elements found", {})
+            return None
+        
+        # Log candidates for transparency
+        self._log("Found candidates with prices", {
+            "count": len(sample_elements),
+            "selectors": [c.get("selector") for c in sample_elements]
+        })
+        
+        # Format candidates for LLM - be EXPLICIT about choices
+        valid_selectors = [c.get("selector") for c in sample_elements]
+        candidates_text = "\n".join([
+            f"- {c.get('selector')}: {c.get('count')} elements, sample: \"{c.get('sample_text', '')[:100]}...\""
+            for c in sample_elements[:5]
+        ])
+        
+        # Ask LLM to pick from EXACT list - no guessing allowed
         decision = await self._ask_llm(
-            "What CSS selector should I use to find product containers? Return format: {'selector': '.class-name', 'reasoning': 'why'}",
+            f"""Pick the BEST product container from this EXACT list of selectors:
+
+{candidates_text}
+
+VALID SELECTORS: {valid_selectors}
+
+Rules:
+- You MUST pick one of the selectors from the list above
+- Look for sample text with product NAMES (not CSS styles or navigation)
+- Return EXACTLY: {{"selector": "<one from list>", "reasoning": "why"}}""",
             {
-                "sample_elements": sample_html[:20],
-                "task": "Find products with prices"
+                "instruction": self.instruction
             }
         )
         
         selector = decision.get("selector")
+        
+        # ENFORCE: selector must be from candidates list
+        if selector and selector not in valid_selectors:
+            self._log("LLM picked invalid selector, using best candidate", {
+                "llm_choice": selector,
+                "valid_selectors": valid_selectors
+            })
+            # Pick candidate with shortest avg text length (more likely product)
+            best = min(sample_elements, key=lambda x: x.get("text_length", 9999))
+            selector = best.get("selector")
+        
         self._log("Container Selector Decision", decision)
         
         return selector

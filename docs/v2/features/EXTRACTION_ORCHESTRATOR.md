@@ -204,7 +204,7 @@ User Request
 ### Ceneo.pl - Produkty
 
 ```bash
-./curllm https://ceneo.pl -d "Find all products under 150zł and extract names, prices and urls"
+./curllm curllm --stealth https://ceneo.pl -d "Find all products under 150zł and extract names, prices and urls"
 ```
 
 **Orkiestrator:**
@@ -216,7 +216,7 @@ User Request
 ### Allegro.pl - Aukcje
 
 ```bash
-./curllm https://allegro.pl -d "Extract all auctions ending today with price below 100zł"
+./curllm curllm --stealth https://allegro.pl -d "Extract all auctions ending today with price below 100zł"
 ```
 
 **Orkiestrator:**

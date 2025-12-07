@@ -50,12 +50,26 @@ class InstructionParser:
     """
     
     def __init__(self):
-        # Price patterns
+        # Price patterns - support multiple currencies
+        # Supported currencies: zł, PLN, $, USD, €, EUR, £, GBP
+        currency_pattern = r"(zł|PLN|złotych|\$|USD|€|EUR|£|GBP)"
+        
         self.price_patterns = [
-            # "under 50zł", "below 50 PLN", "less than 50 złotych"
-            (r"(?:under|below|less than)\s*(\d+(?:[,\.]\d+)?)\s*(zł|PLN|złotych)", ComparisonOp.LT),
-            (r"(?:over|above|more than)\s*(\d+(?:[,\.]\d+)?)\s*(zł|PLN|złotych)", ComparisonOp.GT),
-            (r"between\s*(\d+(?:[,\.]\d+)?)\s*(?:and|to|-)\s*(\d+(?:[,\.]\d+)?)\s*(zł|PLN|złotych)", ComparisonOp.BETWEEN),
+            # Symbol before with capture: "$100", "€50", "£75"
+            (r"(?:under|below|less than)\s*([\$€£])\s*(\d+(?:[,\.]\d+)?)", ComparisonOp.LT, True),
+            (r"(?:over|above|more than)\s*([\$€£])\s*(\d+(?:[,\.]\d+)?)", ComparisonOp.GT, True),
+            # Symbol/unit after: "100zł", "50 PLN", "100 USD"
+            (r"(?:under|below|less than)\s*(\d+(?:[,\.]\d+)?)\s*" + currency_pattern, ComparisonOp.LT, False),
+            (r"(?:over|above|more than)\s*(\d+(?:[,\.]\d+)?)\s*" + currency_pattern, ComparisonOp.GT, False),
+            (r"between\s*(\d+(?:[,\.]\d+)?)\s*(?:and|to|-)\s*(\d+(?:[,\.]\d+)?)\s*" + currency_pattern, ComparisonOp.BETWEEN, False),
+            # "under price 100 zł" or "price under 100 zł" patterns
+            (r"(?:under|below|less than)\s+(?:price|cena)\s+(\d+(?:[,\.]\d+)?)\s*" + currency_pattern, ComparisonOp.LT, False),
+            (r"(?:over|above|more than)\s+(?:price|cena)\s+(\d+(?:[,\.]\d+)?)\s*" + currency_pattern, ComparisonOp.GT, False),
+            # Simple number with price context: "price under 100", "under 100", "below 50"
+            (r"(?:price|cena)\s+(?:under|below|less than|<)\s*(\d+(?:[,\.]\d+)?)", ComparisonOp.LT, False),
+            (r"(?:under|below|less than|<)\s+(?:price|cena)?\s*(\d+(?:[,\.]\d+)?)", ComparisonOp.LT, False),
+            (r"(?:price|cena)\s+(?:over|above|more than|>)\s*(\d+(?:[,\.]\d+)?)", ComparisonOp.GT, False),
+            (r"(?:over|above|more than|>)\s+(?:price|cena)?\s*(\d+(?:[,\.]\d+)?)", ComparisonOp.GT, False),
         ]
         
         # Weight patterns
@@ -147,7 +161,14 @@ class InstructionParser:
     ) -> Optional[Dict]:
         """Parse numeric criteria (price, weight, volume)"""
         
-        for pattern, op in patterns:
+        for pattern_tuple in patterns:
+            # Handle both 2-tuple (pattern, op) and 3-tuple (pattern, op, symbol_first)
+            if len(pattern_tuple) == 3:
+                pattern, op, symbol_first = pattern_tuple
+            else:
+                pattern, op = pattern_tuple
+                symbol_first = False
+            
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 if op == ComparisonOp.BETWEEN:
@@ -160,17 +181,38 @@ class InstructionParser:
                         "unit": match.group(3)
                     }
                 else:
-                    # Under/Over has 2 groups: value, unit
-                    value = float(match.group(1).replace(',', '.'))
-                    unit = match.group(2)
+                    # Under/Over - handle symbol_first patterns differently
+                    if symbol_first:
+                        # Pattern: "$100" - group(1) is symbol, group(2) is value
+                        unit = match.group(1)
+                        value = float(match.group(2).replace(',', '.'))
+                    else:
+                        # Pattern: "100zł" - group(1) is value, optional group(2) is unit
+                        value = float(match.group(1).replace(',', '.'))
+                        try:
+                            unit = match.group(2) if match.lastindex >= 2 else None
+                        except IndexError:
+                            unit = None
                     
-                    # Normalize units
+                    # Default unit for price if not specified
+                    if unit is None and criteria_type == CriteriaType.PRICE:
+                        unit = "unknown"  # Will be handled by currency translator
+                    
+                    # Normalize currency units
                     if unit in ['kg', 'kilogram']:
                         value *= 1000
                         unit = 'g'
                     elif unit in ['l', 'liter']:
                         value *= 1000
                         unit = 'ml'
+                    elif unit in ['$', 'USD']:
+                        unit = 'USD'
+                    elif unit in ['€', 'EUR']:
+                        unit = 'EUR'
+                    elif unit in ['£', 'GBP']:
+                        unit = 'GBP'
+                    elif unit in ['zł', 'PLN', 'złotych']:
+                        unit = 'PLN'
                     
                     return {
                         "type": criteria_type.value,

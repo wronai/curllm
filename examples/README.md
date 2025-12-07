@@ -7,6 +7,7 @@ This directory contains organized examples demonstrating curllm capabilities.
 ```
 examples/
 ├── basic/                   # Simple CLI and curl examples
+├── currency/                # Currency translation for price filters
 ├── detection/               # Dynamic container & pattern detection
 ├── orchestration/           # Multi-strategy extraction orchestration
 ├── extraction/              # Data extraction examples
@@ -76,6 +77,7 @@ executor = CurllmExecutor(LLMConfig(provider="ollama/qwen2.5:7b"))
 | Project | Description | Files |
 |---------|-------------|-------|
 | [basic](basic/) | Simple CLI and curl examples | Bash |
+| [currency](currency/) | Currency translation ($100 → 405 zł) | Python |
 | [detection](detection/) | Dynamic container & LLM heuristics | Python |
 | [orchestration](orchestration/) | Multi-strategy extraction | Python |
 | [extraction/products](extraction/products/) | Product data extraction | Python, Bash |

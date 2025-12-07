@@ -3,12 +3,14 @@ Multi-Criteria Filtering Layer
 
 Complete filtering orchestration that combines:
 1. InstructionParser - parse user criteria
-2. UniversalFieldExtractor - extract fields from products
-3. LLMFilterValidator - LLM validation for semantic criteria
-4. Multi-stage filtering with transparency
+2. CurrencyTranslator - currency conversion for price filters
+3. UniversalFieldExtractor - extract fields from products
+4. LLMFilterValidator - LLM validation for semantic criteria
+5. Multi-stage filtering with transparency
 
 Supports:
 - Numeric filters: price, weight, volume (regex-based, fast)
+- Currency translation: "$100" → "~405 zł" for Polish sites
 - Semantic filters: gluten-free, organic, vegan (LLM-based, accurate)
 - Combined filters: "under 50zł AND gluten-free" (both methods)
 - Fallback strategies: if LLM fails, use regex only
@@ -21,6 +23,13 @@ import json
 from .instruction_parser import InstructionParser
 from .universal_field_extractor import UniversalFieldExtractor
 from .llm_filter_validator import LLMFilterValidator
+
+# Currency translation support
+try:
+    from .streamware.components.currency import CurrencyTranslator, normalize_price_filter
+    CURRENCY_SUPPORT = True
+except ImportError:
+    CURRENCY_SUPPORT = False
 
 
 class FilterStage:
@@ -59,12 +68,16 @@ class MultiCriteriaFilter:
     4. Generate transparency report
     """
     
-    def __init__(self, llm_client=None, run_logger=None):
+    def __init__(self, llm_client=None, run_logger=None, page=None):
         self.instruction_parser = InstructionParser()
         self.field_extractor = UniversalFieldExtractor()
         self.llm_validator = LLMFilterValidator(llm_client, run_logger) if llm_client else None
         self.run_logger = run_logger
+        self.page = page  # For currency detection
         self.stages = []
+        
+        # Currency translator
+        self.currency_translator = CurrencyTranslator(llm_client, run_logger) if CURRENCY_SUPPORT else None
     
     def _log(self, msg: str, data: Any = None):
         """Log with structured data"""
@@ -101,9 +114,55 @@ class MultiCriteriaFilter:
         """
         self.stages = []
         
-        # Parse instruction
+        # Parse instruction first to get price criteria
         parsed_criteria = self.instruction_parser.parse(instruction)
         criteria = parsed_criteria['criteria']
+        
+        # Currency translation stage - convert foreign currencies to page currency
+        if CURRENCY_SUPPORT and criteria.get('price'):
+            price_criteria = criteria['price']
+            source_currency = price_criteria.get('unit', 'unknown')
+            
+            # Detect target currency from page or URL
+            target_currency = 'PLN'  # Default for Polish sites
+            if self.page:
+                try:
+                    url = await self.page.url() if hasattr(self.page, 'url') else str(self.page)
+                    if '.pl' in str(url):
+                        target_currency = 'PLN'
+                    elif '.de' in str(url) or '.fr' in str(url):
+                        target_currency = 'EUR'
+                    elif '.uk' in str(url):
+                        target_currency = 'GBP'
+                except:
+                    pass
+            
+            # Convert if currencies differ
+            if source_currency and source_currency != target_currency and source_currency != 'unknown':
+                try:
+                    from .streamware.components.currency import convert_price
+                    
+                    if price_criteria.get('value'):
+                        original = price_criteria['value']
+                        converted = convert_price(original, source_currency, target_currency)
+                        
+                        self._log("💱 Currency Translation", {
+                            "original": f"{original} {source_currency}",
+                            "converted": f"{converted:.0f} {target_currency}"
+                        })
+                        
+                        # Update criteria with converted value
+                        if price_criteria.get('operator') == 'less_than':
+                            criteria['price'] = {'max': converted, 'unit': target_currency}
+                        elif price_criteria.get('operator') == 'greater_than':
+                            criteria['price'] = {'min': converted, 'unit': target_currency}
+                        else:
+                            criteria['price']['value'] = converted
+                            criteria['price']['unit'] = target_currency
+                        
+                        parsed_criteria['has_filters'] = True
+                except Exception as e:
+                    self._log(f"⚠️ Currency conversion failed: {e}")
         
         self._log("📋 Parsed Criteria", {
             "summary": self.instruction_parser.format_criteria_summary(parsed_criteria),

@@ -100,6 +100,41 @@ async def setup_browser(
         session_id,
     )
 
+def _ensure_playwright_browsers():
+    """Check if Playwright browsers are installed, auto-install if missing."""
+    import subprocess
+    import sys
+    
+    # Check if chromium exists by looking at expected path
+    cache_dir = Path.home() / ".cache" / "ms-playwright"
+    chromium_dirs = list(cache_dir.glob("chromium*")) if cache_dir.exists() else []
+    
+    needs_install = True
+    for d in chromium_dirs:
+        if (d / "chrome-linux" / "chrome").exists() or \
+           (d / "chrome-linux" / "headless_shell").exists():
+            needs_install = False
+            break
+    
+    if needs_install:
+        print("🔧 Playwright browsers not found. Installing automatically...")
+        try:
+            result = subprocess.run(
+                [sys.executable, "-m", "playwright", "install", "chromium"],
+                capture_output=True,
+                text=True,
+                timeout=300  # 5 minutes timeout
+            )
+            if result.returncode == 0:
+                print("✅ Playwright browsers installed successfully!")
+            else:
+                print(f"⚠️ Playwright install warning: {result.stderr[:200]}")
+        except subprocess.TimeoutExpired:
+            print("⚠️ Playwright install timed out, continuing anyway...")
+        except Exception as e:
+            print(f"⚠️ Failed to auto-install Playwright: {e}")
+
+
 async def setup_playwright(
     stealth_mode: bool,
     storage_key: Optional[str],
@@ -110,6 +145,10 @@ async def setup_playwright(
     session_id: Optional[str] = None,
 ):
     from playwright.async_api import async_playwright
+    
+    # Auto-install browsers if missing
+    _ensure_playwright_browsers()
+    
     session_mgr = SessionManager()
     playwright = await async_playwright().start()
     launch_args = {
@@ -135,7 +174,23 @@ async def setup_playwright(
             launch_args["proxy"] = proxy_settings
     elif config.proxy:
         launch_args["proxy"] = {"server": config.proxy}
-    browser = await playwright.chromium.launch(**launch_args)
+    
+    # Try to launch, with retry after auto-install on failure
+    try:
+        browser = await playwright.chromium.launch(**launch_args)
+    except Exception as e:
+        if "Executable doesn't exist" in str(e):
+            print("🔧 Browser missing, forcing reinstall...")
+            import subprocess
+            import sys
+            subprocess.run(
+                [sys.executable, "-m", "playwright", "install", "chromium"],
+                capture_output=True,
+                timeout=300
+            )
+            browser = await playwright.chromium.launch(**launch_args)
+        else:
+            raise
 
     storage_path = None
     if session_id:

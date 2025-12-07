@@ -44,11 +44,14 @@ class DynamicPatternDetector:
     Dynamically detects repeating patterns in DOM structure
     
     No hard-coded selectors - learns from page structure!
+    Uses LLM to discover optimal heuristics for each site.
     """
     
-    def __init__(self, page, run_logger=None):
+    def __init__(self, page, run_logger=None, llm=None):
         self.page = page
         self.run_logger = run_logger
+        self.llm = llm
+        self._dynamic_selectors = None
     
     def _log(self, message: str, data: Any = None):
         """Log detection steps"""
@@ -114,6 +117,35 @@ class DynamicPatternDetector:
         
         return best
     
+    async def _get_dynamic_link_selector(self) -> Optional[str]:
+        """
+        Get dynamic product link selector using LLM heuristics discovery
+        
+        Falls back to common patterns if LLM unavailable
+        """
+        # Return cached if available
+        if self._dynamic_selectors:
+            return self._dynamic_selectors.get("product_link_selector")
+        
+        # Try LLM-based discovery
+        if self.llm:
+            try:
+                from .llm_heuristics import LLMHeuristicsDiscovery
+                discovery = LLMHeuristicsDiscovery(self.page, self.llm, self.run_logger)
+                self._dynamic_selectors = await discovery.build_dynamic_selectors()
+                
+                selector = self._dynamic_selectors.get("product_link_selector")
+                if selector:
+                    self._log("Using LLM-discovered link selector", {"selector": selector})
+                    return selector
+            except Exception as e:
+                self._log("LLM heuristics discovery failed", str(e))
+        
+        # Fallback to common patterns
+        fallback = 'a[href*="product"], a[href*="item"], a[href*="/p/"], a[href*="/produkt"], a[href$=".html"]'
+        self._log("Using fallback link selector", {"selector": fallback})
+        return fallback
+    
     async def _find_signal_elements(self) -> List[Dict]:
         """
         Find elements that signal product presence
@@ -123,12 +155,15 @@ class DynamicPatternDetector:
         - Product-like links
         - Images with alt text
         """
+        # Get dynamic selectors if LLM available
+        link_selector = await self._get_dynamic_link_selector()
+        
         return await self.page.evaluate("""
-            () => {
+            (linkSelector) => {
                 const signals = [];
                 
-                // Price regex
-                const priceRegex = /\\d+[\\s,.]?\\d*[\\s,.]?\\d{2}\\s*(?:zł|PLN|€|\\$|USD|EUR)/i;
+                // Price regex - supports multiple currencies
+                const priceRegex = /\\d+[\\s,.]?\\d*[\\s,.]?\\d{2}\\s*(?:zł|PLN|€|\\$|USD|EUR|грн|руб)/i;
                 
                 // Find all elements
                 const allElements = Array.from(document.querySelectorAll('*'));
@@ -145,8 +180,10 @@ class DynamicPatternDetector:
                     // Skip if text too long (likely not a product)
                     if (text.length > 1000) continue;
                     
-                    // Check for signals
-                    const hasLink = !!el.querySelector('a[href*="product"], a[href*="item"], a[href*="/p/"], a[href*="/produkt"]');
+                    // Check for signals - use DYNAMIC selector from LLM
+                    const hasLink = linkSelector ? 
+                        !!el.querySelector(linkSelector) :
+                        !!el.querySelector('a[href]');
                     const hasImage = !!el.querySelector('img');
                     
                     // Must have at least price OR (link + image)
@@ -167,7 +204,7 @@ class DynamicPatternDetector:
                 
                 return signals.slice(0, 100); // Limit to first 100
             }
-        """)
+        """, link_selector)
     
     async def _extract_parent_structures(self, signals: List[Dict]) -> List[DOMNode]:
         """

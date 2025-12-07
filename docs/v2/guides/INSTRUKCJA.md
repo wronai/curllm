@@ -67,7 +67,7 @@ python3 curllm_server.py &
 
 ### 1. Prosta ekstrakcja danych
 ```bash
-curllm "https://ceneo.pl" \
+curllm curllm --stealth "https://ceneo.pl" \
   -d "znajdź wszystkie produkty poniżej 200 PLN"
 ```
 
