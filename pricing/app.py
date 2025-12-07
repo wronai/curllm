@@ -183,6 +183,93 @@ INSTRUKCJE:
                 error=str(e),
             )
     
+    async def extract_with_url_resolution(
+        self,
+        url: str,
+        prompt: str,
+        stealth: bool = True
+    ) -> ExtractionResult:
+        """
+        Extract with smart URL resolution.
+        
+        If the original URL doesn't contain expected content,
+        try to find the right page via search or category navigation.
+        
+        Args:
+            url: Original URL
+            prompt: Extraction prompt (used to determine expected content)
+            stealth: Use stealth mode
+            
+        Returns:
+            ExtractionResult with extracted data or error
+        """
+        try:
+            from curllm_core.url_resolver import UrlResolver
+            from curllm_core.browser_setup import setup_browser
+            from curllm_core.stealth import apply_stealth
+            
+            logger.info(f"Smart extraction from: {url}")
+            
+            # Setup browser for URL resolution
+            browser, context = await setup_browser(
+                stealth_mode=stealth,
+                headless=True,
+            )
+            
+            try:
+                page = await context.new_page()
+                if stealth:
+                    await apply_stealth(page)
+                
+                # Resolve URL to find correct page
+                resolver = UrlResolver(page, self.executor.llm if hasattr(self.executor, 'llm') else None)
+                resolved = await resolver.resolve(url, prompt)
+                
+                final_url = resolved.resolved_url
+                resolution_info = {
+                    "original_url": url,
+                    "resolved_url": final_url,
+                    "resolution_method": resolved.resolution_method,
+                    "steps": resolved.steps_taken,
+                }
+                
+                await page.close()
+                await context.close()
+                await browser.close()
+                
+            except Exception as e:
+                logger.warning(f"URL resolution failed: {e}, using original URL")
+                final_url = url
+                resolution_info = {"error": str(e)}
+                try:
+                    await browser.close()
+                except Exception:
+                    pass
+            
+            # Now extract from the resolved URL
+            result = await self.extract_from_url(final_url, prompt, stealth)
+            
+            # Add resolution info to result
+            if result.data and isinstance(result.data, dict):
+                result.data["_url_resolution"] = resolution_info
+            elif result.success:
+                result.data = {"_url_resolution": resolution_info, "data": result.data}
+            
+            # Update URL in result
+            result.url = final_url
+            if final_url != url:
+                result.store_name = urlparse(final_url).hostname or result.store_name
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Smart extraction failed for {url}: {e}")
+            return ExtractionResult(
+                url=url,
+                success=False,
+                error=f"Smart extraction failed: {str(e)}",
+            )
+    
     async def extract_from_multiple_urls(
         self,
         urls: List[str],
@@ -520,6 +607,118 @@ def api_extract():
         
     except Exception as e:
         logger.error(f"Extraction failed: {e}")
+        return jsonify({"error": str(e), "success": False}), 500
+
+
+@app.route("/api/smart-extract", methods=["POST"])
+def api_smart_extract():
+    """
+    Smart extraction with URL resolution.
+    
+    If the URL doesn't contain expected content, automatically
+    tries to find the right page via search or category navigation.
+    
+    Request body:
+    {
+        "url": "store_url",
+        "prompt": "What to extract...",
+        "stealth": true
+    }
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({"error": "No JSON data provided"}), 400
+        
+        url = data.get("url", "")
+        prompt = data.get("prompt", "")
+        stealth = data.get("stealth", True)
+        
+        if not url:
+            return jsonify({"error": "No URL provided"}), 400
+        
+        if not prompt:
+            return jsonify({"error": "No prompt provided"}), 400
+        
+        comp = get_comparator()
+        result = run_async(comp.extract_with_url_resolution(url, prompt, stealth))
+        
+        response_data = {
+            "url": result.url,
+            "store_name": result.store_name,
+            "success": result.success,
+            "data": result.data,
+            "error": result.error,
+            "timestamp": result.timestamp,
+        }
+        
+        # Add resolution info if available
+        if result.data and isinstance(result.data, dict):
+            resolution = result.data.get("_url_resolution")
+            if resolution:
+                response_data["url_resolution"] = resolution
+        
+        return jsonify(response_data)
+        
+    except Exception as e:
+        logger.error(f"Smart extraction failed: {e}")
+        return jsonify({"error": str(e), "success": False}), 500
+
+
+@app.route("/api/recompare", methods=["POST"])
+def api_recompare():
+    """
+    Re-run comparison analysis on already extracted results.
+    
+    Request body:
+    {
+        "extraction_results": [...],
+        "comparison_prompt": "..."
+    }
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({"error": "No JSON data provided"}), 400
+        
+        extraction_results = data.get("extraction_results", [])
+        comparison_prompt = data.get("comparison_prompt", "")
+        
+        if not extraction_results:
+            return jsonify({"error": "No extraction results provided"}), 400
+        
+        if not comparison_prompt:
+            comparison_prompt = "Porównaj ceny i parametry produktów ze wszystkich sklepów. Wskaż najlepszą ofertę."
+        
+        # Convert dict results back to ExtractionResult objects
+        results = []
+        for r in extraction_results:
+            results.append(ExtractionResult(
+                url=r.get("url", ""),
+                success=r.get("success", False),
+                data=r.get("data"),
+                error=r.get("error"),
+            ))
+        
+        # Run comparison
+        comp = get_comparator()
+        comparison_result = run_async(comp.compare_results(results, comparison_prompt))
+        
+        return jsonify({
+            "success": True,
+            "comparison": {
+                "analysis": comparison_result.analysis,
+                "summary_table": comparison_result.summary_table,
+                "best_price": comparison_result.best_price,
+                "warnings": comparison_result.warnings,
+                "timestamp": comparison_result.timestamp,
+            },
+        })
+        
+    except Exception as e:
+        logger.error(f"Recompare failed: {e}")
         return jsonify({"error": str(e), "success": False}), 500
 
 

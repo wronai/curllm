@@ -157,10 +157,17 @@ Przykład: Porównaj ceny i parametry produktów, wskaż najlepszą ofertę ceno
         <div id="results" class="hidden space-y-8 fade-in">
             <!-- Extraction Results -->
             <div class="bg-white rounded-2xl shadow-xl p-8">
-                <h2 class="flex items-center gap-3 text-2xl font-bold text-gray-800 mb-6">
-                    <i data-lucide="database" class="w-7 h-7 text-green-600"></i>
-                    Wyniki ekstrakcji z poszczególnych sklepów
-                </h2>
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="flex items-center gap-3 text-2xl font-bold text-gray-800">
+                        <i data-lucide="database" class="w-7 h-7 text-green-600"></i>
+                        Wyniki ekstrakcji z poszczególnych sklepów
+                    </h2>
+                    <button onclick="rerunComparison()" id="rerunComparisonBtn"
+                            class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition flex items-center gap-2">
+                        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                        Ponów analizę porównawczą
+                    </button>
+                </div>
                 <div id="extractionResults" class="space-y-4">
                     <!-- Results will be inserted here -->
                 </div>
@@ -313,13 +320,19 @@ Przykład: Porównaj ceny i parametry produktów, wskaż najlepszą ofertę ceno
             document.getElementById('errorMessage').textContent = message;
         }
 
+        // Store all results globally for retry functionality
+        let allExtractionResults = [];
+        let currentExtractionPrompt = '';
+        
         function renderExtractionResults(results) {
             const container = document.getElementById('extractionResults');
             container.innerHTML = '';
+            allExtractionResults = results;
 
             results.forEach((result, index) => {
                 const card = document.createElement('div');
                 card.className = `result-card border rounded-xl p-6 ${result.success ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`;
+                card.id = `result-card-${index}`;
                 
                 const icon = result.success ? 'check-circle' : 'x-circle';
                 const iconColor = result.success ? 'text-green-600' : 'text-red-600';
@@ -335,7 +348,35 @@ Przykład: Porównaj ceny i parametry produktów, wskaż najlepszą ofertę ceno
                         </details>
                     `;
                 } else if (result.error) {
-                    dataHtml = `<p class="text-red-600 mt-2">${result.error}</p>`;
+                    dataHtml = `
+                        <p class="text-red-600 mt-2 mb-3">${result.error}</p>
+                        <div class="retry-section bg-white rounded-lg p-3 border border-gray-200">
+                            <div class="flex flex-col gap-2">
+                                <label class="text-sm font-medium text-gray-700">Edytuj URL i ponów:</label>
+                                <input type="url" id="retry-url-${index}" 
+                                       value="${result.url}"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500">
+                                <div class="flex gap-2">
+                                    <button onclick="retryExtraction(${index})" 
+                                            class="flex-1 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition flex items-center justify-center gap-2">
+                                        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                                        Ponów
+                                    </button>
+                                    <button onclick="smartRetryExtraction(${index})" 
+                                            class="flex-1 px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition flex items-center justify-center gap-2"
+                                            title="Automatycznie znajdzie odpowiednią stronę przez wyszukiwarkę sklepu">
+                                        <i data-lucide="wand-2" class="w-4 h-4"></i>
+                                        Smart
+                                    </button>
+                                    <button onclick="removeResult(${index})" 
+                                            class="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300 transition">
+                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                    </button>
+                                </div>
+                                <p class="text-xs text-gray-500">💡 "Smart" automatycznie wyszuka produkty na stronie sklepu</p>
+                            </div>
+                        </div>
+                    `;
                 }
 
                 card.innerHTML = `
@@ -352,6 +393,249 @@ Przykład: Porównaj ceny i parametry produktów, wskaż najlepszą ofertę ceno
                 container.appendChild(card);
             });
 
+            lucide.createIcons();
+        }
+        
+        async function retryExtraction(index) {
+            const urlInput = document.getElementById(`retry-url-${index}`);
+            const newUrl = urlInput.value.trim();
+            
+            if (!newUrl || !newUrl.startsWith('http')) {
+                alert('Proszę podać prawidłowy URL');
+                return;
+            }
+            
+            const card = document.getElementById(`result-card-${index}`);
+            card.innerHTML = `
+                <div class="flex items-center gap-4 p-4">
+                    <div class="loader" style="width: 24px; height: 24px; border-width: 3px;"></div>
+                    <span class="text-gray-600">Pobieranie danych z ${new URL(newUrl).hostname}...</span>
+                </div>
+            `;
+            
+            try {
+                const extractionPrompt = document.getElementById('extractionPrompt').value.trim();
+                const stealth = document.getElementById('stealthMode').checked;
+                
+                const response = await fetch('/api/extract', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        url: newUrl,
+                        prompt: extractionPrompt,
+                        stealth: stealth
+                    })
+                });
+                
+                const result = await response.json();
+                
+                // Update the result in our array
+                allExtractionResults[index] = result;
+                
+                // Re-render just this card
+                renderSingleResult(index, result);
+                
+            } catch (error) {
+                allExtractionResults[index] = {
+                    url: newUrl,
+                    store_name: new URL(newUrl).hostname,
+                    success: false,
+                    error: error.message
+                };
+                renderSingleResult(index, allExtractionResults[index]);
+            }
+        }
+        
+        async function smartRetryExtraction(index) {
+            const urlInput = document.getElementById(`retry-url-${index}`);
+            const newUrl = urlInput.value.trim();
+            
+            if (!newUrl || !newUrl.startsWith('http')) {
+                alert('Proszę podać prawidłowy URL');
+                return;
+            }
+            
+            const card = document.getElementById(`result-card-${index}`);
+            card.innerHTML = `
+                <div class="flex items-center gap-4 p-4">
+                    <div class="loader" style="width: 24px; height: 24px; border-width: 3px;"></div>
+                    <div>
+                        <span class="text-gray-600">🔍 Smart search: ${new URL(newUrl).hostname}...</span>
+                        <p class="text-xs text-gray-500">Szukam odpowiedniej strony z produktami...</p>
+                    </div>
+                </div>
+            `;
+            
+            try {
+                const extractionPrompt = document.getElementById('extractionPrompt').value.trim();
+                const stealth = document.getElementById('stealthMode').checked;
+                
+                const response = await fetch('/api/smart-extract', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        url: newUrl,
+                        prompt: extractionPrompt,
+                        stealth: stealth
+                    })
+                });
+                
+                const result = await response.json();
+                
+                // Update the result in our array
+                allExtractionResults[index] = result;
+                
+                // Show resolution info if available
+                if (result.url_resolution && result.url_resolution.resolved_url !== newUrl) {
+                    console.log('URL resolved:', result.url_resolution);
+                }
+                
+                // Re-render just this card
+                renderSingleResult(index, result);
+                
+            } catch (error) {
+                allExtractionResults[index] = {
+                    url: newUrl,
+                    store_name: new URL(newUrl).hostname,
+                    success: false,
+                    error: error.message
+                };
+                renderSingleResult(index, allExtractionResults[index]);
+            }
+        }
+        
+        function renderSingleResult(index, result) {
+            const card = document.getElementById(`result-card-${index}`);
+            card.className = `result-card border rounded-xl p-6 ${result.success ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`;
+            
+            const icon = result.success ? 'check-circle' : 'x-circle';
+            const iconColor = result.success ? 'text-green-600' : 'text-red-600';
+            
+            let dataHtml = '';
+            if (result.success && result.data) {
+                dataHtml = `
+                    <details class="mt-4">
+                        <summary class="cursor-pointer text-blue-600 hover:text-blue-800 font-medium">
+                            Pokaż szczegóły danych
+                        </summary>
+                        <pre class="mt-3 p-4 bg-gray-800 text-green-400 rounded-lg overflow-x-auto text-sm">${JSON.stringify(result.data, null, 2)}</pre>
+                    </details>
+                `;
+            } else if (result.error) {
+                dataHtml = `
+                    <p class="text-red-600 mt-2 mb-3">${result.error}</p>
+                    <div class="retry-section bg-white rounded-lg p-3 border border-gray-200">
+                        <div class="flex flex-col gap-2">
+                            <label class="text-sm font-medium text-gray-700">Edytuj URL i ponów:</label>
+                            <input type="url" id="retry-url-${index}" 
+                                   value="${result.url}"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500">
+                            <div class="flex gap-2">
+                                <button onclick="retryExtraction(${index})" 
+                                        class="flex-1 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition flex items-center justify-center gap-2">
+                                    <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                                    Ponów
+                                </button>
+                                <button onclick="smartRetryExtraction(${index})" 
+                                        class="flex-1 px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition flex items-center justify-center gap-2"
+                                        title="Automatycznie znajdzie odpowiednią stronę przez wyszukiwarkę sklepu">
+                                    <i data-lucide="wand-2" class="w-4 h-4"></i>
+                                    Smart
+                                </button>
+                                <button onclick="removeResult(${index})" 
+                                        class="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300 transition">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                            <p class="text-xs text-gray-500">💡 "Smart" automatycznie wyszuka produkty na stronie sklepu</p>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Show URL resolution info if available
+            let resolutionHtml = '';
+            if (result.url_resolution && result.url_resolution.resolution_method !== 'none') {
+                const r = result.url_resolution;
+                if (r.resolved_url !== r.original_url) {
+                    resolutionHtml = `
+                        <div class="mt-2 p-2 bg-purple-50 rounded-lg text-xs">
+                            <span class="text-purple-600 font-medium">🔍 URL rozwiązany:</span>
+                            <span class="text-gray-600">${r.resolution_method}</span>
+                        </div>
+                    `;
+                }
+            }
+
+            card.innerHTML = `
+                <div class="flex items-start gap-4">
+                    <i data-lucide="${icon}" class="w-6 h-6 ${iconColor} flex-shrink-0 mt-1"></i>
+                    <div class="flex-1">
+                        <h4 class="font-bold text-gray-800">${result.store_name}</h4>
+                        <a href="${result.url}" target="_blank" class="text-blue-600 hover:underline text-sm break-all">${result.url}</a>
+                        ${resolutionHtml}
+                        ${dataHtml}
+                    </div>
+                </div>
+            `;
+            
+            lucide.createIcons();
+        }
+        
+        function removeResult(index) {
+            allExtractionResults.splice(index, 1);
+            renderExtractionResults(allExtractionResults);
+        }
+        
+        async function rerunComparison() {
+            const btn = document.getElementById('rerunComparisonBtn');
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<div class="loader" style="width: 16px; height: 16px; border-width: 2px;"></div> Analizuję...';
+            btn.disabled = true;
+            
+            // Filter only successful results
+            const successfulResults = allExtractionResults.filter(r => r.success && r.data);
+            
+            if (successfulResults.length === 0) {
+                alert('Brak udanych ekstrakcji do porównania. Popraw błędne URL-e i spróbuj ponownie.');
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+                return;
+            }
+            
+            try {
+                const comparisonPrompt = document.getElementById('comparisonPrompt').value.trim() || 
+                    'Porównaj ceny i parametry produktów ze wszystkich sklepów.';
+                
+                const response = await fetch('/api/recompare', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        extraction_results: successfulResults,
+                        comparison_prompt: comparisonPrompt
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success && data.comparison) {
+                    if (data.comparison.analysis) {
+                        renderComparisonAnalysis(data.comparison.analysis);
+                    }
+                    if (data.comparison.summary_table) {
+                        renderSummaryTable(data.comparison.summary_table);
+                    }
+                    if (data.comparison.best_price) {
+                        renderBestPrice(data.comparison.best_price);
+                    }
+                }
+                
+            } catch (error) {
+                alert('Błąd podczas analizy: ' + error.message);
+            }
+            
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
             lucide.createIcons();
         }
 

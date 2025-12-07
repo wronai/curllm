@@ -30,7 +30,60 @@ from .result_store import previous_for_context as _previous_for_context
 from .tool_retry import ToolRetryManager
 
 
-async def _try_early_form_fill(executor, instruction: str, page, domain_dir, run_logger, result: Dict[str, Any], lower_instr: str) -> Optional[Dict[str, Any]]:
+async def _smart_intent_check(instruction: str, page_context: Optional[Dict[str, Any]], url: Optional[str], runtime: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Use smart intent detector to determine true user intent.
+    Returns recommended runtime params based on intent.
+    """
+    try:
+        from .intent_detector import detect_intent, TaskIntent
+        
+        intent_result = await detect_intent(instruction, page_context, url)
+        
+        # If extraction intent detected with high confidence, set no_form_fill
+        if intent_result.intent in [
+            TaskIntent.EXTRACT_PRODUCTS,
+            TaskIntent.EXTRACT_ARTICLES,
+            TaskIntent.EXTRACT_LINKS,
+            TaskIntent.EXTRACT_TABLE,
+            TaskIntent.EXTRACT_GENERIC,
+            TaskIntent.COMPARE_DATA
+        ] and intent_result.confidence >= 0.6:
+            return {
+                'intent': intent_result.intent.value,
+                'confidence': intent_result.confidence,
+                'reasoning': intent_result.reasoning,
+                'recommended_params': intent_result.recommended_params,
+                'should_skip_form_fill': True
+            }
+        
+        return {
+            'intent': intent_result.intent.value,
+            'confidence': intent_result.confidence,
+            'reasoning': intent_result.reasoning,
+            'recommended_params': intent_result.recommended_params,
+            'should_skip_form_fill': runtime.get('no_form_fill', False)
+        }
+    except Exception as e:
+        logger.debug(f"Smart intent check failed: {e}")
+        return {
+            'intent': 'unknown',
+            'confidence': 0,
+            'reasoning': f'Intent detection failed: {e}',
+            'recommended_params': {},
+            'should_skip_form_fill': runtime.get('no_form_fill', False)
+        }
+
+
+async def _try_early_form_fill(executor, instruction: str, page, domain_dir, run_logger, result: Dict[str, Any], lower_instr: str, runtime: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+    runtime = runtime or {}
+    
+    # Check if form fill should be skipped based on smart intent detection
+    if runtime.get('no_form_fill', False):
+        if run_logger:
+            run_logger.log_text("⏭️ Skipping early form fill (no_form_fill=True)")
+        return None
+    
     try:
         if any(k in lower_instr for k in ["form", "formularz", "fill", "wypełnij", "wypelnij", "submit"]):
             det_form = await executor._deterministic_form_fill(instruction, page, run_logger, domain_dir)
