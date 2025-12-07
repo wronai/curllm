@@ -1,27 +1,19 @@
-import json
-import re
-from typing import Any, Dict, Optional
+"""
+Form Fill module - DEPRECATED: Use curllm_core.form_fill package instead.
 
+This module is kept for backward compatibility.
+New code should use:
+    from curllm_core.form_fill import deterministic_form_fill, parse_form_pairs
+"""
 
-def parse_form_pairs(instruction: str | None) -> Dict[str, str]:
-    pairs: Dict[str, str] = {}
-    text = instruction or ""
-    # If JSON-like wrapper is used, parse to get inner instruction
-    try:
-        obj = json.loads(text)
-        if isinstance(obj, dict) and isinstance(obj.get("instruction"), str):
-            text = obj.get("instruction") or text
-    except Exception:
-        pass
-    # Extract key=value pairs separated by commas/semicolons/newlines
-    for m in re.finditer(r"([A-Za-ząćęłńóśźż\- ]+)\s*=\s*([^,;\n]+)", text, flags=re.IGNORECASE):
-        k = (m.group(1) or "").strip().lower()
-        v = (m.group(2) or "").strip()
-        if k and v:
-            pairs[k] = v
-    return pairs
+# Re-export from new package for backward compatibility
+from curllm_core.form_fill import (
+    parse_form_pairs,
+    robust_fill_field as _robust_fill_field_new,
+    deterministic_form_fill,
+)
 
-
+# Keep old function signatures for compatibility
 async def _robust_fill_field(page, selector: str, value: str) -> bool:
     """Robust field filling with multiple fallbacks and event triggering."""
     try:

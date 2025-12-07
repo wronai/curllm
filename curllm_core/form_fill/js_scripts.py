@@ -1,0 +1,358 @@
+"""JavaScript scripts for form detection and manipulation"""
+
+# Script to find and mark form fields
+FIND_FORM_FIELDS_JS = r"""
+() => {
+  const visible = (el) => {
+    if (!el) return false;
+    const r = el.getBoundingClientRect();
+    return r && r.width > 1 && r.height > 1 && !el.disabled && el.offsetParent !== null;
+  };
+  const intoView = (el) => { try { el.scrollIntoView({behavior:'auto', block:'center'}); } catch(e){} };
+  const add = (arr, el, score) => { if (el && visible(el)) { intoView(el); arr.push({el, score}); } };
+  
+  const getForm = (el) => {
+    if (!el) return null;
+    return el.closest('form');
+  };
+  
+  const findField = (keywords, prefer, targetForm) => {
+    const C = [];
+    const by = (sel, s) => { 
+      try { 
+        document.querySelectorAll(sel).forEach(el => {
+          if (!targetForm || getForm(el) === targetForm) {
+            add(C, el, s);
+          }
+        });
+      } catch(e){} 
+    };
+    keywords.forEach(k => {
+      by(`input[name*="${k}"]`, 12);
+      by(`input[id*="${k}"]`, 11);
+      by(`input[placeholder*="${k}"]`, 10);
+      by(`input[aria-label*="${k}"]`, 10);
+      by(`textarea[name*="${k}"]`, 12);
+      by(`textarea[id*="${k}"]`, 11);
+      by(`textarea[placeholder*="${k}"]`, 10);
+      by(`textarea[aria-label*="${k}"]`, 10);
+    });
+    // label association
+    Array.from(document.querySelectorAll('label')).forEach(lb => {
+      const t = (lb.innerText||'').toLowerCase();
+      keywords.forEach(k => {
+        if (t.includes(k)) {
+          const forId = lb.getAttribute('for');
+          let el = null;
+          if (forId) el = document.getElementById(forId);
+          if (!el) el = lb.querySelector('input,textarea');
+          if (el && (!targetForm || getForm(el) === targetForm)) {
+            add(C, el, 13);
+          }
+        }
+      });
+    });
+    if (C.length === 0 && prefer === 'input') {
+      by('input[type="email"]', 9);
+      by('input[type="text"]', 5);
+    }
+    if (prefer === 'email') {
+      by('input[type="email"]', 14);
+    }
+    C.sort((a,b)=>b.score-a.score);
+    return C.length ? C[0].el : null;
+  };
+  
+  // Find best form
+  const forms = Array.from(document.querySelectorAll('form'));
+  let bestForm = null;
+  let bestScore = 0;
+  
+  forms.forEach(form => {
+    let score = 0;
+    const nameEl = findField(['name','fullname','full name','imi','imię','nazw'], 'input', form);
+    if (nameEl) score += 3;
+    const emailEl = findField(['email','e-mail','mail','adres'], 'email', form);
+    if (emailEl) score += 3;
+    const msgEl = findField(['message','wiadomo','treść','tresc','content','komentarz'], 'textarea', form);
+    if (msgEl) score += 2;
+    const phoneEl = findField(['phone','telefon','tel'], 'input', form);
+    if (phoneEl) score += 1;
+    
+    if (score > bestScore) {
+      bestScore = score;
+      bestForm = form;
+    }
+  });
+  
+  const targetForm = bestForm;
+  const res = {};
+  const marked = new Set();
+  const mark = (el, key) => { 
+    if (!el) return null; 
+    if (el.hasAttribute('data-curllm-target') && el.getAttribute('data-curllm-target') !== key) {
+      return null;
+    }
+    el.setAttribute('data-curllm-target', key); 
+    marked.add(el);
+    return `[data-curllm-target="${key}"]`; 
+  };
+  
+  // EMAIL FIELD FIRST
+  const emailEl = findField(['email','e-mail','mail','adres'], 'email', targetForm);
+  if (emailEl && !marked.has(emailEl)) {
+    res.email = mark(emailEl, 'email');
+    res._debug_email = { id: emailEl.id, name: emailEl.name, type: emailEl.type };
+  }
+  
+  // MESSAGE FIELD
+  let msgEl = findField(['message','wiadomo','treść','tresc','content','komentarz','zapytanie','opis','description'], 'textarea', targetForm);
+  if (!msgEl && targetForm) {
+    const fallbackTextareas = targetForm.querySelectorAll('textarea');
+    for (const ta of fallbackTextareas) {
+      if (visible(ta) && !marked.has(ta)) {
+        msgEl = ta;
+        break;
+      }
+    }
+  }
+  if (msgEl && !marked.has(msgEl)) {
+    res.message = mark(msgEl, 'message');
+    res._debug_message = { id: msgEl.id, name: msgEl.name, type: msgEl.tagName };
+  }
+  
+  // NAME FIELD
+  const firstNameEl = findField(['first','firstname','first name','imi','imię'], 'input', targetForm);
+  const lastNameEl = findField(['last','lastname','last name','nazwisko','nazw'], 'input', targetForm);
+  
+  if (firstNameEl && lastNameEl && !marked.has(firstNameEl) && !marked.has(lastNameEl)) {
+    res.name_first = mark(firstNameEl, 'name_first');
+    res.name_last = mark(lastNameEl, 'name_last');
+    res._split_name = true;
+  } else {
+    const nameEl = findField(['name','fullname','full name','imi','imię','nazw'], 'input', targetForm);
+    if (nameEl && !marked.has(nameEl)) res.name = mark(nameEl, 'name');
+  }
+  
+  // SUBJECT (optional)
+  const subjCandidates = [];
+  ['subject','temat'].forEach(k => {
+    try {
+      document.querySelectorAll(`input[name*="${k}"], input[id*="${k}"], input[placeholder*="${k}"]`).forEach(el => {
+        if (el && el.offsetParent !== null && !marked.has(el) && (!targetForm || getForm(el) === targetForm)) {
+          subjCandidates.push(el);
+        }
+      });
+    } catch(e){}
+  });
+  if (subjCandidates.length > 0) {
+    res.subject = mark(subjCandidates[0], 'subject');
+  }
+  
+  // PHONE (optional)
+  const phoneEl = findField(['phone','telefon','tel'], 'input', targetForm);
+  if (phoneEl && !marked.has(phoneEl)) res.phone = mark(phoneEl, 'phone');
+  
+  // CONSENT CHECKBOX
+  const consentKeywords = ['zgod', 'akcept', 'regulamin', 'polityk', 'rodo', 'privacy', 'consent', 'agree', 'terms', 'warunki', 'akceptuj', 'potwierdzam'];
+  let consent = null;
+  let consentScore = 0;
+  
+  Array.from(document.querySelectorAll('label')).forEach(lb => {
+    const t = (lb.innerText||'').toLowerCase();
+    const matchCount = consentKeywords.filter(k => t.includes(k)).length;
+    if (matchCount > consentScore) {
+      const forId = lb.getAttribute('for');
+      let cb = null;
+      if (forId) {
+        cb = document.getElementById(forId);
+      } else {
+        cb = lb.querySelector('input[type="checkbox"]');
+        if (!cb && lb.previousElementSibling && lb.previousElementSibling.tagName === 'INPUT' && lb.previousElementSibling.type === 'checkbox') {
+          cb = lb.previousElementSibling;
+        }
+        if (!cb && lb.nextElementSibling && lb.nextElementSibling.tagName === 'INPUT' && lb.nextElementSibling.type === 'checkbox') {
+          cb = lb.nextElementSibling;
+        }
+      }
+      if (cb && cb.type === 'checkbox' && visible(cb) && (!targetForm || getForm(cb) === targetForm)) {
+        consent = cb;
+        consentScore = matchCount;
+      }
+    }
+  });
+  
+  if (!consent) {
+    Array.from(document.querySelectorAll('input[type="checkbox"]')).forEach(cb => {
+      if (!visible(cb) || (targetForm && getForm(cb) !== targetForm)) return;
+      const name = (cb.getAttribute('name')||'').toLowerCase();
+      const id = (cb.getAttribute('id')||'').toLowerCase();
+      const ariaLabel = (cb.getAttribute('aria-label')||'').toLowerCase();
+      const combined = name + ' ' + id + ' ' + ariaLabel;
+      const matchCount = consentKeywords.filter(k => combined.includes(k)).length;
+      if (matchCount > consentScore) {
+        consent = cb;
+        consentScore = matchCount;
+      }
+    });
+  }
+  
+  if (!consent && targetForm) {
+    const reqCheckbox = targetForm.querySelector('input[type="checkbox"][required]');
+    if (reqCheckbox && visible(reqCheckbox)) {
+      consent = reqCheckbox;
+    }
+  }
+  
+  if (!consent && targetForm) {
+    const allCheckboxes = Array.from(targetForm.querySelectorAll('input[type="checkbox"]')).filter(cb => visible(cb));
+    if (allCheckboxes.length === 1) {
+      consent = allCheckboxes[0];
+    }
+  }
+  
+  if (consent && visible(consent)) {
+    res.consent = mark(consent, 'consent');
+  }
+  
+  res._debug_consent = {
+    targetFormId: targetForm ? (targetForm.id || targetForm.className || 'unnamed') : 'none',
+    allCheckboxes: Array.from(document.querySelectorAll('input[type="checkbox"]')).length,
+    visibleCheckboxes: Array.from(document.querySelectorAll('input[type="checkbox"]')).filter(cb => visible(cb)).length,
+    consentFound: !!consent,
+    consentScore: consentScore
+  };
+  
+  // SUBMIT BUTTON
+  let subs = [];
+  if (targetForm) {
+    subs = Array.from(targetForm.querySelectorAll('button, input[type="submit"], .wpcf7-submit'));
+  } else {
+    subs = Array.from(document.querySelectorAll('button, input[type="submit"], .wpcf7-submit'));
+  }
+  subs = subs.filter(el => visible(el) && ((el.getAttribute('type')||'').toLowerCase()==='submit' || /(wyślij|wyslij|wyślij wiadomość|send message|send|submit)/i.test((el.innerText||el.value||'').toLowerCase())));
+  if (subs.length) res.submit = mark(subs[0], 'submit');
+  
+  if (targetForm) {
+    res._formId = targetForm.id || targetForm.getAttribute('class') || 'unnamed-form';
+  }
+  return res;
+}
+"""
+
+# Script to validate filled fields
+VALIDATE_FIELDS_JS = """
+() => {
+  const results = {};
+  const check = (key) => {
+    const el = document.querySelector(`[data-curllm-target="${key}"]`);
+    if (!el) return { found: false };
+    const value = el.value || '';
+    const checked = el.type === 'checkbox' ? el.checked : null;
+    const required = el.required || el.getAttribute('aria-required') === 'true';
+    return { 
+      found: true, 
+      value: value,
+      checked: checked,
+      isEmpty: value.trim() === '' && checked === null,
+      isChecked: checked === true,
+      required: required
+    };
+  };
+  results.name = check('name');
+  results.name_first = check('name_first');
+  results.name_last = check('name_last');
+  results.email = check('email');
+  results.subject = check('subject');
+  results.phone = check('phone');
+  results.message = check('message');
+  results.consent = check('consent');
+  return results;
+}
+"""
+
+# Script to check for submission success
+POST_SUBMIT_CHECK_JS = """
+() => {
+  const result = { success: false, errors: [], successIndicators: [] };
+  const t = (document.body.innerText||'').toLowerCase();
+  
+  if (/(dziękujemy|dziekujemy|wiadomość została|wiadomosc zostala|wiadomość wysłana|message sent|thank you|success)/i.test(t)) {
+    result.successIndicators.push('success_text_found');
+  }
+  if (document.querySelector('.wpcf7-mail-sent-ok, .wpcf7-response-output, .elementor-message-success, .elementor-alert.elementor-alert-success')) {
+    result.successIndicators.push('success_element_found');
+  }
+  
+  if (result.successIndicators.length > 0) {
+    result.success = true;
+    return result;
+  }
+  
+  const targetForm = document.querySelector('[data-curllm-target="submit"]')?.closest('form');
+  if (targetForm) {
+    const errorCheckboxes = targetForm.querySelectorAll('input[type="checkbox"][required]:not(:checked)');
+    errorCheckboxes.forEach(cb => {
+      const label = cb.labels?.[0]?.innerText || cb.id || 'checkbox';
+      result.errors.push({ type: 'required_checkbox_unchecked', field: label.substring(0, 100) });
+    });
+    
+    const emptyRequired = targetForm.querySelectorAll('input[required]:not([type="checkbox"]), textarea[required]');
+    emptyRequired.forEach(inp => {
+      if (!inp.value?.trim()) {
+        const label = inp.labels?.[0]?.innerText || inp.placeholder || inp.id || 'field';
+        result.errors.push({ type: 'required_field_empty', field: label.substring(0, 100) });
+      }
+    });
+    
+    const errorMessages = targetForm.querySelectorAll('.forminator-error-message, .wpcf7-not-valid-tip, .error-message');
+    errorMessages.forEach(msg => {
+      if (msg.offsetParent !== null && msg.innerText?.trim()) {
+        result.errors.push({ type: 'validation_error', message: msg.innerText.substring(0, 150) });
+      }
+    });
+  }
+  
+  return result;
+}
+"""
+
+# Script to trigger events on all form fields
+TRIGGER_EVENTS_JS = """
+() => {
+  const qs = '[data-curllm-target="name"], [data-curllm-target="email"], [data-curllm-target="subject"], [data-curllm-target="phone"], [data-curllm-target="message"]';
+  document.querySelectorAll(qs).forEach(el => {
+    try { el.dispatchEvent(new Event('input', {bubbles:true})); } catch(e){}
+    try { el.blur(); } catch(e){}
+  });
+}
+"""
+
+# Script to auto-fix blocking issues (check unchecked required checkboxes)
+AUTO_FIX_JS = """
+() => {
+  const fixed = [];
+  const targetForm = document.querySelector('[data-curllm-target="submit"]')?.closest('form');
+  if (!targetForm) return { fixed, success: false };
+  
+  const requiredCheckboxes = targetForm.querySelectorAll('input[type="checkbox"][required], input[type="checkbox"][aria-required="true"]');
+  requiredCheckboxes.forEach(cb => {
+    if (!cb.checked && cb.offsetParent !== null) {
+      try {
+        cb.click();
+        fixed.push({ type: 'checkbox_checked', element: cb.id || cb.name || 'unnamed' });
+      } catch(e) {
+        try {
+          const label = cb.labels?.[0] || cb.closest('label');
+          if (label) {
+            label.click();
+            fixed.push({ type: 'checkbox_checked_via_label', element: cb.id || cb.name || 'unnamed' });
+          }
+        } catch(e2) {}
+      }
+    }
+  });
+  
+  return { fixed, success: fixed.length > 0 };
+}
+"""

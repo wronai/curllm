@@ -33,7 +33,7 @@ async def handle_widget_captcha(page, current_url: Optional[str], solver, run_lo
         return False
     try:
         info = await page.evaluate(
-            """
+            r"""
             () => {
               const q = (sel) => document.querySelector(sel);
               const byAttr = document.querySelector('[data-sitekey]');
