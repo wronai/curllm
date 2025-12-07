@@ -111,6 +111,11 @@ class DSLExecutor:
             if data:
                 self.logger.log_code("json", json.dumps(data, indent=2, ensure_ascii=False)[:1000])
     
+    def _log_code(self, lang: str, code: str):
+        """Log code block in specified language."""
+        if self.logger:
+            self.logger.log_code(lang, code)
+    
     async def execute(
         self,
         url: str,
@@ -169,6 +174,37 @@ class DSLExecutor:
         
         execution_time_ms = int((time.time() - start_time) * 1000)
         
+        # 3.5. Filter specs data (remove pricing, stock info) for extract_specs task
+        if result_data and task == "extract_specs" and isinstance(result_data, dict):
+            try:
+                from functions.extractors.specs.filter_specs import filter_specs, categorize_specs
+                
+                # Categorize and filter
+                categories = categorize_specs(result_data)
+                filtered = filter_specs(result_data, strict=False)
+                
+                # Log what was filtered
+                pricing_count = len(categories.get("pricing", {}))
+                stock_count = len(categories.get("stock", {}))
+                technical_count = len(categories.get("technical", {}))
+                
+                if pricing_count > 0 or stock_count > 0:
+                    self._log(f"📊 Filtered: {technical_count} technical, {pricing_count} pricing, {stock_count} stock items")
+                
+                # Store original and filtered data
+                result_data = {
+                    "specifications": filtered,
+                    "categories": categories,
+                    "original_count": len(result_data),
+                    "filtered_count": len(filtered),
+                }
+            except ImportError:
+                # Fallback if filter module not available
+                result_data = {"specifications": result_data}
+            except Exception as e:
+                self._log(f"⚠️ Filtering failed: {e}")
+                result_data = {"specifications": result_data}
+        
         # 4. Validate results
         validation_score = 0.0
         suggestions = []
@@ -214,6 +250,15 @@ class DSLExecutor:
             
             dsl_path = self.parser.save_strategy(strategy, self.dsl_dir)
             self._log(f"💾 Saved strategy to {dsl_path}")
+            
+            # Log the YAML content
+            try:
+                with open(dsl_path, 'r', encoding='utf-8') as f:
+                    yaml_content = f.read()
+                self._log("\n📄 DSL Strategy YAML:\n")
+                self._log_code("yaml", yaml_content)
+            except Exception as e:
+                self._log(f"⚠️ Could not read YAML file: {e}")
             
             record.dsl_file = dsl_path
         

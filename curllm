@@ -766,14 +766,15 @@ export_html() {
 export_xml() {
     local outfile="$1"; shift || true
     need_jq || return 1
-    printf '%s' "$RESPONSE" | json_select_rows | jq -r '
-      def esc($s): ($s|tostring|gsub("&";"&amp;")|gsub("<";"&lt;")|gsub(">";"&gt;")|gsub("\"";"&quot;"));
-      "<rows>" +
-      ( .[] |
-        "<row>" + ( to_entries | map("<" + .key + ">" + esc(.value) + "</" + .key + ">") | join("") ) + "</row>"
-      ) +
-      "</rows>"
-    ' > "$outfile"
+    {
+        echo '<?xml version="1.0" encoding="UTF-8"?>'
+        echo '<data>'
+        printf '%s' "$RESPONSE" | json_select_rows | jq -r '
+          def esc($s): ($s|tostring|gsub("&";"&amp;")|gsub("<";"&lt;")|gsub(">";"&gt;")|gsub("\"";"&quot;"));
+          .[] | "<item>" + ( to_entries | map("<" + .key + ">" + esc(.value) + "</" + .key + ">") | join("") ) + "</item>"
+        '
+        echo '</data>'
+    } > "$outfile"
     echo -e "${GREEN}✓ XML exported to${NC} $outfile" 1>&2
 }
 
@@ -1117,11 +1118,29 @@ EOF
     fi
 
     # Detect server error and skip export
-    if printf '%s' "$RESPONSE" | jq -e '(.success == false) or (.error != null)' >/dev/null 2>&1; then
-        { echo -e "${RED}Server returned an error; skipping export.${NC}"; } 1>&2
+    # Check for .success == false OR .error OR .result.error (navigation errors)
+    if printf '%s' "$RESPONSE" | jq -e '(.success == false) or (.error != null) or (.result.error != null)' >/dev/null 2>&1; then
+        { echo -e "${RED}Server returned an error; skipping formatted export.${NC}"; } 1>&2
         if [ -n "$OUTPUT_FILE" ]; then
-            echo "$RESPONSE" > "$OUTPUT_FILE"
-            { echo -e "${YELLOW}Response saved to: $OUTPUT_FILE${NC}"; } 1>&2
+            # Still try to export in requested format if possible
+            DETECTED_FORMAT=$(detect_format_from_extension "$OUTPUT_FILE")
+            case "$DETECTED_FORMAT" in
+                yaml)
+                    printf '%s' "$RESPONSE" | python3 -c "
+import sys, json
+try:
+    import yaml
+    data = json.load(sys.stdin)
+    print(yaml.dump(data, allow_unicode=True, default_flow_style=False, sort_keys=False))
+except ImportError:
+    print(json.dumps(json.load(sys.stdin), indent=2, ensure_ascii=False))
+" > "$OUTPUT_FILE"
+                    ;;
+                *)
+                    echo "$RESPONSE" | jq '.' > "$OUTPUT_FILE" 2>/dev/null || echo "$RESPONSE" > "$OUTPUT_FILE"
+                    ;;
+            esac
+            { echo -e "${YELLOW}Error response saved to: $OUTPUT_FILE${NC}"; } 1>&2
         fi
         exit 1
     fi

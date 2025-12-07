@@ -403,6 +403,29 @@ class CurllmExecutor:
             # Intelligent success evaluation
             success, reason, eval_metadata = evaluate_run_success(result, instruction, run_logger)
             
+            # Validate results against instruction (check for missing fields)
+            try:
+                from .result_corrector import analyze_and_report, detect_required_fields
+                
+                correction = analyze_and_report(instruction, result.get("data"), run_logger)
+                
+                if correction.missing_fields:
+                    eval_metadata["missing_fields"] = correction.missing_fields
+                    eval_metadata["warnings"].append(
+                        f"Missing requested fields: {', '.join(correction.missing_fields)}"
+                    )
+                    
+                    # Add suggestions to hints
+                    if correction.suggestions:
+                        hints = (result.get("meta", {}) or {}).get("hints", [])
+                        hints.extend(correction.suggestions)
+                        if "meta" not in result:
+                            result["meta"] = {}
+                        result["meta"]["hints"] = hints
+                        
+            except Exception as e:
+                logger.debug(f"Result correction failed: {e}")
+            
             res = {
                 "success": success,
                 "reason": reason,

@@ -100,6 +100,38 @@ def evaluate_run_success(
                     "Navigation failed: Timeout exceeded (page took too long to load)",
                     metadata
                 )
+            
+            # Check for invalid URL (e.g., "--yaml" passed as URL)
+            if "invalid url" in error_msg.lower() or "cannot navigate" in error_msg.lower():
+                url_attempted = ""
+                if isinstance(diagnostics, dict):
+                    url_attempted = diagnostics.get("url", "")
+                metadata["failures"].append(f"Invalid URL: {url_attempted}")
+                if run_logger:
+                    run_logger.log_text(f"❌ FAILURE: Invalid URL - '{url_attempted}'")
+                    run_logger.log_text("   Check command line arguments - flag may have been parsed as URL")
+                return (
+                    False,
+                    f"Navigation failed: Invalid URL '{url_attempted}' - check command syntax",
+                    metadata
+                )
+            
+            # Check for DNS resolution failure
+            if isinstance(diagnostics, dict):
+                if diagnostics.get("dns_resolves") is False:
+                    url_attempted = diagnostics.get("url", "unknown")
+                    dns_error = diagnostics.get("dns_error", "")
+                    metadata["failures"].append(f"DNS resolution failed for: {url_attempted}")
+                    if run_logger:
+                        run_logger.log_text(f"❌ FAILURE: Cannot resolve hostname")
+                        run_logger.log_text(f"   URL: {url_attempted}")
+                        if dns_error:
+                            run_logger.log_text(f"   Error: {dns_error}")
+                    return (
+                        False,
+                        f"Navigation failed: Cannot resolve hostname '{url_attempted}'",
+                        metadata
+                    )
     
     # Check 2: Zero steps taken
     metadata["checks_performed"].append("steps_check")
@@ -186,7 +218,7 @@ def evaluate_run_success(
         # Check for empty results
         if isinstance(data, dict):
             # Check common extraction result keys
-            extraction_keys = ["links", "emails", "phones", "articles", "products"]
+            extraction_keys = ["links", "emails", "phones", "articles", "products", "items", "specifications"]
             has_data = False
             for key in extraction_keys:
                 if key in data and data[key]:
@@ -197,6 +229,41 @@ def evaluate_run_success(
                 metadata["warnings"].append("Extraction task but minimal data returned")
                 if run_logger:
                     run_logger.log_text("⚠️  WARNING: Extraction task but minimal data returned")
+        
+        # Check 4b: Verify required fields from instruction are present
+        metadata["checks_performed"].append("required_fields_check")
+        
+        # Detect required fields from instruction
+        required_field_keywords = {
+            "price": ["price", "cena", "koszt", "cost", "zł", "pln"],
+            "name": ["name", "nazwa", "title", "tytuł"],
+            "description": ["description", "opis"],
+            "rating": ["rating", "ocena", "review"],
+        }
+        
+        required_fields = []
+        for field, keywords in required_field_keywords.items():
+            if any(kw in instruction_lower for kw in keywords):
+                required_fields.append(field)
+        
+        if required_fields:
+            # Check if required fields are present in data
+            sample = None
+            if isinstance(data, dict):
+                if "items" in data and data["items"]:
+                    sample = data["items"][0]
+                elif "specifications" not in data:
+                    sample = data
+            elif isinstance(data, list) and data:
+                sample = data[0]
+            
+            if sample and isinstance(sample, dict):
+                missing = [f for f in required_fields if f not in sample]
+                
+                if missing:
+                    metadata["warnings"].append(f"Missing fields from instruction: {', '.join(missing)}")
+                    if run_logger:
+                        run_logger.log_text(f"⚠️  WARNING: Instruction mentions '{', '.join(missing)}' but not in results")
     
     # Check 5: Navigation tasks
     if any(kw in instruction_lower for kw in ["navigate", "go to", "open", "visit", "przejdź"]):
