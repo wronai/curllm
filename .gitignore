@@ -1,3 +1,6 @@
+product*.*
+dsl*.*
+dsl/
 .idea
 package-lock.json
 test-results.txt

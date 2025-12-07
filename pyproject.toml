@@ -47,6 +47,7 @@ curllm-setup = "curllm_core.cli.setup:main"
 curllm-doctor = "curllm_core.cli.doctor:main"
 curllm-web = "curllm_core.cli.web:main"
 curllm-flow = "curllm_core.cli.flow:main"
+curllm-feedback = "curllm_core.cli.feedback:main"
 
 [tool.setuptools]
 # Install non-Python CLI script and top-level modules
@@ -54,4 +55,4 @@ script-files = ["curllm"]
 py-modules = ["curllm_server", "bql_parser", "curllm_web"]
 
 [tool.setuptools.packages.find]
-include = ["curllm_core*"]
+include = ["curllm_core*", "functions*"]

@@ -329,6 +329,10 @@ class TestExtractionSpeed:
 [x] Specs extraction (specs_table, dl_pairs)
 [x] Metrics collector (JSONL)
 [x] Skip LLM validation dla specs
+[x] Feedback system (curllm_core/feedback.py)
+[x] Atomic functions framework (functions/)
+[x] Function generator (LLM-powered)
+[x] CLI: curllm-feedback
 [ ] Fix parsowania specs key/value
 [ ] Accept cookies pre-action
 ```
