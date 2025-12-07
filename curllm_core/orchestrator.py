@@ -31,6 +31,8 @@ from .url_resolver import UrlResolver
 from .url_types import TaskGoal
 from .stealth import StealthConfig
 from .llm_element_finder import LLMElementFinder
+from .orchestrator_steps import StepExecutor
+from .result_validator import ResultValidator, ValidationLevel, ValidationResult
 
 # Import logging package
 try:
@@ -187,7 +189,22 @@ class Orchestrator:
                 result.success = False
                 result.error = f"Step {failed_steps[0].step_index + 1} failed: {failed_steps[0].error}"
             else:
-                result.success = True
+                # Check verification step result if it exists
+                verification_passed = True
+                for sr in step_results:
+                    if sr.step_type == "verify" and sr.data:
+                        verified = sr.data.get("verified", True)
+                        has_error = sr.data.get("has_error_indicator", False)
+                        if not verified or has_error:
+                            verification_passed = False
+                            self._log("warning", f"⚠️ Verification check failed (success_indicator={sr.data.get('has_success_indicator')}, error_indicator={has_error})")
+                            break
+                
+                if verification_passed:
+                    result.success = True
+                else:
+                    result.success = False
+                    result.error = "Verification failed: no success confirmation found on page"
             
             # Get final state
             if self.page:
@@ -263,6 +280,18 @@ class Orchestrator:
         
         self.resolver = UrlResolver(self.page, llm=self.llm)
         self.element_finder = LLMElementFinder(llm=self.llm, page=self.page)
+        
+        # Initialize step executor for modular step handling
+        self.step_executor = StepExecutor(
+            page=self.page,
+            resolver=self.resolver,
+            element_finder=self.element_finder,
+            llm=self.llm,
+            log_fn=self._log
+        )
+        
+        # Initialize result validator
+        self.result_validator = ResultValidator(ValidationLevel.NORMAL)
         
         # Initialize screenshot manager from curllm_logs
         if HAS_LOG_PACKAGE and ScreenshotManager:
@@ -381,314 +410,23 @@ class Orchestrator:
         step: TaskStep,
         parsed: ParsedCommand
     ) -> Optional[Dict[str, Any]]:
-        """Execute a single step"""
+        """
+        Execute a single step.
         
+        Delegates to StepExecutor for most steps, but handles
+        screenshot specially to use the orchestrator's screenshot path.
+        """
         step_type = step.step_type
         params = step.params
         
-        if step_type == StepType.NAVIGATE:
-            url = params.get("url")
-            await self.page.goto(url, wait_until="domcontentloaded", timeout=step.timeout_ms)
-            return {"url": self.page.url}
-        
-        elif step_type == StepType.RESOLVE:
-            goal_str = params.get("goal")
-            goal = TaskGoal(goal_str) if goal_str else TaskGoal.GENERIC
-            result = await self.resolver.resolve_for_goal(self.page.url, goal)
-            return {
-                "resolved_url": result.resolved_url,
-                "success": result.success,
-                "method": result.resolution_method
-            }
-        
-        elif step_type == StepType.ANALYZE:
-            # Analyze page structure
-            page_info = await self.page.evaluate("""
-                () => ({
-                    title: document.title,
-                    url: location.href,
-                    forms: document.querySelectorAll('form').length,
-                    inputs: document.querySelectorAll('input, textarea').length,
-                    products: document.querySelectorAll('[class*="product"], [class*="offer"]').length
-                })
-            """)
-            return page_info
-        
-        elif step_type == StepType.WAIT:
-            ms = params.get("ms", 1000)
-            await asyncio.sleep(ms / 1000)
-            return {"waited_ms": ms}
-        
-        elif step_type == StepType.SEARCH:
-            query = params.get("query", "")
-            
-            # Use LLM Element Finder to locate search input
-            self._log("step", f"  🔍 Finding search input using {'LLM' if self.llm else 'heuristics'}...")
-            
-            search_match = await self.element_finder.find_search_input()
-            search_input = None
-            
-            if search_match and search_match.selector:
-                self._log("step", f"  Found: {search_match.selector} (confidence: {search_match.confidence:.0%})")
-                try:
-                    search_input = await self.page.query_selector(search_match.selector)
-                    if search_input and not await search_input.is_visible():
-                        await search_input.scroll_into_view_if_needed()
-                except Exception as e:
-                    self._log("step", f"  Selector failed: {e}")
-            
-            if search_input:
-                # Clear and fill using intelligent typing
-                await search_input.click()
-                await search_input.fill("")
-                await search_input.type(query, delay=50)
-                await asyncio.sleep(300)
-                
-                # Submit search
-                await self.page.keyboard.press("Enter")
-                
-                # Wait for navigation or results
-                try:
-                    await self.page.wait_for_load_state("domcontentloaded", timeout=10000)
-                except Exception:
-                    await asyncio.sleep(2000)
-                
-                return {
-                    "query": query, 
-                    "filled": True, 
-                    "url": self.page.url,
-                    "method": "llm" if self.llm else "heuristic",
-                    "selector": search_match.selector if search_match else None
-                }
-            else:
-                # Try URL-based search as fallback
-                from urllib.parse import urljoin, quote_plus
-                current_url = self.page.url
-                search_url = urljoin(current_url, f"/search?q={quote_plus(query)}")
-                try:
-                    await self.page.goto(search_url, timeout=10000)
-                    return {"query": query, "filled": False, "fallback": "url", "url": self.page.url}
-                except Exception:
-                    pass
-            
-            return {"query": query, "filled": False, "url": self.page.url}
-        
-        elif step_type == StepType.FILL_FIELD:
-            value = params.get("value", "")
-            field_type = params.get("field_type", "")
-            
-            # Use LLM Element Finder to locate the field
-            self._log("step", f"  🔍 Finding {field_type} field using {'LLM' if self.llm else 'heuristics'}...")
-            
-            field_match = await self.element_finder.find_form_field(
-                field_purpose=field_type,
-                value_to_fill=value
-            )
-            
-            if field_match and field_match.selector:
-                self._log("step", f"  Found: {field_match.selector} (confidence: {field_match.confidence:.0%})")
-                try:
-                    el = await self.page.query_selector(field_match.selector)
-                    if el:
-                        await el.scroll_into_view_if_needed()
-                        if await el.is_visible():
-                            await el.click()
-                            await el.fill("")
-                            await el.type(value, delay=30)
-                            return {
-                                "selector": field_match.selector,
-                                "filled": True,
-                                "value": value[:20],
-                                "method": "llm" if self.llm else "heuristic",
-                                "confidence": field_match.confidence
-                            }
-                except Exception as e:
-                    self._log("step", f"  Fill failed: {e}")
-            
-            raise Exception(f"Could not find {field_type} field")
-        
-        elif step_type == StepType.FILL_FORM:
-            # Fill multiple fields using LLM Element Finder
-            form_data = params.get("data", {})
-            filled = []
-            
-            for field_name, value in form_data.items():
-                field_match = await self.element_finder.find_form_field(
-                    field_purpose=field_name,
-                    value_to_fill=value
-                )
-                
-                if field_match and field_match.selector:
-                    try:
-                        el = await self.page.query_selector(field_match.selector)
-                        if el and await el.is_visible():
-                            await el.fill(value)
-                            filled.append(field_name)
-                    except Exception:
-                        continue
-            
-            return {"filled_fields": filled, "method": "llm" if self.llm else "heuristic"}
-        
-        elif step_type == StepType.CLICK:
-            selector = params.get("selector", "")
-            await self.page.click(selector, timeout=step.timeout_ms)
-            return {"clicked": selector}
-        
-        elif step_type == StepType.SUBMIT:
-            wait_after = params.get("wait_after_ms", 2000)
-            form_context = params.get("form_context", "form")
-            
-            # Use LLM Element Finder to locate submit button
-            self._log("step", f"  🔍 Finding submit button using {'LLM' if self.llm else 'heuristics'}...")
-            
-            button_match = await self.element_finder.find_submit_button(form_context)
-            
-            if button_match and button_match.selector:
-                self._log("step", f"  Found: {button_match.selector} (confidence: {button_match.confidence:.0%})")
-                try:
-                    el = await self.page.query_selector(button_match.selector)
-                    if el and await el.is_visible():
-                        await el.click()
-                        await asyncio.sleep(wait_after / 1000)
-                        return {
-                            "submitted": True,
-                            "selector": button_match.selector,
-                            "method": "llm" if self.llm else "heuristic"
-                        }
-                except Exception as e:
-                    self._log("step", f"  Submit failed: {e}")
-            
-            raise Exception("Could not find submit button")
-        
-        elif step_type == StepType.EXTRACT:
-            extract_type = params.get("type", "page_content")
-            
-            if extract_type == "products":
-                # Use intelligent extraction - analyze visible products on page
-                products = await self.page.evaluate("""
-                    () => {
-                        // Find product containers using multiple strategies
-                        const strategies = [
-                            // Common class patterns
-                            '[class*="product"]',
-                            '[class*="offer"]', 
-                            '[class*="item"]',
-                            '[class*="card"]',
-                            // Data attributes
-                            '[data-product]',
-                            '[data-offer]',
-                            // List items in product grids
-                            '.products li',
-                            '.catalog li',
-                            '.listing li',
-                        ];
-                        
-                        let items = [];
-                        for (const sel of strategies) {
-                            const found = document.querySelectorAll(sel);
-                            if (found.length > items.length) {
-                                items = Array.from(found);
-                            }
-                        }
-                        
-                        // Score and filter: real products have price-like text
-                        const priceRegex = /\\d+[,.]\\d{2}\\s*(zł|PLN|EUR|USD|€|\\$)/i;
-                        
-                        return items
-                            .filter(el => el.offsetParent !== null)  // visible
-                            .filter(el => priceRegex.test(el.innerText))  // has price
-                            .slice(0, 20)
-                            .map(el => ({
-                                text: el.innerText.slice(0, 300).replace(/\\s+/g, ' '),
-                                link: el.querySelector('a')?.href,
-                                hasPrice: true
-                            }));
-                    }
-                """)
-                return {"products": products, "count": len(products), "method": "intelligent"}
-            
-            elif extract_type == "cart_items":
-                cart = await self.page.evaluate("""
-                    () => ({
-                        items: document.querySelectorAll('[class*="cart-item"], [class*="basket-item"]').length,
-                        total: document.querySelector('[class*="total"], [class*="sum"]')?.innerText
-                    })
-                """)
-                return cart
-            
-            elif extract_type == "pricing":
-                # Extract pricing/service price information
-                pricing = await self.page.evaluate("""
-                    () => {
-                        const priceRegex = /\\d+[,.]?\\d*\\s*(zł|PLN|EUR|USD|€|\\$|)/gi;
-                        const results = [];
-                        
-                        // Look for pricing tables, cards, or lists
-                        const selectors = [
-                            '[class*="price"]',
-                            '[class*="cennik"]',
-                            '[class*="pricing"]',
-                            '[class*="plan"]',
-                            '[class*="package"]',
-                            '[class*="offer"]',
-                            '[class*="service"]',
-                            'table tr',
-                            '.card',
-                            'li',
-                        ];
-                        
-                        for (const sel of selectors) {
-                            document.querySelectorAll(sel).forEach(el => {
-                                if (el.offsetParent === null) return; // not visible
-                                
-                                const text = el.innerText.trim();
-                                const prices = text.match(priceRegex);
-                                
-                                if (prices && text.length < 500) {
-                                    results.push({
-                                        text: text.replace(/\\s+/g, ' ').slice(0, 300),
-                                        prices: prices,
-                                        element: el.tagName.toLowerCase()
-                                    });
-                                }
-                            });
-                            
-                            if (results.length >= 20) break;
-                        }
-                        
-                        // Deduplicate by text
-                        const seen = new Set();
-                        return results.filter(r => {
-                            const key = r.text.slice(0, 50);
-                            if (seen.has(key)) return false;
-                            seen.add(key);
-                            return true;
-                        }).slice(0, 20);
-                    }
-                """)
-                return {"pricing": pricing, "count": len(pricing), "method": "intelligent"}
-            
-            else:
-                content = await self.page.evaluate("() => document.body.innerText.slice(0, 5000)")
-                return {"content": content}
-        
-        elif step_type == StepType.VERIFY:
-            expected = params.get("expected", "")
-            # Simple verification - check page content
-            content = await self.page.evaluate("() => document.body.innerText.toLowerCase()")
-            
-            success_indicators = ["dziękujemy", "thank", "sukces", "success", "wysłano", "sent"]
-            is_success = any(ind in content for ind in success_indicators)
-            
-            return {"verified": is_success, "expected": expected}
-        
-        elif step_type == StepType.SCREENSHOT:
+        # Handle screenshot specially (needs orchestrator's path)
+        if step_type == StepType.SCREENSHOT:
             name = params.get("name", "screenshot")
             path = await self._take_screenshot(name)
             return {"path": path}
         
-        else:
-            raise Exception(f"Unknown step type: {step_type}")
+        # Delegate to StepExecutor for all other steps
+        return await self.step_executor.execute(step, parsed)
     
     async def _take_screenshot(self, name: str) -> str:
         """Take screenshot and return path"""

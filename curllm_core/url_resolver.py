@@ -61,40 +61,49 @@ class UrlResolver:
         self.run_logger = run_logger
     
     def detect_goal(self, instruction: str) -> TaskGoal:
-        """Detect user's goal from instruction with fuzzy matching"""
+        """
+        Detect user's goal from instruction using intelligent methods.
+        
+        Uses GoalDetectorHybrid which combines:
+        1. Pattern matching (fast, specific)
+        2. TF-IDF statistical similarity (broader matching)
+        3. LLM classification (when available)
+        """
+        try:
+            from .goal_detector_llm import GoalDetectorHybrid
+            
+            detector = GoalDetectorHybrid(self.llm)
+            result = detector.detect_goal_sync(instruction)
+            
+            if result.confidence > 0.3:
+                return result.goal
+        except Exception as e:
+            logger.debug(f"Intelligent goal detection failed: {e}")
+        
+        # Fallback to simple pattern matching
+        return self._detect_goal_fallback(instruction)
+    
+    def _detect_goal_fallback(self, instruction: str) -> TaskGoal:
+        """Simple fallback goal detection using patterns"""
         instr_lower = instruction.lower()
-        instr_normalized = self._normalize_polish(instr_lower)
         
-        scores = {}
-        for goal, keywords in GOAL_KEYWORDS.items():
-            score = 0
-            for kw in keywords:
-                kw_lower = kw.lower()
-                kw_normalized = self._normalize_polish(kw_lower)
-                
-                # Multi-word phrases need stricter matching
-                is_phrase = ' ' in kw_lower
-                
-                # Exact match (highest score)
-                if kw_lower in instr_lower:
-                    score += 3 if is_phrase else 2
-                # Normalized match (handles accents)
-                elif kw_normalized in instr_normalized:
-                    score += 2.5 if is_phrase else 1.5
-                # For single words only: stem matching
-                elif not is_phrase:
-                    # Stem match (zalogować → zaloguj)
-                    if len(kw) >= 5 and kw_lower[:5] in instr_lower:
-                        score += 1
-                    # Word stem in text
-                    elif len(kw) >= 6 and any(kw_lower[:6] in word for word in instr_lower.split()):
-                        score += 0.8
-            if score > 0:
-                scores[goal] = score
+        # Simple keyword patterns
+        patterns = [
+            (TaskGoal.FIND_CART, ['koszyk', 'cart', 'basket']),
+            (TaskGoal.FIND_LOGIN, ['zaloguj', 'login', 'logowanie', 'konto']),
+            (TaskGoal.FIND_REGISTER, ['zarejestruj', 'register', 'rejestracja']),
+            (TaskGoal.FIND_CONTACT_FORM, ['kontakt', 'contact', 'wiadomość', 'support']),
+            (TaskGoal.FIND_SHIPPING, ['dostawa', 'shipping', 'wysyłka']),
+            (TaskGoal.FIND_RETURNS, ['zwrot', 'return', 'reklamacja']),
+            (TaskGoal.FIND_FAQ, ['faq', 'pytania']),
+            (TaskGoal.FIND_HELP, ['pomoc', 'help']),
+            (TaskGoal.FIND_CAREERS, ['kariera', 'praca', 'jobs', 'careers']),
+            (TaskGoal.FIND_BLOG, ['blog', 'artykuły', 'articles']),
+        ]
         
-        if scores:
-            best_goal = max(scores, key=scores.get)
-            return best_goal
+        for goal, keywords in patterns:
+            if any(kw in instr_lower for kw in keywords):
+                return goal
         
         return TaskGoal.GENERIC
     
