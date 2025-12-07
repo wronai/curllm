@@ -20,7 +20,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, Response, jsonify, render_template, request
 
 # Add parent directory to path to import curllm_core
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -470,6 +470,116 @@ def api_extract():
         
     except Exception as e:
         logger.error(f"Extraction failed: {e}")
+        return jsonify({"error": str(e), "success": False}), 500
+
+
+@app.route("/api/compare/stream", methods=["POST"])
+def api_compare_stream():
+    """
+    Streaming API endpoint for price comparison with real-time logs.
+    
+    Uses Server-Sent Events (SSE) to stream progress updates.
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({"error": "No JSON data provided"}), 400
+        
+        urls = data.get("urls", [])
+        extraction_prompt = data.get("extraction_prompt", "")
+        comparison_prompt = data.get("comparison_prompt", "")
+        stealth = data.get("stealth", True)
+        
+        if not urls:
+            return jsonify({"error": "No URLs provided"}), 400
+        
+        if not extraction_prompt:
+            return jsonify({"error": "No extraction prompt provided"}), 400
+        
+        if not comparison_prompt:
+            comparison_prompt = "Porównaj ceny i parametry produktów ze wszystkich sklepów. Wskaż najlepszą ofertę."
+        
+        def generate():
+            """Generator for SSE streaming"""
+            comp = get_comparator()
+            extraction_results = []
+            processed = 0
+            
+            # Stage 1: Extract from each URL
+            yield f"data: {json.dumps({'type': 'stage', 'message': 'Etap 1: Ekstrakcja danych z poszczególnych sklepów...'})}\n\n"
+            
+            for i, url in enumerate(urls):
+                store_name = urlparse(url).hostname or "Unknown"
+                yield f"data: {json.dumps({'type': 'log', 'level': 'info', 'message': f'[{i+1}/{len(urls)}] Pobieram: {store_name}...'})}\n\n"
+                
+                try:
+                    result = run_async(comp.extract_from_url(url, extraction_prompt, stealth))
+                    extraction_results.append(result)
+                    processed += 1
+                    
+                    yield f"data: {json.dumps({'type': 'progress', 'processed': processed, 'total': len(urls), 'store': store_name, 'success': result.success, 'error': result.error})}\n\n"
+                    
+                except Exception as e:
+                    processed += 1
+                    extraction_results.append(ExtractionResult(
+                        url=url,
+                        success=False,
+                        error=str(e),
+                    ))
+                    yield f"data: {json.dumps({'type': 'progress', 'processed': processed, 'total': len(urls), 'store': store_name, 'success': False, 'error': str(e)})}\n\n"
+            
+            # Stage 2: Comparison
+            yield f"data: {json.dumps({'type': 'stage', 'message': 'Etap 2: Analiza porównawcza z użyciem LLM...'})}\n\n"
+            
+            try:
+                comparison_result = run_async(comp.compare_results(extraction_results, comparison_prompt))
+                yield f"data: {json.dumps({'type': 'log', 'level': 'success', 'message': 'Analiza porównawcza zakończona'})}\n\n"
+            except Exception as e:
+                comparison_result = ComparisonResult(
+                    analysis=f"Błąd analizy: {str(e)}",
+                    summary_table=[],
+                    warnings=[str(e)],
+                )
+                yield f"data: {json.dumps({'type': 'log', 'level': 'error', 'message': f'Błąd analizy: {str(e)}'})}\n\n"
+            
+            # Final result
+            final_result = {
+                "success": True,
+                "extraction_results": [
+                    {
+                        "url": r.url,
+                        "store_name": r.store_name,
+                        "success": r.success,
+                        "data": r.data,
+                        "error": r.error,
+                        "timestamp": r.timestamp,
+                    }
+                    for r in extraction_results
+                ],
+                "comparison": {
+                    "analysis": comparison_result.analysis,
+                    "summary_table": comparison_result.summary_table,
+                    "best_price": comparison_result.best_price,
+                    "warnings": comparison_result.warnings,
+                    "timestamp": comparison_result.timestamp,
+                },
+                "timestamp": datetime.now().isoformat(),
+            }
+            
+            yield f"data: {json.dumps({'type': 'result', 'data': final_result})}\n\n"
+        
+        return Response(
+            generate(),
+            mimetype='text/event-stream',
+            headers={
+                'Cache-Control': 'no-cache',
+                'X-Accel-Buffering': 'no',
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"Streaming comparison failed: {e}")
         return jsonify({"error": str(e), "success": False}), 500
 
 

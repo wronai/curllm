@@ -126,11 +126,31 @@ Przykład: Porównaj ceny i parametry produktów, wskaż najlepszą ofertę ceno
             </form>
         </div>
 
-        <!-- Loading State -->
-        <div id="loading" class="hidden text-center py-12">
-            <div class="loader mx-auto mb-4"></div>
-            <p class="text-gray-600 text-lg" id="loadingText">Pobieranie danych ze sklepów...</p>
-            <p class="text-gray-500 text-sm mt-2">To może potrwać kilka minut w zależności od liczby URL-i</p>
+        <!-- Loading State with Logs -->
+        <div id="loading" class="hidden py-8">
+            <div class="bg-white rounded-2xl shadow-xl p-6 mb-6">
+                <div class="flex items-center gap-4 mb-4">
+                    <div class="loader"></div>
+                    <div>
+                        <p class="text-gray-800 text-lg font-semibold" id="loadingText">Pobieranie danych ze sklepów...</p>
+                        <p class="text-gray-500 text-sm" id="loadingProgress">0 / 0 URL-i przetworzonych</p>
+                    </div>
+                </div>
+                <!-- Progress bar -->
+                <div class="w-full bg-gray-200 rounded-full h-2 mb-4">
+                    <div id="progressBar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <!-- Real-time logs -->
+                <div class="bg-gray-900 rounded-xl p-4 max-h-80 overflow-y-auto" id="logContainer">
+                    <div class="flex items-center gap-2 mb-3">
+                        <i data-lucide="terminal" class="w-4 h-4 text-green-400"></i>
+                        <span class="text-green-400 text-sm font-mono">Logi ekstrakcji</span>
+                    </div>
+                    <div id="logContent" class="font-mono text-xs space-y-1">
+                        <!-- Logs will be added here -->
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Results Section -->
@@ -216,19 +236,33 @@ Przykład: Porównaj ceny i parametry produktów, wskaż najlepszą ofertę ceno
         // Update count on textarea input
         document.getElementById('urlsTextarea').addEventListener('input', updateUrlCount);
 
+        let totalUrls = 0;
+        let processedUrls = 0;
+
         function resetForm() {
             document.getElementById('results').classList.add('hidden');
             document.getElementById('error').classList.add('hidden');
             document.getElementById('loading').classList.add('hidden');
             document.getElementById('submitBtn').disabled = false;
+            document.getElementById('logContent').innerHTML = '';
+            document.getElementById('progressBar').style.width = '0%';
+            totalUrls = 0;
+            processedUrls = 0;
         }
 
-        function showLoading(text = 'Pobieranie danych ze sklepów...') {
+        function showLoading(text, urlCount) {
             document.getElementById('loading').classList.remove('hidden');
             document.getElementById('loadingText').textContent = text;
             document.getElementById('results').classList.add('hidden');
             document.getElementById('error').classList.add('hidden');
             document.getElementById('submitBtn').disabled = true;
+            document.getElementById('logContent').innerHTML = '';
+            document.getElementById('progressBar').style.width = '0%';
+            totalUrls = urlCount || 0;
+            processedUrls = 0;
+            updateProgress();
+            addLog('info', `Rozpoczynam ekstrakcję z ${totalUrls} URL-i...`);
+            lucide.createIcons();
         }
 
         function hideLoading() {
@@ -236,7 +270,44 @@ Przykład: Porównaj ceny i parametry produktów, wskaż najlepszą ofertę ceno
             document.getElementById('submitBtn').disabled = false;
         }
 
+        function updateProgress() {
+            const percent = totalUrls > 0 ? Math.round((processedUrls / totalUrls) * 100) : 0;
+            document.getElementById('progressBar').style.width = `${percent}%`;
+            document.getElementById('loadingProgress').textContent = `${processedUrls} / ${totalUrls} URL-i przetworzonych`;
+        }
+
+        function addLog(type, message) {
+            const logContent = document.getElementById('logContent');
+            const logContainer = document.getElementById('logContainer');
+            const time = new Date().toLocaleTimeString('pl-PL');
+            
+            const colors = {
+                'info': 'text-blue-400',
+                'success': 'text-green-400',
+                'error': 'text-red-400',
+                'warning': 'text-yellow-400',
+                'progress': 'text-gray-400'
+            };
+            
+            const icons = {
+                'info': '→',
+                'success': '✓',
+                'error': '✗',
+                'warning': '⚠',
+                'progress': '•'
+            };
+            
+            const div = document.createElement('div');
+            div.className = `${colors[type] || 'text-gray-300'}`;
+            div.innerHTML = `<span class="text-gray-500">[${time}]</span> ${icons[type] || '•'} ${message}`;
+            logContent.appendChild(div);
+            
+            // Auto-scroll to bottom
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
         function showError(message) {
+            addLog('error', message);
             hideLoading();
             document.getElementById('error').classList.remove('hidden');
             document.getElementById('errorMessage').textContent = message;
@@ -359,14 +430,11 @@ Przykład: Porównaj ceny i parametry produktów, wskaż najlepszą ofertę ceno
         document.getElementById('compareForm').addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            // Collect URLs
-            const urlInputs = document.querySelectorAll('input[name="urls[]"]');
-            const urls = Array.from(urlInputs)
-                .map(input => input.value.trim())
-                .filter(url => url);
+            // Collect URLs from textarea
+            const urls = getUrlsFromTextarea();
 
             if (urls.length === 0) {
-                showError('Proszę podać przynajmniej jeden URL produktu.');
+                showError('Proszę podać przynajmniej jeden URL produktu (jeden URL na linię).');
                 return;
             }
 
@@ -379,10 +447,17 @@ Przykład: Porównaj ceny i parametry produktów, wskaż najlepszą ofertę ceno
                 return;
             }
 
-            showLoading(`Pobieranie danych z ${urls.length} sklepów...`);
+            showLoading(`Pobieranie danych z ${urls.length} sklepów...`, urls.length);
+
+            // Log each URL we're about to process
+            urls.forEach((url, i) => {
+                const hostname = new URL(url).hostname;
+                addLog('progress', `[${i+1}/${urls.length}] Zakolejkowano: ${hostname}`);
+            });
 
             try {
-                const response = await fetch('/api/compare', {
+                // Use streaming API
+                const response = await fetch('/api/compare/stream', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -393,28 +468,69 @@ Przykład: Porównaj ceny i parametry produktów, wskaż najlepszą ofertę ceno
                     })
                 });
 
-                const data = await response.json();
-
-                if (!response.ok || data.error) {
-                    throw new Error(data.error || 'Unknown error occurred');
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Request failed');
                 }
 
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let finalData = null;
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // Keep incomplete line in buffer
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const eventData = JSON.parse(line.slice(6));
+                                
+                                if (eventData.type === 'log') {
+                                    addLog(eventData.level || 'info', eventData.message);
+                                } else if (eventData.type === 'progress') {
+                                    processedUrls = eventData.processed;
+                                    updateProgress();
+                                    addLog(eventData.success ? 'success' : 'error', 
+                                           `${eventData.store}: ${eventData.success ? 'OK' : eventData.error}`);
+                                } else if (eventData.type === 'stage') {
+                                    addLog('info', eventData.message);
+                                } else if (eventData.type === 'result') {
+                                    finalData = eventData.data;
+                                }
+                            } catch (e) {
+                                // Skip invalid JSON
+                            }
+                        }
+                    }
+                }
+
+                if (!finalData) {
+                    throw new Error('No result received from server');
+                }
+
+                addLog('success', 'Ekstrakcja zakończona pomyślnie!');
                 hideLoading();
 
                 // Render results
-                if (data.extraction_results) {
-                    renderExtractionResults(data.extraction_results);
+                if (finalData.extraction_results) {
+                    renderExtractionResults(finalData.extraction_results);
                 }
 
-                if (data.comparison) {
-                    if (data.comparison.analysis) {
-                        renderComparisonAnalysis(data.comparison.analysis);
+                if (finalData.comparison) {
+                    if (finalData.comparison.analysis) {
+                        renderComparisonAnalysis(finalData.comparison.analysis);
                     }
-                    if (data.comparison.summary_table) {
-                        renderSummaryTable(data.comparison.summary_table);
+                    if (finalData.comparison.summary_table) {
+                        renderSummaryTable(finalData.comparison.summary_table);
                     }
-                    if (data.comparison.best_price) {
-                        renderBestPrice(data.comparison.best_price);
+                    if (finalData.comparison.best_price) {
+                        renderBestPrice(finalData.comparison.best_price);
                     }
                 }
 
@@ -426,7 +542,7 @@ Przykład: Porównaj ceny i parametry produktów, wskaż najlepszą ofertę ceno
         });
 
         // Initialize
-        updateRemoveButtons();
+        updateUrlCount();
     </script>
 </body>
 </html>
