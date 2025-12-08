@@ -1,10 +1,11 @@
 from typing import Any, Dict, List, Callable
 import functools
 from ..flow import flow, Flow
-from ..registry import list_components, list_schemes
 from ...diagnostics import get_logger
 
-from .pipeline import pipeline
+
+logger = get_logger(__name__)
+
 
 def batch_process(items: List[Any], pipeline_uri: str, batch_size: int = 10) -> List[Any]:
     """

@@ -6,6 +6,9 @@ from ..registry import register, create_component
 from ..exceptions import ComponentError
 from ...diagnostics import get_logger
 
+logger = get_logger(__name__)
+
+
 @register("choose")
 class ChooseComponent(Component):
     """

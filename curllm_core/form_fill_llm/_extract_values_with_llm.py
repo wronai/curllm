@@ -1,9 +1,4 @@
-import logging
 from typing import Any, Dict, List, Optional
-from dataclasses import dataclass
-from curllm_core.llm_dsl import DSLExecutor, AtomicFunctions
-from curllm_core.llm_dsl.atoms import AtomResult
-
 from ._simple_parse import _simple_parse
 
 async def _extract_values_with_llm(instruction: str, llm) -> Dict[str, str]:

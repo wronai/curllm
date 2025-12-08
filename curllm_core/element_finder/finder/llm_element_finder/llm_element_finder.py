@@ -7,6 +7,8 @@ from ..element_match import ElementMatch
 from ..page_context import PageContext
 
 
+logger = logging.getLogger(__name__)
+
 class LLMElementFinder:
     """
     Use LLM to find elements on page based on intent.

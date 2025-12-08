@@ -1,5 +1,4 @@
 import json
-import logging
 import os
 from datetime import datetime
 from pathlib import Path
@@ -22,13 +21,8 @@ from curllm_core.page_context import extract_page_context
 from curllm_core.actions import execute_action
 from curllm_core.result_evaluator import evaluate_run_success
 from curllm_core.human_verify import handle_human_verification, looks_like_human_verify_text
-from curllm_core.captcha_widget import handle_captcha_image as _handle_captcha_image_widget, handle_widget_captcha as _handle_widget_captcha
-from curllm_core.page_utils import auto_scroll as _auto_scroll, accept_cookies as _accept_cookies, is_block_page as _is_block_page
 from curllm_core.extraction import generic_fastpath, direct_fastpath, product_heuristics, fallback_extract, extract_articles_eval, validate_with_llm, extract_links_by_selectors
-from curllm_core.captcha_slider import attempt_slider_challenge
-from curllm_core.slider_plugin import try_external_slider_solver
 from curllm_core.bql import BQLExecutor
-from curllm_core.validation_utils import should_validate
 from curllm_core.screenshots import take_screenshot as _take_screenshot_func
 from curllm_core.form_fill import deterministic_form_fill as _deterministic_form_fill_func, parse_form_pairs as _parse_form_pairs_func
 from curllm_core.llm_field_filler import llm_guided_field_fill as _llm_guided_field_fill_func

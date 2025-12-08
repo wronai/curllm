@@ -4,6 +4,8 @@ from ..flow import flow, Flow
 from ..registry import list_components, list_schemes
 from ...diagnostics import get_logger
 
+logger = get_logger(__name__)
+
 
 def validate_data(schema: Dict[str, Any]) -> Callable:
     """

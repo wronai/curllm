@@ -11,6 +11,7 @@ from ..diagnostics import get_logger
 logger = get_logger(__name__)
 
 
+
 class Flow:
     """
     Flow builder for composable component pipelines
@@ -58,13 +59,12 @@ class Flow:
         self._input_data = data
         return self
         
-    def with_diagnostics(self, enabled: bool = True, trace: bool = False) -> 'Flow':
+    def with_diagnostics(self, enabled: bool = True) -> 'Flow':
         """
         Enable diagnostics for the flow
         
         Args:
             enabled: Enable diagnostics
-            trace: Enable detailed tracing
             
         Returns:
             Self for chaining

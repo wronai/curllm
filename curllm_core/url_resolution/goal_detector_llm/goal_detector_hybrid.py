@@ -1,7 +1,3 @@
-import logging
-from dataclasses import dataclass
-from typing import Optional
-from enum import Enum
 from curllm_core.url_types import TaskGoal
 
 from .goal_detection_result import GoalDetectionResult
