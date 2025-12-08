@@ -516,6 +516,8 @@ lub wyszukał jesli jest dostepne ten produkt czy fraze, o którą pytał user
 curllm --stealth "https://fatpc.pl/pl/c/DDR5/1169" -d "Find all products with prices under 500PLN"
 
 
+curllm "Wejdź na prototypowanie.pl i wyślij wiadomość przez formularz z zapytaniem o dostępność usługi prototypowania 3d z adresem email info@softreck.com i nazwiskiem Sapletta"
+
 
 
 wykonaj make test i napraw błędy
@@ -528,7 +530,63 @@ wyszukiwanie odpowiednich danych z użyciem kontekstu
 np. używaj zatomizowanych algorytmow, statystyk, heurystyk oraz zapytan LLM, 
 aby w sposob dynamiczny i generyczny pozyskać odpowiednie url 
 w oparciu o dane z aktualnego kontekstu z drzewa DOM, sitemap itd
+javascript
+findField(['email', 'mail', 'adres'], 'email', form)
+To NIE jest hardkodowany selektor - to dynamiczne wyszukiwanie, ale 
+tego typu funkcje powinien realizować LLM, powinien poprzez język DSL
+generować odpowiednie zapytania do zatomizowanych wyspecjalizowanych funkcji, 
+to nie powinno być keyword sensetive hardkoded filtering
+Stwórz nową architekturę opartą na LLM + DSL
+
+python ./scripts/find_hardcoded.py 
+hardcoded_report.json
+przejdź do refaktoryzacji konkretnego pliku używając nowego llm_dsl
+Użytkownik: "Znajdź formularz kontaktowy"
+              ↓
+    ┌─────────────────────────────────────────────────────────┐
+    │              LLM-DSL Architecture                        │
+    ├─────────────────────────────────────────────────────────┤
+    │  1. LLM Analysis (highest priority)                      │
+    │     - Analizuje wszystkie linki/elementy na stronie      │
+    │     - Wybiera najlepszy na podstawie semantyki           │
+    │                                                          │
+    │  2. Statistical Analysis (fallback)                      │
+    │     - Word overlap scoring                               │
+    │     - Location-based scoring                             │
+    │                                                          │
+    │  3. Keyword Fallback (legacy)                            │
+    │     - Zachowane dla kompatybilności                      │
+    │     - Będzie stopniowo usuwane                          │
+    └─────────────────────────────────────────────────────────┘
 
 
-curllm "Wejdź na prototypowanie.pl i wyślij wiadomość przez formularz z zapytaniem o dostępność usługi prototypowania 3d z adresem email info@softreck.com i nazwiskiem Sapletta"
+### Before (Hardcoded)
+```python
+# Hardcoded selector
+element = document.querySelector('input[name="email"]')
+
+# Hardcoded keyword list
+for field in ["name", "email", "phone"]:
+    # ...
+```
+
+### After (LLM-DSL)
+```python
+# LLM-driven element finding
+element = await dsl.execute("find_element", {
+    "purpose": "email_input",
+    "context": page_context
+})
+
+# LLM-driven field detection
+fields = await dsl.execute("analyze_form", {
+    "form_context": form_html,
+    "detect_purposes": True
+})
+for field in fields.data:
+    # ...
+```
+
+
+
 
