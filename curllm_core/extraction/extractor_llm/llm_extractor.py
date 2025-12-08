@@ -1,38 +1,10 @@
-"""
-LLM-Driven Data Extractor - No hardcoded patterns
-
-Uses LLM to:
-1. Understand what data to extract
-2. Find data patterns dynamically
-3. Validate and structure results
-
-Replaces hardcoded regexes and keyword lists.
-"""
-
 import logging
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
-
 from curllm_core.llm_dsl import AtomicFunctions
 
-logger = logging.getLogger(__name__)
-
-
-@dataclass
-class ExtractionRequest:
-    """What to extract - parsed by LLM"""
-    data_types: List[str]  # emails, phones, links, products, etc.
-    limit: int
-    filter_text: Optional[str]
-
-
-@dataclass
-class ExtractionResult:
-    """Extraction result"""
-    success: bool
-    data: Dict[str, Any]
-    method: str  # llm, statistical
-
+from .extraction_request import ExtractionRequest
+from .extraction_result import ExtractionResult
 
 class LLMExtractor:
     """
@@ -283,53 +255,3 @@ Return ONLY the JSON array."""
             else:
                 self.run_logger.log_text(f"   {message}")
         logger.info(message)
-
-
-# =============================================================================
-# CONVENIENCE FUNCTIONS
-# =============================================================================
-
-async def llm_extract(
-    page,
-    llm,
-    instruction: str,
-    run_logger=None,
-) -> Dict[str, Any]:
-    """
-    Convenience function for LLM-driven extraction.
-    
-    Args:
-        page: Playwright page
-        llm: LLM instance
-        instruction: What to extract
-        run_logger: Optional logger
-        
-    Returns:
-        Dict with extracted data
-    """
-    extractor = LLMExtractor(page=page, llm=llm, run_logger=run_logger)
-    result = await extractor.extract(instruction)
-    return result.data if result.success else {}
-
-
-async def extract_with_llm(
-    page,
-    llm,
-    data_type: str,
-    limit: int = 50,
-) -> List[Any]:
-    """
-    Extract specific data type using LLM.
-    
-    Args:
-        page: Playwright page
-        llm: LLM instance
-        data_type: What to extract (emails, phones, links, etc.)
-        limit: Max items
-        
-    Returns:
-        List of extracted items
-    """
-    extractor = LLMExtractor(page=page, llm=llm)
-    extracted = await extractor._extract_data_type(data_type, limit)
-    return extracted

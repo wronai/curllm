@@ -1,20 +1,8 @@
-"""
-LLM-Driven Hierarchical Planner - No hardcoded keyword lists
-
-Uses LLM to:
-1. Decide if hierarchical planning is needed
-2. Detect simple vs complex tasks
-3. Identify multi-step requirements
-
-Replaces hardcoded keyword matching with LLM inference.
-"""
-
 import json
 import logging
 from typing import Any, Dict, List, Optional
 
-logger = logging.getLogger(__name__)
-
+from .extract_strategic_context import extract_strategic_context
 
 class LLMHierarchicalPlanner:
     """
@@ -185,27 +173,3 @@ Return ONLY valid JSON."""
         if page_context.get("products"):
             return "product_list"
         return "unknown"
-
-
-# =============================================================================
-# CONVENIENCE FUNCTIONS (compatible with original API)
-# =============================================================================
-
-async def should_use_hierarchical_llm(
-    instruction: str,
-    page_context: Dict[str, Any],
-    llm=None
-) -> bool:
-    """
-    LLM-driven decision on hierarchical planner usage.
-    """
-    planner = LLMHierarchicalPlanner(llm=llm)
-    return await planner.should_use_hierarchical(instruction, page_context)
-
-
-def extract_strategic_context(page_context: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Extract strategic context (stateless, no LLM needed).
-    """
-    planner = LLMHierarchicalPlanner()
-    return planner._extract_strategic_context(page_context)
