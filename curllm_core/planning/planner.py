@@ -271,6 +271,32 @@ class TaskPlanner:
         form_data = parsed.form_data
         prev_step = after_step
         
+        # Check if user wants to fill the form or just find it
+        has_fill_data = (
+            form_data.email or 
+            form_data.name or 
+            form_data.message or 
+            form_data.phone
+        )
+        
+        # Check instruction for fill intent
+        instr_lower = parsed.original_instruction.lower()
+        has_fill_intent = any(word in instr_lower for word in [
+            'wyślij', 'wyslij', 'wypełnij', 'wypelnij', 'send', 'submit', 
+            'fill', 'napisz', 'wiadomość', 'wiadomosc'
+        ]) and has_fill_data
+        
+        # If no form data and no fill intent, just extract form info
+        if not has_fill_data and not has_fill_intent:
+            plan.add_step(
+                StepType.EXTRACT,
+                params={"type": "forms"},
+                description="Extract contact form info",
+                depends_on=[prev_step]
+            )
+            plan.expected_outcome = "form_fields"  # Mark as find operation
+            return
+        
         # Generate name if not provided (required for most forms)
         name_value = form_data.name
         if not name_value and form_data.email:
