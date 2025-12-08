@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import json
 import logging
 import os
@@ -6,8 +5,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse
-
-
 from curllm_core.config import config
 from curllm_core.logger import RunLogger
 from curllm_core.llm_factory import setup_llm as setup_llm_factory
@@ -46,10 +43,6 @@ from curllm_core.rerun_cmd import build_rerun_curl as _build_rerun_curl_func
 from curllm_core.task_runner import run_task as _run_task
 from curllm_core.result_store import apply_diff_and_store as _apply_diff_and_store
 
-logger = logging.getLogger(__name__)
-
-def _should_validate(instruction: Optional[str], data: Optional[Any]) -> bool:
-    return should_validate(instruction, data)
 
 class CurllmExecutor:
     """Main browser automation executor with LLM support"""

@@ -1,45 +1,11 @@
-"""
-LLM Element Finder - Intelligent element detection using LLM
-
-Instead of hardcoded selectors, this module uses LLM to:
-1. Analyze page DOM structure
-2. Understand what element is needed based on context
-3. Generate appropriate selectors dynamically
-4. Verify element matches intent
-
-This provides a generic, always-working approach that adapts to any website.
-"""
-
 import json
 import logging
 import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
-logger = logging.getLogger(__name__)
-
-
-@dataclass
-class ElementMatch:
-    """Result of LLM element finding"""
-    selector: str
-    confidence: float
-    reasoning: str
-    element_type: str  # input, button, link, textarea, etc.
-    attributes: Dict[str, str]
-
-
-@dataclass
-class PageContext:
-    """Context extracted from page for LLM"""
-    url: str
-    title: str
-    visible_text: str
-    form_fields: List[Dict[str, str]]
-    buttons: List[Dict[str, str]]
-    links: List[Dict[str, str]]
-    inputs: List[Dict[str, str]]
-
+from .element_match import ElementMatch
+from .page_context import PageContext
 
 class LLMElementFinder:
     """
@@ -708,14 +674,3 @@ Respond in JSON format:
             return f"{tag}.{first_class}"
         
         return tag
-
-
-async def find_element_with_llm(
-    page,
-    intent: str,
-    llm=None,
-    element_type: str = "any"
-) -> Optional[ElementMatch]:
-    """Convenience function for finding elements"""
-    finder = LLMElementFinder(llm=llm, page=page)
-    return await finder.find_element(intent, element_type)
