@@ -22,14 +22,8 @@ import asyncio
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urljoin, urlparse, quote_plus
 
-# Import types and patterns from separate modules
+# Import types from separate modules (no hardcoded patterns - using LLM-DSL)
 from curllm_core.url_types import TaskGoal, PageMatchResult, ResolvedUrl
-from curllm_core.url_patterns import (
-    SEARCH_SELECTORS, SEARCH_SUBMIT_SELECTORS,
-    CATEGORY_PATTERNS, CART_URL_PATTERNS, CONTACT_URL_PATTERNS, LOGIN_URL_PATTERNS,
-    GOAL_KEYWORDS, GOAL_URL_PATTERNS,
-    detect_goal_from_instruction,
-)
 from curllm_core import dom_helpers
 
 logger = logging.getLogger(__name__)
@@ -697,6 +691,9 @@ No explanation, just the URL or NONE."""
                     success=False,
                     steps_taken=[f"Navigation failed: {e}"],
                 )
+            
+            # Wait for SPA hydration before analysis
+            await dom_helpers.ensure_page_ready(self.page, wait_ms=3000)
         
         # Step 2: Analyze if current page matches intent
         page_match = await self._analyze_page_match(instruction)

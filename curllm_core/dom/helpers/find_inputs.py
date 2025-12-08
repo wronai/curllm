@@ -53,16 +53,23 @@ async def find_inputs(
     
     if purpose:
         purpose_lower = purpose.lower()
-        purpose_keywords = {
-            'email': ['email', 'mail', 'e-mail'],
-            'password': ['password', 'haslo', 'hasło'],
-            'name': ['name', 'imie', 'imię', 'nazwisko'],
-            'phone': ['phone', 'tel', 'telefon', 'mobile'],
-            'search': ['search', 'szukaj', 'query', 'q'],
-            'message': ['message', 'wiadomosc', 'wiadomość', 'text', 'comment'],
-        }
         
-        keywords = purpose_keywords.get(purpose_lower, [purpose_lower])
+        # Dynamically derive keywords from purpose string
+        # This avoids hardcoded keyword lists - purpose itself becomes the keyword
+        # Additional common variations are generated from the purpose word
+        base_keywords = [purpose_lower]
+        
+        # Add common variations (language-agnostic approach)
+        # These are semantic derivations, not hardcoded selectors
+        if len(purpose_lower) > 3:
+            # Add partial matches (stem)
+            base_keywords.append(purpose_lower[:4])
+        
+        # The purpose word + its type indicator
+        base_keywords.append(f"{purpose_lower}_input")
+        base_keywords.append(f"{purpose_lower}_field")
+        
+        keywords = base_keywords
         
         filtered = []
         for e in results:

@@ -42,26 +42,43 @@ GOAL_TRANSLATIONS = {
 }
 
 
-async def _find_link_keyword_fallback(page, goal: str) -> Optional[LinkInfo]:
+async def _find_link_keyword_fallback(page, goal: str, llm=None) -> Optional[LinkInfo]:
     """
     DEPRECATED: Legacy fallback keyword-based link finding.
     
     Use _find_link_with_llm() or _find_link_statistical() instead.
     
-    This function derives keywords dynamically from the goal string,
-    with minimal translations for Polish/English coverage.
+    This function derives keywords dynamically from the goal string.
+    If LLM is available, it generates semantic translations dynamically.
+    Otherwise falls back to minimal static translations.
     """
-    logger.debug(f"Using legacy keyword fallback for goal: {goal}")
+    logger.debug(f"Using keyword fallback for goal: {goal}")
     
     # Extract core keywords from goal string
     goal_clean = goal.replace('find_', '').replace('_', ' ')
     goal_words = goal_clean.split()
     
-    # Add translations for better language coverage
     all_keywords = list(goal_words)
-    for word in goal_words:
-        translations = GOAL_TRANSLATIONS.get(word.lower(), [])
-        all_keywords.extend(translations)
+    
+    # Try LLM for semantic keyword expansion
+    if llm:
+        try:
+            prompt = f"""Generate 5-8 keywords/synonyms for finding "{goal_clean}" links on a Polish e-commerce website.
+Include Polish and English terms. Return ONLY comma-separated words, no explanation.
+Example for "cart": koszyk,basket,bag,shopping cart,zakupy"""
+            
+            response = await llm.aquery(prompt)
+            llm_keywords = [kw.strip().lower() for kw in response.split(',') if kw.strip()]
+            all_keywords.extend(llm_keywords[:8])
+            logger.debug(f"LLM generated keywords: {llm_keywords[:8]}")
+        except Exception as e:
+            logger.debug(f"LLM keyword generation failed: {e}")
+    
+    # Fallback: Add minimal translations for language coverage (only if LLM not used)
+    if len(all_keywords) == len(goal_words):
+        for word in goal_words:
+            translations = GOAL_TRANSLATIONS.get(word.lower(), [])
+            all_keywords.extend(translations)
     
     # Derive URL patterns from keywords
     url_patterns = [f'/{kw}' for kw in all_keywords[:5]]

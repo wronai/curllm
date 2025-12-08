@@ -22,6 +22,11 @@ from curllm_core.dom.helpers import (
     execute_search,
     analyze_page_type,
     has_content_type,
+    # SPA hydration utilities
+    wait_for_spa_hydration,
+    wait_for_interactive_elements,
+    wait_for_navigation_ready,
+    ensure_page_ready,
 )
 
 __all__ = [
@@ -41,4 +46,9 @@ __all__ = [
     'execute_search',
     'analyze_page_type',
     'has_content_type',
+    # SPA hydration utilities
+    'wait_for_spa_hydration',
+    'wait_for_interactive_elements',
+    'wait_for_navigation_ready',
+    'ensure_page_ready',
 ]

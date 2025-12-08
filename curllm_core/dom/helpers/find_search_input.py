@@ -79,41 +79,82 @@ No explanation, just the selector."""
         except Exception as e:
             logger.debug(f"LLM search input finding failed: {e}")
     
-    # 2. Try standard approach
+    # 2. Try standard approach with semantic purpose
     inputs = await find_inputs(page, purpose='search')
     if inputs:
         return inputs[0]
     
-    # 3. Fallback: look for common search selectors
-    fallback_selectors = [
-        'input[type="search"]',
-        'input[name="q"]',
-        'input[name="query"]',
-        'input[name="search"]',
-        'input[placeholder*="szukaj" i]',
-        'input[placeholder*="search" i]',
-        'input[placeholder*="Czego szukasz" i]',
-        'input[placeholder*="Wpisz" i]',
-        '#search',
-        '.search-input',
-        '[role="search"] input',
-        'header input[type="text"]',
-        'nav input[type="text"]',
-    ]
-    
-    for selector in fallback_selectors:
-        try:
-            el = await page.query_selector(selector)
-            if el and await el.is_visible():
-                return ElementInfo(
-                    selector=selector,
-                    tag='input',
-                    text='',
-                    attributes={},
-                    visible=True,
-                    location='header'
-                )
-        except Exception:
-            continue
+    # 3. Statistical fallback: Score inputs by semantic indicators
+    # No hardcoded selectors - dynamically analyze all visible inputs
+    try:
+        scored_inputs = await page.evaluate("""() => {
+            const inputs = [];
+            document.querySelectorAll('input, [contenteditable="true"]').forEach(el => {
+                if (!el.offsetParent) return;  // Skip hidden
+                
+                const type = (el.getAttribute('type') || 'text').toLowerCase();
+                const name = (el.getAttribute('name') || '').toLowerCase();
+                const placeholder = (el.getAttribute('placeholder') || '').toLowerCase();
+                const ariaLabel = (el.getAttribute('aria-label') || '').toLowerCase();
+                const id = (el.id || '').toLowerCase();
+                const role = (el.closest('[role="search"]') ? 'search' : '');
+                
+                // Skip password, email, hidden, submit inputs
+                if (['password', 'email', 'hidden', 'submit', 'button', 'checkbox', 'radio'].includes(type)) {
+                    return;
+                }
+                
+                // Score based on semantic indicators
+                let score = 0;
+                const searchIndicators = ['search', 'szukaj', 'query', 'find', 'szuk', 'wyszuk'];
+                
+                // Type is search = high score
+                if (type === 'search') score += 10;
+                
+                // Role search container
+                if (role === 'search') score += 8;
+                
+                // Check name, placeholder, aria for search indicators
+                const text = name + ' ' + placeholder + ' ' + ariaLabel + ' ' + id;
+                for (const indicator of searchIndicators) {
+                    if (text.includes(indicator)) score += 5;
+                }
+                
+                // Location bonus: in header/nav
+                const rect = el.getBoundingClientRect();
+                if (rect.top < 200) score += 2;  // Near top of page
+                
+                if (score > 0) {
+                    // Generate unique selector
+                    let selector = el.tagName.toLowerCase();
+                    if (el.id) selector = '#' + el.id;
+                    else if (el.getAttribute('name')) selector = '[name="' + el.getAttribute('name') + '"]';
+                    else if (type === 'search') selector = 'input[type="search"]';
+                    
+                    inputs.push({ selector, score, type, name, placeholder: placeholder.substring(0, 30) });
+                }
+            });
+            
+            // Sort by score descending
+            inputs.sort((a, b) => b.score - a.score);
+            return inputs.slice(0, 5);
+        }""")
+        
+        if scored_inputs and len(scored_inputs) > 0:
+            best = scored_inputs[0]
+            if best['score'] >= 5:  # Minimum confidence threshold
+                el = await page.query_selector(best['selector'])
+                if el and await el.is_visible():
+                    logger.debug(f"Found search input via scoring: {best['selector']} (score: {best['score']})")
+                    return ElementInfo(
+                        selector=best['selector'],
+                        tag='input',
+                        text='',
+                        attributes={'placeholder': best.get('placeholder', '')},
+                        visible=True,
+                        location='header'
+                    )
+    except Exception as e:
+        logger.debug(f"Statistical search input finding failed: {e}")
     
     return None

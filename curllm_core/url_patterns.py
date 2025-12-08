@@ -1,13 +1,14 @@
 """
-URL Patterns - Static patterns and keywords for URL resolution
+URL Patterns - DEPRECATED
 
-Contains:
-- Search selectors
-- Category patterns
-- URL patterns for cart, contact, login
-- Goal detection keywords
+⚠️ DEPRECATED: This module contains hardcoded selectors and patterns.
+Use LLM-DSL approach instead:
+- dom_helpers.find_search_input(page, llm=llm) - semantic search input finding
+- dom_helpers.find_link_for_goal(page, goal, llm=llm) - LLM-driven link finding
+- goal_detector_hybrid.detect_goal() - statistical goal detection
 
-Extracted from url_resolver.py for better modularity.
+These patterns are kept for backward compatibility only.
+Will be removed in future versions.
 """
 
 from .url_types import TaskGoal

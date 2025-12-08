@@ -38,5 +38,5 @@ async def find_link_for_goal(
     if result:
         return result
     
-    # Final fallback to keyword-based config
-    return await _find_link_keyword_fallback(page, goal)
+    # Final fallback to keyword-based config (passes LLM for dynamic keyword generation)
+    return await _find_link_keyword_fallback(page, goal, llm=llm)

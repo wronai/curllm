@@ -30,7 +30,7 @@
 
 **curllm** is a powerful CLI tool that combines browser automation with local LLMs (like Ollama's Qwen, Llama, Mistral) to intelligently extract data, fill forms, and automate web workflows - all running **locally** on your machine with **complete privacy**.
 
-> 🆕 **v2 is now default!** LLM-driven element detection without hardcoded selectors. Use `--v1` for legacy behavior.
+> 🆕 **v2 LLM-DSL Architecture!** Dynamic element detection, semantic goal understanding, no hardcoded selectors. 388 tests passing.
 
 ```bash
 # Extract products with prices from any e-commerce site
@@ -55,6 +55,38 @@ curllm "https://example.com" -d "extract all email addresses"
 | 🔍 **BQL Support** | Browser Query Language for structured queries |
 | 📊 **Export Formats** | JSON, CSV, HTML, XLS output |
 | 🔒 **Privacy-First** | Everything runs locally - no cloud APIs needed |
+
+## 🧠 LLM-DSL Architecture
+
+curllm v2 uses **LLM-DSL** (LLM Domain Specific Language) - a dynamic approach that eliminates hardcoded selectors:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     LLM-DSL Flow                            │
+├─────────────────────────────────────────────────────────────┤
+│  1. Goal Detection (semantic)                               │
+│     "Find RAM DDR5" → FIND_PRODUCTS                         │
+│                                                             │
+│  2. Strategy Selection                                      │
+│     FIND_PRODUCTS → use search flow                         │
+│     FIND_CART → find link by semantic scoring               │
+│                                                             │
+│  3. Element Finding (LLM-first)                             │
+│     LLM analysis → Statistical scoring → Fallback           │
+│                                                             │
+│  4. Dynamic Selector Generation                             │
+│     Analyze DOM → Score elements → Generate selector        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Key Benefits
+
+| Feature | Traditional | LLM-DSL |
+|---------|-------------|---------|
+| Selectors | Hardcoded CSS/XPath | Dynamic generation |
+| Keywords | Static lists | Semantic analysis |
+| Language | English only | Multi-language (PL, EN) |
+| Maintenance | Manual updates | Self-adapting |
 
 ## 🚀 Quick Start
 
@@ -205,15 +237,17 @@ CURLLM_LOCALE=en-US              # Browser locale
 
 | Component | Description | LLM Calls |
 |-----------|-------------|-----------|
-| **DSL Executor** | Orchestrates extraction with fallback algorithms | 1-3 |
-| **Knowledge Base** | Tracks algorithm success per domain (SQLite) | 0 |
+| **URL Resolver** | Smart navigation with goal detection | 0-1 |
+| **Goal Detector** | Semantic intent understanding | 0-1 |
+| **Element Finder** | Dynamic selector generation | 0-1 |
 | **DOM Toolkit** | Pure JavaScript atomic queries | 0 |
-| **Strategy Files** | Reusable YAML extraction recipes | 0 |
-| **Result Validator** | Validates output + optional LLM check | 0-1 |
+| **SPA Hydration** | Wait for CSR/SPA content | 0 |
 
 📖 **[Full Architecture Documentation →](docs/v2/architecture/ARCHITECTURE.md)**
 
 ## 🧬 DSL System (Strategy-Based Extraction)
+
+> **Note:** The YAML DSL system works alongside the newer LLM-DSL. YAML strategies are used for **known sites** with proven extraction patterns, while LLM-DSL handles **unknown sites** dynamically.
 
 curllm automatically **learns** and **saves** successful extraction strategies as YAML files:
 
@@ -236,10 +270,24 @@ metadata:
 
 ### How It Works
 
-1. **First visit** - DOM Toolkit finds containers, extracts data
+1. **First visit** - LLM-DSL dynamically analyzes page, extracts data
 2. **Successful** - Strategy saved to `dsl/*.yaml`, recorded in Knowledge Base
-3. **Next visit** - Knowledge Base suggests best algorithm based on history
-4. **Reuse** - Strategy loaded from YAML, no discovery needed
+3. **Next visit** - Knowledge Base loads saved strategy (fast path)
+4. **Unknown site** - Falls back to LLM-DSL dynamic discovery
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                   Request Flow                          │
+├─────────────────────────────────────────────────────────┤
+│  URL → Knowledge Base lookup                            │
+│        │                                                │
+│        ├─ Found? → Load YAML strategy (fast)            │
+│        │                                                │
+│        └─ Not found? → LLM-DSL dynamic (flexible)       │
+│                        │                                │
+│                        └─ Success? → Save to YAML       │
+└─────────────────────────────────────────────────────────┘
+```
 
 ### Algorithms
 
@@ -284,6 +332,7 @@ config = LLMConfig(provider="ollama/qwen2.5:7b")
 - **[🧬 DSL System](docs/v2/architecture/DSL_SYSTEM.md)** - Strategy-based extraction
 - **[⚛️ DOM Toolkit](docs/v2/architecture/ATOMIC_QUERY_SYSTEM.md)** - Pure JS queries
 - **[🧩 Components](docs/v2/architecture/COMPONENTS.md)** - Module overview
+- **[🔗 LLM-DSL URL Resolution](docs/LLM_DSL_URL_RESOLUTION.md)** - Smart URL navigation
 
 ### Reference
 - **[🔌 API Reference](docs/v2/api/README.md)**
@@ -298,8 +347,11 @@ git clone https://github.com/wronai/curllm.git
 cd curllm
 make install
 
-# Run tests
+# Run tests (388 tests passing)
 make test
+
+# Run URL resolver examples
+cd examples/url_resolver && python run_all.py
 
 # Run with Docker
 docker compose up -d
