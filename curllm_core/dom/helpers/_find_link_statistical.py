@@ -7,6 +7,8 @@ from urllib.parse import urljoin, urlparse
 from .link_info import LinkInfo
 from .extract_all_links import extract_all_links
 
+logger = logging.getLogger(__name__)
+
 async def _find_link_statistical(page, goal: str) -> Optional[LinkInfo]:
     """Use statistical analysis to find best link"""
     # Extract goal keywords from the goal string

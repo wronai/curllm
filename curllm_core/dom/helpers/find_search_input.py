@@ -7,6 +7,8 @@ from urllib.parse import urljoin, urlparse
 from .element_info import ElementInfo
 from .find_inputs import find_inputs
 
+logger = logging.getLogger(__name__)
+
 async def find_search_input(page, llm=None) -> Optional[ElementInfo]:
     """
     Find the main search input on the page.

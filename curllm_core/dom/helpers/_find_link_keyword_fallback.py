@@ -9,6 +9,8 @@ from .find_links_by_text import find_links_by_text
 from .find_links_by_url_pattern import find_links_by_url_pattern
 from .find_links_by_aria import find_links_by_aria
 
+logger = logging.getLogger(__name__)
+
 async def _find_link_keyword_fallback(page, goal: str) -> Optional[LinkInfo]:
     """
     Fallback keyword-based link finding.

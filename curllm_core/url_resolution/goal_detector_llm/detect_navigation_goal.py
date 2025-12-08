@@ -9,8 +9,7 @@ from .goal_detector_hybrid import GoalDetectorHybrid
 
 async def detect_navigation_goal(
     instruction: str,
-    llm=None,
-    page_context: Optional[dict] = None
+    llm=None
 ) -> GoalDetectionResult:
     """
     Convenience function to detect navigation goal.
@@ -18,7 +17,6 @@ async def detect_navigation_goal(
     Args:
         instruction: User instruction
         llm: LLM client (optional)
-        page_context: Current page context (optional, for enhanced detection)
         
     Returns:
         GoalDetectionResult

@@ -1,7 +1,3 @@
-"""
-Transparent LLM-based Extraction Orchestrator
-Similar to form orchestrator but for data extraction tasks
-"""
 import json
 import time
 from typing import Any, Dict, Optional, List

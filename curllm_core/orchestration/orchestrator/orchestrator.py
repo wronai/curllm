@@ -19,6 +19,32 @@ from .step_result import StepResult
 from .orchestrator_result import OrchestratorResult
 from .orchestrator_config import OrchestratorConfig
 
+try:
+    # Optional structured logging package
+    from curllm_logs import (
+        LogEntry,
+        LogLevel,
+        StepLog,
+        CommandInfo,
+        EnvironmentInfo,
+        ResultInfo,
+        LogSession,
+        create_session,
+        MarkdownLogWriter,
+        ScreenshotManager,
+    )
+    HAS_LOG_PACKAGE = True
+except Exception:  # pragma: no cover - optional dependency
+    HAS_LOG_PACKAGE = False
+    LogEntry = LogLevel = StepLog = None
+    CommandInfo = EnvironmentInfo = ResultInfo = None
+    LogSession = create_session = None
+    MarkdownLogWriter = None
+    ScreenshotManager = None
+
+
+logger = logging.getLogger(__name__)
+
 class Orchestrator:
     """
     Main orchestrator for executing complex commands.

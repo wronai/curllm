@@ -7,6 +7,8 @@ from urllib.parse import urljoin, urlparse
 from .link_info import LinkInfo
 from .extract_all_links import extract_all_links
 
+logger = logging.getLogger(__name__)
+
 async def _find_link_with_llm(page, goal: str, llm) -> Optional[LinkInfo]:
     """Use LLM to find the best link for a goal"""
     try:

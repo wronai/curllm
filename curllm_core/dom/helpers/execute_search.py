@@ -1,10 +1,13 @@
 import re
+import asyncio
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from urllib.parse import urljoin, urlparse
 
 from .find_search_input import find_search_input
+
+logger = logging.getLogger(__name__)
 
 async def execute_search(
     page,

@@ -3,9 +3,9 @@ import logging
 import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
+from ..element_match import ElementMatch
+from ..page_context import PageContext
 
-from .element_match import ElementMatch
-from .page_context import PageContext
 
 class LLMElementFinder:
     """

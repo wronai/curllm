@@ -4,6 +4,8 @@ from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from urllib.parse import urljoin, urlparse
 
+logger = logging.getLogger(__name__)
+
 
 async def try_direct_urls(
     page,
