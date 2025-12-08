@@ -299,17 +299,26 @@ def create_vision_decision_tree(
         if canonical in canonical_groups:
             canonical_groups[canonical].append(field)
         else:
-            # Try to infer canonical from field name
+            # Try to infer canonical from field name using semantic concept groups
             field_name_lower = field["name"].lower()
-            if any(kw in field_name_lower for kw in ["name", "imie", "nazwisko"]):
+            
+            # Semantic concept groups (language-agnostic)
+            # LLM would determine these dynamically in production
+            name_concepts = {"name", "imie", "nazwisko", "fullname", "nombre", "first", "last"}
+            email_concepts = {"email", "mail", "e-mail", "correo", "poczta"}
+            phone_concepts = {"phone", "tel", "telefon", "mobile", "komórka", "celular"}
+            subject_concepts = {"subject", "temat", "asunto", "topic", "title"}
+            message_concepts = {"message", "wiadomosc", "textarea", "content", "body", "komentarz"}
+            
+            if any(kw in field_name_lower for kw in name_concepts):
                 canonical_groups["name"].append(field)
-            elif any(kw in field_name_lower for kw in ["email", "mail"]):
+            elif any(kw in field_name_lower for kw in email_concepts):
                 canonical_groups["email"].append(field)
-            elif any(kw in field_name_lower for kw in ["phone", "tel", "telefon"]):
+            elif any(kw in field_name_lower for kw in phone_concepts):
                 canonical_groups["phone"].append(field)
-            elif any(kw in field_name_lower for kw in ["subject", "temat"]):
+            elif any(kw in field_name_lower for kw in subject_concepts):
                 canonical_groups["subject"].append(field)
-            elif any(kw in field_name_lower for kw in ["message", "wiadomosc", "textarea"]):
+            elif any(kw in field_name_lower for kw in message_concepts):
                 canonical_groups["message"].append(field)
     
     # Log canonical grouping
