@@ -2,160 +2,160 @@
 HARDCODED VALUES ANALYSIS REPORT
 ================================================================================
 
-Total files with hardcoded values: 146
-Total findings: 1754
-  - High severity: 199
+Total files with hardcoded values: 155
+Total findings: 1854
+  - High severity: 201
   - Medium severity: 2
-  - Low severity: 1553
+  - Low severity: 1651
 
 FINDINGS BY TYPE:
 ----------------------------------------
-  label: 810 occurrences
-  selector: 748 occurrences
-  xpath: 143 occurrences
+  label: 890 occurrences
+  selector: 766 occurrences
+  xpath: 145 occurrences
   url: 51 occurrences
   regex: 2 occurrences
 
 TOP 20 FILES TO REFACTOR (by score):
 ----------------------------------------
-   1. curllm_core/form_fill.py (score: 132, findings: 124)
-   2. curllm_core/orchestrators/social.py (score: 89, findings: 55)
-   3. curllm_core/orchestrators/auth.py (score: 59, findings: 59)
-   4. curllm_core/form_fill/filler.py (score: 57, findings: 57)
-   5. curllm_core/form_fill/js_scripts.py (score: 52, findings: 48)
-   6. curllm_core/extraction/extractor.py (score: 51, findings: 51)
-   7. curllm_core/proxy.py (score: 45, findings: 15)
-   8. curllm_core/streamware/components/form/smart_orchestrator.py (score: 45, findings: 45)
-   9. curllm_core/streamware/components/currency/translator.py (score: 38, findings: 36)
-  10. curllm_core/streamware/components/form/orchestrator.py (score: 38, findings: 38)
-  11. curllm_core/hierarchical/planner.py (score: 38, findings: 38)
-  12. curllm_core/dynamic/selectors.py (score: 38, findings: 38)
-  13. curllm_core/dsl/executor.py (score: 34, findings: 30)
+   1. curllm_core/form_fill.py (score: 128, findings: 120)
+   2. curllm_core/form_fill/js_scripts.py (score: 86, findings: 82)
+   3. curllm_core/orchestrators/social.py (score: 74, findings: 40)
+   4. curllm_core/orchestrators/auth.py (score: 60, findings: 60)
+   5. curllm_core/form_fill/filler.py (score: 57, findings: 57)
+   6. curllm_core/proxy.py (score: 45, findings: 15)
+   7. curllm_core/streamware/components/form/smart_orchestrator.py (score: 45, findings: 45)
+   8. curllm_core/extraction/extractor.py (score: 45, findings: 45)
+   9. curllm_core/dsl/executor.py (score: 43, findings: 39)
+  10. curllm_core/streamware/components/form/orchestrator.py (score: 41, findings: 41)
+  11. curllm_core/hierarchical/planner.py (score: 39, findings: 39)
+  12. curllm_core/streamware/components/currency/translator.py (score: 38, findings: 36)
+  13. curllm_core/dynamic/selectors.py (score: 38, findings: 38)
   14. curllm_core/iterative_extractor.py (score: 33, findings: 29)
-  15. curllm_core/field_filling/filler.py (score: 33, findings: 29)
-  16. curllm_core/orchestrators/ecommerce.py (score: 32, findings: 32)
-  17. curllm_core/streamware/components/dom_fix.py (score: 31, findings: 23)
-  18. curllm_core/element_finder/finder.py (score: 31, findings: 31)
-  19. curllm_core/orchestrators/form.py (score: 31, findings: 31)
-  20. curllm_core/streamware/flow.py (score: 30, findings: 10)
+  15. curllm_core/orchestrators/ecommerce.py (score: 32, findings: 32)
+  16. curllm_core/streamware/components/dom_fix.py (score: 31, findings: 23)
+  17. curllm_core/element_finder/finder.py (score: 31, findings: 31)
+  18. curllm_core/orchestrators/form.py (score: 31, findings: 31)
+  19. curllm_core/streamware/flow.py (score: 30, findings: 10)
+  20. curllm_core/streamware/components/captcha/solve.py (score: 30, findings: 14)
 
 HIGH SEVERITY FINDINGS:
 ----------------------------------------
 
-  File: curllm_core/form_fill.py:574
+  File: curllm_core/form_fill.py:599
   Type: selector
   Value: querySelectorAll('input[required], textarea[required], input[aria-required="...
   Suggestion: Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection
 
-  File: curllm_core/form_fill.py:738
+  File: curllm_core/form_fill.py:763
   Type: selector
   Value: querySelector('.wpcf7-mail-sent-ok, .wpcf7-response-output, .elementor-message-s...
   Suggestion: Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection
 
-  File: curllm_core/form_fill.py:773
+  File: curllm_core/form_fill.py:798
   Type: selector
   Value: querySelectorAll('.forminator-error-message, .wpcf7-not-valid-tip, .error-messag...
   Suggestion: Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection
 
-  File: curllm_core/form_fill.py:842
+  File: curllm_core/form_fill.py:867
   Type: selector
   Value: querySelector('.wpcf7-not-valid, .forminator-error-message, .elementor-field-req...
   Suggestion: Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection
 
-  File: curllm_core/orchestrators/social.py:45
-  Type: url
-  Value: https://facebook.com/login...
-  Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
-
-  File: curllm_core/orchestrators/social.py:45
-  Type: xpath
-  Value: //facebook.com/login'...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/orchestrators/social.py:53
-  Type: url
-  Value: https://twitter.com/login...
-  Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
-
-  File: curllm_core/orchestrators/social.py:53
-  Type: xpath
-  Value: //twitter.com/login'...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/orchestrators/social.py:61
-  Type: url
-  Value: https://linkedin.com/login...
-  Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
-
-  File: curllm_core/orchestrators/social.py:61
-  Type: xpath
-  Value: //linkedin.com/login'...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/orchestrators/social.py:521
-  Type: selector
-  Value: querySelector('.h-captcha, [data-hcaptcha-sitekey]'...
-  Suggestion: Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection
-
-  File: curllm_core/orchestrators/social.py:567
-  Type: url
-  Value: https://twitter.com/...
-  Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
-
-  File: curllm_core/orchestrators/social.py:567
-  Type: xpath
-  Value: //twitter.com/...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/orchestrators/social.py:568
-  Type: url
-  Value: https://instagram.com/...
-  Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
-
-  File: curllm_core/orchestrators/social.py:568
-  Type: xpath
-  Value: //instagram.com/...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/orchestrators/social.py:569
-  Type: url
-  Value: https://facebook.com/...
-  Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
-
-  File: curllm_core/orchestrators/social.py:569
-  Type: xpath
-  Value: //facebook.com/...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/orchestrators/social.py:570
-  Type: url
-  Value: https://linkedin.com/in/...
-  Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
-
-  File: curllm_core/orchestrators/social.py:570
-  Type: xpath
-  Value: //linkedin.com/in/...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/orchestrators/social.py:571
-  Type: url
-  Value: https://tiktok.com/...
-  Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
-
-  File: curllm_core/orchestrators/social.py:571
-  Type: xpath
-  Value: //tiktok.com/@...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/form_fill/js_scripts.py:283
+  File: curllm_core/form_fill/js_scripts.py:410
   Type: selector
   Value: querySelector('.wpcf7-mail-sent-ok, .wpcf7-response-output, .elementor-message-s...
   Suggestion: Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection
 
-  File: curllm_core/form_fill/js_scripts.py:308
+  File: curllm_core/form_fill/js_scripts.py:435
   Type: selector
   Value: querySelectorAll('.forminator-error-message, .wpcf7-not-valid-tip, .error-messag...
   Suggestion: Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection
+
+  File: curllm_core/orchestrators/social.py:58
+  Type: url
+  Value: https://facebook.com/login...
+  Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
+
+  File: curllm_core/orchestrators/social.py:58
+  Type: xpath
+  Value: //facebook.com/login'...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/orchestrators/social.py:66
+  Type: url
+  Value: https://twitter.com/login...
+  Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
+
+  File: curllm_core/orchestrators/social.py:66
+  Type: xpath
+  Value: //twitter.com/login'...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/orchestrators/social.py:74
+  Type: url
+  Value: https://linkedin.com/login...
+  Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
+
+  File: curllm_core/orchestrators/social.py:74
+  Type: xpath
+  Value: //linkedin.com/login'...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/orchestrators/social.py:567
+  Type: selector
+  Value: querySelector('.h-captcha, [data-hcaptcha-sitekey]'...
+  Suggestion: Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection
+
+  File: curllm_core/orchestrators/social.py:613
+  Type: url
+  Value: https://twitter.com/...
+  Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
+
+  File: curllm_core/orchestrators/social.py:613
+  Type: xpath
+  Value: //twitter.com/...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/orchestrators/social.py:614
+  Type: url
+  Value: https://instagram.com/...
+  Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
+
+  File: curllm_core/orchestrators/social.py:614
+  Type: xpath
+  Value: //instagram.com/...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/orchestrators/social.py:615
+  Type: url
+  Value: https://facebook.com/...
+  Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
+
+  File: curllm_core/orchestrators/social.py:615
+  Type: xpath
+  Value: //facebook.com/...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/orchestrators/social.py:616
+  Type: url
+  Value: https://linkedin.com/in/...
+  Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
+
+  File: curllm_core/orchestrators/social.py:616
+  Type: xpath
+  Value: //linkedin.com/in/...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/orchestrators/social.py:617
+  Type: url
+  Value: https://tiktok.com/...
+  Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
+
+  File: curllm_core/orchestrators/social.py:617
+  Type: xpath
+  Value: //tiktok.com/@...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
   File: curllm_core/proxy.py:57
   Type: xpath
@@ -232,20 +232,20 @@ HIGH SEVERITY FINDINGS:
   Value: //..."...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/streamware/components/currency/translator.py:176
-  Type: xpath
-  Value: //api.exchangerate.host/latest...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/dsl/executor.py:625
+  File: curllm_core/dsl/executor.py:702
   Type: xpath
   Value: //i...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/dsl/executor.py:934
+  File: curllm_core/dsl/executor.py:1011
   Type: selector
   Value: querySelectorAll(':scope > span, :scope > strong, :scope > b, :scope > em'...
   Suggestion: Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection
+
+  File: curllm_core/streamware/components/currency/translator.py:176
+  Type: xpath
+  Value: //api.exchangerate.host/latest...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
   File: curllm_core/iterative_extractor.py:150
   Type: xpath
@@ -255,16 +255,6 @@ HIGH SEVERITY FINDINGS:
   File: curllm_core/iterative_extractor.py:522
   Type: selector
   Value: querySelectorAll('h1, h2, h3, h4, a, span, div[class*="...
-  Suggestion: Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection
-
-  File: curllm_core/field_filling/filler.py:346
-  Type: selector
-  Value: querySelector('.error-message, .forminator-error-message, .wpcf7-not-valid-tip'...
-  Suggestion: Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection
-
-  File: curllm_core/field_filling/filler.py:506
-  Type: selector
-  Value: querySelector('.wpcf7-mail-sent-ok, .success-message, .elementor-message-success...
   Suggestion: Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection
 
   File: curllm_core/streamware/components/dom_fix.py:22
@@ -376,6 +366,16 @@ HIGH SEVERITY FINDINGS:
   Type: xpath
   Value: //2captcha.com/res.php...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/field_filling/filler.py:346
+  Type: selector
+  Value: querySelector('.error-message, .forminator-error-message, .wpcf7-not-valid-tip'...
+  Suggestion: Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection
+
+  File: curllm_core/field_filling/filler.py:559
+  Type: selector
+  Value: querySelector('.wpcf7-mail-sent-ok, .success-message, .elementor-message-success...
+  Suggestion: Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection
 
   File: curllm_core/hierarchical_planner_v2.py:156
   Type: xpath
@@ -772,6 +772,31 @@ HIGH SEVERITY FINDINGS:
   Value: querySelectorAll('h1, h2, h3, h4, h5, h6, strong, b'...
   Suggestion: Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection
 
+  File: curllm_core/parsing/parser.py:99
+  Type: xpath
+  Value: //[...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/parsing/parser.py:101
+  Type: xpath
+  Value: //)...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/parsing/parser.py:102
+  Type: xpath
+  Value: //)...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/parsing/parser.py:312
+  Type: xpath
+  Value: //')...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/parsing/parser.py:312
+  Type: xpath
+  Value: //')...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
   File: curllm_core/result_corrector.py:144
   Type: xpath
   Value: //"...
@@ -911,21 +936,6 @@ HIGH SEVERITY FINDINGS:
   Type: selector
   Value: querySelectorAll('input, button, a, select, textarea, [role="...
   Suggestion: Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection
-
-  File: curllm_core/parsing/parser.py:98
-  Type: xpath
-  Value: //)...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/parsing/parser.py:99
-  Type: xpath
-  Value: //)...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/parsing/parser.py:100
-  Type: xpath
-  Value: //[...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
   File: curllm_core/atomic_functions.py:297
   Type: xpath

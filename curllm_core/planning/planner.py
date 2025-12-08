@@ -395,6 +395,24 @@ class TaskPlanner:
                 depends_on=[prev_step]
             )
         
+        # Try to accept consent/RODO checkbox (if present)
+        prev_step = plan.add_step(
+            StepType.FILL_FIELD,
+            params={
+                "field_type": "consent",
+                "value": "true",
+                "selectors": [
+                    'input[type="checkbox"][name*="consent"]',
+                    'input[type="checkbox"][name*="zgoda"]',
+                    'input[type="checkbox"][name*="rodo"]',
+                    'input[type="checkbox"][id*="consent"]',
+                    'input[type="checkbox"][id*="zgoda"]',
+                ]
+            },
+            description="Accept consent/RODO",
+            depends_on=[prev_step]
+        )
+        
         # Submit form
         plan.add_step(
             StepType.SUBMIT,

@@ -117,8 +117,7 @@ class TestLLMHierarchicalPlanner:
     
     def test_extract_strategic_context(self):
         """Test strategic context extraction."""
-        from curllm_core.v2 import LLMHierarchicalPlanner
-        planner = LLMHierarchicalPlanner(llm=None)
+        from curllm_core.v2 import extract_strategic_context
         
         context = {
             "title": "Contact Us",
@@ -126,7 +125,7 @@ class TestLLMHierarchicalPlanner:
             "forms": [{"id": "contact", "fields": []}],
         }
         
-        strategic = planner._extract_strategic_context(context)
+        strategic = extract_strategic_context(context)
         assert strategic["title"] == "Contact Us"
         assert strategic["form_count"] == 1
         assert strategic["has_forms"] is True

@@ -1,57 +1,12 @@
-"""
-Task Validator - Multi-strategy validation for task completion verification
-
-Validates that user's task was completed correctly by combining:
-1. Semantic Validation - LLM understands if result matches expectations
-2. Structural Validation - Data structure matches expected format
-3. Rule-based Validation - Business rules check (price limits, counts, etc.)
-4. Visual Validation - Screenshot shows expected state
-5. DOM Comparison - Before/after DOM changes
-6. Output Schema Validation - Result matches expected schema
-
-Each validator produces a score and explanation. Final decision combines all.
-"""
-
 import json
 import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Callable
 from enum import Enum
 
-
-class ValidationStrategy(Enum):
-    """Available validation strategies"""
-    SEMANTIC = "semantic"       # LLM-based understanding
-    STRUCTURAL = "structural"   # Data structure check
-    RULES = "rules"             # Business rules
-    VISUAL = "visual"           # Screenshot analysis
-    DOM_DIFF = "dom_diff"       # DOM before/after
-    SCHEMA = "schema"           # JSON schema validation
-    CUSTOM = "custom"           # User-defined
-
-
-@dataclass
-class ValidationCheck:
-    """Result of a single validation check"""
-    strategy: str
-    passed: bool
-    score: float  # 0.0 - 1.0
-    reason: str
-    details: Dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
-class ValidationReport:
-    """Complete validation report for a task"""
-    task_type: str
-    instruction: str
-    overall_passed: bool
-    overall_score: float
-    confidence: float
-    checks: List[ValidationCheck]
-    summary: str
-    recommendations: List[str] = field(default_factory=list)
-    
+from .validation_strategy import ValidationStrategy
+from .validation_check import ValidationCheck
+from .validation_report import ValidationReport
 
 class TaskValidator:
     """
@@ -776,30 +731,3 @@ JSON:"""
                 self.run_logger.log_text(f"❌ {message}")
             else:
                 self.run_logger.log_text(f"   {message}")
-
-
-# Convenience function
-async def validate_task(
-    instruction: str,
-    result: Dict[str, Any],
-    llm=None,
-    page_context: Optional[Dict[str, Any]] = None,
-    **kwargs
-) -> ValidationReport:
-    """
-    Convenience function for quick task validation.
-    
-    Usage:
-        report = await validate_task(
-            instruction="Fill form with name=John",
-            result={"form_fill": {"submitted": True}},
-            llm=llm_client
-        )
-    """
-    validator = TaskValidator(llm=llm)
-    return await validator.validate(
-        instruction=instruction,
-        result=result,
-        page_context=page_context,
-        **kwargs
-    )
