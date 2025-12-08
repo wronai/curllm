@@ -95,18 +95,21 @@ status:
 	@bash scripts/status.sh
 
 # Testing
+# Use venv Python if available, otherwise system Python
+PYTHON := $(shell [ -f venv/bin/python3 ] && echo "venv/bin/python3" || echo "python3")
+
 test:
 	@echo "Running unit tests (excluding integration tests that require browsers)..."
-	@python3 -m pytest tests/ --ignore=tests/integration -v -p pytest_asyncio
+	@$(PYTHON) -m pytest tests/ --ignore=tests/integration -v
 
 test-integration:
 	@echo "Running integration tests (requires Playwright browsers)..."
 	@echo "If browsers not installed, run: playwright install chromium"
-	@python3 -m pytest tests/integration/ -v -p pytest_asyncio
+	@$(PYTHON) -m pytest tests/integration/ -v
 
 test-all:
 	@echo "Running all tests (unit + integration)..."
-	@python3 -m pytest tests/ -v -p pytest_asyncio
+	@$(PYTHON) -m pytest tests/ -v
 
 test-e2e-diff:
 	@echo "Running E2E diff test..."

@@ -378,14 +378,132 @@ async def find_inputs(
 async def find_link_for_goal(
     page,
     goal: str,
-    base_url: Optional[str] = None
+    base_url: Optional[str] = None,
+    llm=None,
+    use_llm: bool = True
 ) -> Optional[LinkInfo]:
     """
     Find best link for a specific goal using multiple strategies.
     
-    Combines text matching, URL patterns, aria labels, and location hints.
+    Strategy hierarchy:
+    1. LLM analysis (if available and use_llm=True)
+    2. Statistical/semantic analysis of links
+    3. Fallback keyword configurations
+    
+    The LLM approach analyzes all visible links and picks the best match
+    based on semantic understanding, not just keyword matching.
     """
-    # Goal-specific configurations
+    # Try LLM-based link finding first
+    if use_llm and llm:
+        result = await _find_link_with_llm(page, goal, llm)
+        if result:
+            return result
+    
+    # Fallback to statistical analysis
+    result = await _find_link_statistical(page, goal)
+    if result:
+        return result
+    
+    # Final fallback to keyword-based config
+    return await _find_link_keyword_fallback(page, goal)
+
+
+async def _find_link_with_llm(page, goal: str, llm) -> Optional[LinkInfo]:
+    """Use LLM to find the best link for a goal"""
+    try:
+        # Get all visible links with context
+        all_links = await extract_all_links(page)
+        
+        if not all_links:
+            return None
+        
+        # Prepare compact link summary for LLM
+        link_summary = []
+        for i, link in enumerate(all_links[:50]):  # Limit for token efficiency
+            link_summary.append({
+                "idx": i,
+                "text": link.text[:50] if link.text else "",
+                "url": link.url,
+                "loc": link.location,
+                "aria": link.aria_label[:30] if link.aria_label else ""
+            })
+        
+        import json
+        prompt = f"""Find the best link for goal: "{goal}"
+
+Available links:
+{json.dumps(link_summary, indent=1)}
+
+Return JSON: {{"index": N, "confidence": 0.0-1.0, "reason": "why"}}
+If no good match, return: {{"index": -1, "confidence": 0, "reason": "not found"}}
+"""
+        
+        response = await llm.aquery(prompt)
+        
+        # Parse response
+        import re
+        json_match = re.search(r'\{[^{}]+\}', response)
+        if json_match:
+            result = json.loads(json_match.group())
+            idx = result.get('index', -1)
+            confidence = result.get('confidence', 0)
+            
+            if idx >= 0 and idx < len(all_links) and confidence > 0.5:
+                link = all_links[idx]
+                link.score = confidence * 10
+                link.method = 'llm'
+                logger.info(f"LLM found link for {goal}: {link.url} (confidence: {confidence})")
+                return link
+    
+    except Exception as e:
+        logger.debug(f"LLM link finding failed: {e}")
+    
+    return None
+
+
+async def _find_link_statistical(page, goal: str) -> Optional[LinkInfo]:
+    """Use statistical analysis to find best link"""
+    # Extract goal keywords from the goal string
+    goal_words = goal.replace('find_', '').replace('_', ' ').split()
+    
+    all_links = await extract_all_links(page)
+    
+    if not all_links:
+        return None
+    
+    # Score each link based on word overlap
+    for link in all_links:
+        link_text = f"{link.text} {link.url} {link.aria_label or ''} {link.title or ''}".lower()
+        
+        score = 0.0
+        for word in goal_words:
+            if word.lower() in link_text:
+                score += 2.0
+        
+        # Location bonus
+        if link.location in ['nav', 'header', 'footer']:
+            score += 0.5
+        
+        link.score = score
+    
+    # Get best match
+    best_links = sorted(all_links, key=lambda x: x.score, reverse=True)
+    
+    if best_links and best_links[0].score > 1.5:
+        best = best_links[0]
+        best.method = 'statistical'
+        logger.info(f"Statistical analysis found link for {goal}: {best.url} (score: {best.score:.1f})")
+        return best
+    
+    return None
+
+
+async def _find_link_keyword_fallback(page, goal: str) -> Optional[LinkInfo]:
+    """
+    Fallback keyword-based link finding.
+    Uses predefined keyword configs for common goals.
+    """
+    # Goal-specific configurations (fallback only)
     goal_config = {
         'find_contact_form': {
             'text_keywords': ['kontakt', 'contact', 'napisz', 'formularz', 'pomoc', 'support', 'help'],
@@ -521,11 +639,16 @@ async def find_link_for_goal(
     
     if unique_candidates:
         best = unique_candidates[0]
+        best.method = 'keyword_fallback'
         logger.info(f"Found link for {goal}: {best.url} (score: {best.score:.1f})")
         return best
     
     return None
 
+
+# =============================================================================
+# URL TRIAL FUNCTIONS
+# =============================================================================
 
 async def try_direct_urls(
     page,

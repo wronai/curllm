@@ -308,12 +308,12 @@ class CommandParser:
                 # Clean up trailing punctuation
                 matched = matched.rstrip('.,;:')
                 
-                # Check if it's a full URL with protocol
-                if matched.startswith('http'):
+                # Check if it's a full URL with protocol (http:// or https://)
+                if matched.startswith('http://') or matched.startswith('https://'):
                     parsed = urlparse(matched)
                     return parsed.netloc, matched
                 else:
-                    # It might be domain or domain+path
+                    # It might be domain or domain+path (like httpbin.org/path)
                     full_url = f"https://{matched}"
                     parsed = urlparse(full_url)
                     # Extract just the domain (netloc)

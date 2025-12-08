@@ -13,9 +13,13 @@ NO hardcoded keywords or selectors - everything is LLM-driven.
 from curllm_core.llm_dsl.executor import DSLExecutor
 from curllm_core.llm_dsl.generator import DSLQueryGenerator
 from curllm_core.llm_dsl.atoms import AtomicFunctions
+from curllm_core.llm_dsl.element_finder import LLMElementFinder, ElementMatch, find_element_by_purpose
 
 __all__ = [
     'DSLExecutor',
     'DSLQueryGenerator', 
     'AtomicFunctions',
+    'LLMElementFinder',
+    'ElementMatch',
+    'find_element_by_purpose',
 ]
