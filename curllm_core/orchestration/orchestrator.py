@@ -488,6 +488,12 @@ class Orchestrator:
                 step_result.success = True
                 step_result.data = data
                 step.status = StepStatus.COMPLETED
+
+                # If this was an explicit SCREENSHOT step, capture path in StepResult
+                if step.step_type == StepType.SCREENSHOT and isinstance(data, dict):
+                    path = data.get("path") or data.get("screenshot")
+                    if path:
+                        step_result.screenshot_path = path
                 
                 # Capture screenshot if configured
                 if self.config.screenshot_each_step and self.screenshot_manager:

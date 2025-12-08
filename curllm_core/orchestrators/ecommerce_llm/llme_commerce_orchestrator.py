@@ -1,60 +1,12 @@
-"""
-LLM-Driven E-Commerce Orchestrator - No hardcoded selectors
-
-Uses LLM to:
-1. Understand shopping intent
-2. Find products dynamically
-3. Handle cart operations
-4. Navigate checkout flows
-
-Replaces hardcoded selectors and keyword lists.
-"""
-
 import logging
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
 from enum import Enum
-
 from curllm_core.llm_dsl import AtomicFunctions
 
-logger = logging.getLogger(__name__)
-
-
-class CheckoutStep(Enum):
-    """Checkout steps - detected by LLM"""
-    CART = "cart"
-    SHIPPING = "shipping"
-    PAYMENT = "payment"
-    CONFIRMATION = "confirmation"
-
-
-@dataclass
-class ShoppingIntent:
-    """Shopping intent parsed by LLM"""
-    action: str  # search, add_to_cart, checkout, browse
-    query: Optional[str]
-    payment_method: Optional[str]
-    shipping: Dict[str, str]
-    confidence: float
-
-
-@dataclass 
-class ShoppingResult:
-    """Shopping operation result"""
-    success: bool
-    action: str
-    products: List[Dict] = None
-    cart: List[Dict] = None
-    checkout_step: Optional[str] = None
-    message: Optional[str] = None
-    error: Optional[str] = None
-    
-    def __post_init__(self):
-        if self.products is None:
-            self.products = []
-        if self.cart is None:
-            self.cart = []
-
+from .checkout_step import CheckoutStep
+from .shopping_intent import ShoppingIntent
+from .shopping_result import ShoppingResult
 
 class LLMECommerceOrchestrator:
     """
