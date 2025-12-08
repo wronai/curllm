@@ -1,47 +1,9 @@
-"""
-LLM-Driven Form Orchestrator - No hardcoded keywords
-
-Uses LLM to:
-1. Parse form data from instruction
-2. Map values to fields by context
-3. Handle consents intelligently
-4. Verify submission
-
-Replaces hardcoded keyword mappings.
-"""
-
 import logging
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
-
 from curllm_core.llm_dsl import AtomicFunctions
 
-logger = logging.getLogger(__name__)
-
-
-@dataclass
-class FormField:
-    """Form field detected by LLM"""
-    selector: str
-    purpose: str
-    field_type: str
-    required: bool
-    label: str
-
-
-@dataclass
-class FormResult:
-    """Form operation result"""
-    success: bool
-    filled: Dict[str, str]
-    submitted: bool
-    verification: Optional[str] = None
-    errors: List[str] = None
-    
-    def __post_init__(self):
-        if self.errors is None:
-            self.errors = []
-
+from .form_result import FormResult
 
 class LLMFormOrchestrator:
     """
