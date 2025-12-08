@@ -106,7 +106,7 @@ Answer ONLY: multi-step or single-step"""
         if not self.llm:
             return {"strategy": "direct", "steps": []}
         
-        strategic = self._extract_strategic_context(page_context)
+        strategic = extract_strategic_context(page_context)
         
         prompt = f"""Create an execution plan for this task.
 
@@ -147,29 +147,3 @@ Return ONLY valid JSON."""
             return len(json.dumps(page_context))
         except Exception:
             return 0
-    
-    def _extract_strategic_context(
-        self, 
-        page_context: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Extract high-level strategic info."""
-        forms = page_context.get("forms", [])
-        
-        return {
-            "title": page_context.get("title", ""),
-            "url": page_context.get("url", ""),
-            "page_type": self._detect_page_type(page_context),
-            "form_count": len(forms),
-            "interactive_count": len(page_context.get("interactive", [])),
-            "has_forms": len(forms) > 0,
-        }
-    
-    def _detect_page_type(self, page_context: Dict[str, Any]) -> str:
-        """Detect page type from context structure."""
-        if page_context.get("forms"):
-            return "form"
-        if page_context.get("article_candidates"):
-            return "article_list"
-        if page_context.get("products"):
-            return "product_list"
-        return "unknown"
