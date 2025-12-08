@@ -1,56 +1,12 @@
-"""
-LLM-Driven Social Media Orchestrator - No hardcoded selectors or keywords
-
-Uses LLM to:
-1. Detect platform from page context
-2. Understand user intent
-3. Find UI elements dynamically
-4. Perform actions
-
-Replaces hardcoded PLATFORM_CONFIG with intelligent detection.
-"""
-
 import logging
 from typing import Any, Dict, Optional
 from dataclasses import dataclass
 from enum import Enum
-
 from curllm_core.llm_dsl import DSLExecutor, AtomicFunctions
 
-logger = logging.getLogger(__name__)
-
-
-class SocialPlatform(Enum):
-    """Social platforms - detected by LLM, not hardcoded matching"""
-    FACEBOOK = "facebook"
-    TWITTER = "twitter"
-    INSTAGRAM = "instagram"
-    LINKEDIN = "linkedin"
-    YOUTUBE = "youtube"
-    TIKTOK = "tiktok"
-    UNKNOWN = "unknown"
-
-
-@dataclass
-class SocialIntent:
-    """User's social media intent - parsed by LLM"""
-    action: str  # login, post, message, like, follow, comment, browse
-    credentials: Dict[str, str]
-    content: Optional[str]
-    target: Optional[str]
-    confidence: float
-
-
-@dataclass
-class SocialResult:
-    """Result of social media action"""
-    success: bool
-    platform: str
-    action: str
-    message: Optional[str] = None
-    data: Optional[Dict] = None
-    error: Optional[str] = None
-
+from .social_platform import SocialPlatform
+from .social_intent import SocialIntent
+from .social_result import SocialResult
 
 class LLMSocialOrchestrator:
     """
