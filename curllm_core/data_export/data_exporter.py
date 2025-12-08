@@ -1,23 +1,3 @@
-"""
-Data Export System - Multi-Format Export
-
-Support for:
-- JSON (pretty, compact, JSONL)
-- CSV (with headers, custom delimiter)
-- XML (with schema)
-- Excel (XLSX)
-- Markdown (tables)
-- HTML (tables)
-- YAML
-- SQLite
-
-Usage:
-    exporter = DataExporter(data)
-    exporter.to_json("products.json", pretty=True)
-    exporter.to_csv("products.csv")
-    exporter.to_excel("products.xlsx")
-"""
-
 import json
 import csv
 import io
@@ -409,25 +389,3 @@ class DataExporter:
         
         conn.commit()
         conn.close()
-
-
-# Convenience functions
-
-def export_json(data: Union[List[Dict], Dict], file_path: str, **kwargs) -> str:
-    """Quick JSON export"""
-    return DataExporter(data).to_json(file_path, **kwargs)
-
-
-def export_csv(data: Union[List[Dict], Dict], file_path: str, **kwargs) -> str:
-    """Quick CSV export"""
-    return DataExporter(data).to_csv(file_path, **kwargs)
-
-
-def export_excel(data: Union[List[Dict], Dict], file_path: str, **kwargs):
-    """Quick Excel export"""
-    return DataExporter(data).to_excel(file_path, **kwargs)
-
-
-def export_markdown(data: Union[List[Dict], Dict], file_path: str, **kwargs) -> str:
-    """Quick Markdown export"""
-    return DataExporter(data).to_markdown(file_path, **kwargs)

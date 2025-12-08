@@ -333,52 +333,10 @@ start_services() {
     # Start API server (only if not already running)
     if [ "$SKIP_API_START" = false ] && ! curl -s "http://localhost:${PORT}/health" > /dev/null 2>&1; then
         echo "Starting curllm API server..."
-        # Find Python script location
-        SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
-        SCRIPT_DIR="$( dirname "${SCRIPT_PATH}" )"
-        dbg "BASH_SOURCE[0]=${BASH_SOURCE[0]}"
-        dbg "Resolved SCRIPT_PATH=${SCRIPT_PATH}"
-        dbg "Resolved SCRIPT_DIR=${SCRIPT_DIR}"
-        # Fallback search for curllm_server.py
-        CANDIDATES=(
-            "$SCRIPT_DIR/curllm_server.py"
-            "$(dirname "$SCRIPT_DIR")/curllm_server.py"
-            "$PWD/curllm_server.py"
-            "$(dirname "$PWD")/curllm_server.py"
-        )
-        SERVER_PATH=""
-        for c in "${CANDIDATES[@]}"; do
-            dbg "Checking server candidate: $c"
-            if [ -f "$c" ]; then SERVER_PATH="$c"; break; fi
-        done
-        if [ -z "$SERVER_PATH" ]; then
-            # Try to locate curllm_server module via Python import (pip-installed site-packages)
-            SERVER_PATH_PY=$(python3 - <<'PY'
-import importlib, inspect
-try:
-    m = importlib.import_module('curllm_server')
-    print(inspect.getfile(m))
-except Exception:
-    pass
-PY
-)
-            if [ -n "$SERVER_PATH_PY" ] && [ -f "$SERVER_PATH_PY" ]; then
-                SERVER_PATH="$SERVER_PATH_PY"
-                dbg "Found server via Python import: $SERVER_PATH"
-            fi
-        fi
-        if [ -n "$SERVER_PATH" ]; then
-            dbg "Using server path: $SERVER_PATH"
-            CURLLM_API_PORT=${PORT} CURLLM_OLLAMA_HOST="http://localhost:${OPORT}" CURLLM_DEBUG=false python3 "$SERVER_PATH" > /tmp/curllm.log 2>&1 &
-            echo $! > /tmp/curllm.pid
-            sleep 3
-        else
-            echo -e "${RED}Error: curllm_server.py not found${NC}"
-            echo "Searched paths:"
-            for c in "${CANDIDATES[@]}"; do echo "  - $c"; done
-            echo "Tip: ensure the curllm script points to the repository version (symlink) or run from repo root."
-            return 1
-        fi
+        # Use new curllm_core.server entrypoint directly
+        CURLLM_API_PORT=${PORT} CURLLM_OLLAMA_HOST="http://localhost:${OPORT}" CURLLM_DEBUG=false python3 -m curllm_core.server > /tmp/curllm.log 2>&1 &
+        echo $! > /tmp/curllm.pid
+        sleep 3
     fi
     
     # Start Browserless if enabled

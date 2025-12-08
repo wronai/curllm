@@ -1,9 +1,9 @@
 {
   "summary": {
-    "total_files": 226,
-    "llm_versions": 10,
-    "unused_files": 27,
-    "duplicates": 9
+    "total_files": 290,
+    "llm_versions": 8,
+    "unused_files": 38,
+    "duplicates": 1
   },
   "llm_versions": {
     "goal_detector_llm.py": {
@@ -16,45 +16,35 @@
       "llm_version": "url_resolver_llm.py",
       "original_exists": true
     },
-    "form_fill_llm.py": {
-      "original": "form_fill.py",
-      "llm_version": "form_fill_llm.py",
-      "original_exists": true
+    "streamware/components/form/submit_llm/submit_form_llm.py": {
+      "original": "submit_form.py",
+      "llm_version": "streamware/components/form/submit_llm/submit_form_llm.py",
+      "original_exists": false
     },
-    "hierarchical/planner_llm.py": {
-      "original": "hierarchical/planner.py",
-      "llm_version": "hierarchical/planner_llm.py",
-      "original_exists": true
+    "element_finder/finder/find_element_with_llm.py": {
+      "original": "find_element_with.py",
+      "llm_version": "element_finder/finder/find_element_with_llm.py",
+      "original_exists": false
     },
-    "extraction/extractor_llm.py": {
-      "original": "extraction/extractor.py",
-      "llm_version": "extraction/extractor_llm.py",
-      "original_exists": true
+    "hierarchical/planner_llm/should_use_hierarchical_llm.py": {
+      "original": "should_use_hierarchical.py",
+      "llm_version": "hierarchical/planner_llm/should_use_hierarchical_llm.py",
+      "original_exists": false
     },
-    "orchestrators/social_llm.py": {
-      "original": "orchestrators/social.py",
-      "llm_version": "orchestrators/social_llm.py",
-      "original_exists": true
+    "extraction/extractor_llm/extract_with_llm.py": {
+      "original": "extract_with.py",
+      "llm_version": "extraction/extractor_llm/extract_with_llm.py",
+      "original_exists": false
     },
-    "orchestrators/ecommerce_llm.py": {
-      "original": "orchestrators/ecommerce.py",
-      "llm_version": "orchestrators/ecommerce_llm.py",
-      "original_exists": true
+    "dom/helpers/_find_link_with_llm.py": {
+      "original": "_find_link_with.py",
+      "llm_version": "dom/helpers/_find_link_with_llm.py",
+      "original_exists": false
     },
-    "orchestrators/form_llm.py": {
-      "original": "orchestrators/form.py",
-      "llm_version": "orchestrators/form_llm.py",
-      "original_exists": true
-    },
-    "orchestrators/auth_llm.py": {
-      "original": "orchestrators/auth.py",
-      "llm_version": "orchestrators/auth_llm.py",
-      "original_exists": true
-    },
-    "dsl/executor_llm.py": {
-      "original": "dsl/executor.py",
-      "llm_version": "dsl/executor_llm.py",
-      "original_exists": true
+    "form_fill_llm/_extract_values_with_llm.py": {
+      "original": "_extract_values_with.py",
+      "llm_version": "form_fill_llm/_extract_values_with_llm.py",
+      "original_exists": false
     }
   },
   "unused_files": [
@@ -63,91 +53,46 @@
     "error_handler.py",
     "data_export.py",
     "rate_limiter.py",
-    "form_fill_llm.py",
-    "dom_selectors.py",
+    "url_resolution/goal_detector_llm/detect_navigation_goal.py",
     "streamware/llm_bridge.py",
-    "streamware/components/form/smart_orchestrator.py",
+    "streamware/components/decision_llm/llm_decision_component.py",
+    "streamware/components/form/smart_orchestrator/smart_fill_form.py",
+    "streamware/components/form/submit_llm/llm_submit_detector.py",
+    "streamware/components/form/submit_llm/llm_success_evaluator.py",
+    "streamware/components/form/submit_llm/submit_form_llm.py",
     "tools/extraction/products_ceneo.py",
-    "hierarchical/planner_llm.py",
-    "extraction/extractor_llm.py",
+    "execution/executor/curllm_executor.py",
+    "hierarchical/planner_llm/should_use_hierarchical_llm.py",
+    "extraction/extractor_llm/extract_with_llm.py",
     "deprecated/extraction_registry.py",
     "deprecated/prompt_dsl.py",
     "deprecated/hybrid_selector_ranker.py",
     "deprecated/hierarchical_planner_v2.py",
+    "deprecated/dom_selectors.py",
     "deprecated/llm_form_orchestrator.py",
     "deprecated/llm_transparent_orchestrator.py",
     "deprecated/atomic_query.py",
-    "orchestrators/social_llm.py",
-    "orchestrators/ecommerce_llm.py",
-    "orchestrators/form_llm.py",
+    "dom/helpers/has_content_type.py",
+    "dom/helpers/find_elements_by_role.py",
+    "dom/helpers/find_links_by_location.py",
+    "dom/helpers/find_buttons.py",
+    "dom/helpers/try_direct_urls.py",
     "orchestrators/master.py",
-    "orchestrators/auth_llm.py",
-    "validation/task_validator.py",
-    "dsl/executor_llm.py",
+    "orchestrators/ecommerce_llm/llme_commerce_orchestrator.py",
+    "orchestrators/auth_llm/llm_auth_orchestrator.py",
+    "orchestrators/form_llm/llm_form_orchestrator.py",
+    "orchestrators/social_llm/llm_social_orchestrator.py",
+    "form_fill_llm/smart_form_fill.py",
+    "validation/task_validator/validate_task.py",
+    "dsl/executor_llm/llmdsl_executor.py",
     "dom_toolkit/orchestrator/task_router.py"
   ],
   "duplicates": [
     {
       "original": "url_resolver.py",
       "llm_version": "url_resolver_llm.py",
-      "original_imports": 2,
-      "llm_imports": 1,
-      "recommendation": "keep_both"
-    },
-    {
-      "original": "form_fill.py",
-      "llm_version": "form_fill_llm.py",
-      "original_imports": 6,
-      "llm_imports": 0,
-      "recommendation": "keep_both"
-    },
-    {
-      "original": "hierarchical/planner.py",
-      "llm_version": "hierarchical/planner_llm.py",
-      "original_imports": 7,
-      "llm_imports": 0,
-      "recommendation": "keep_both"
-    },
-    {
-      "original": "extraction/extractor.py",
-      "llm_version": "extraction/extractor_llm.py",
-      "original_imports": 4,
-      "llm_imports": 0,
-      "recommendation": "keep_both"
-    },
-    {
-      "original": "orchestrators/social.py",
-      "llm_version": "orchestrators/social_llm.py",
-      "original_imports": 1,
-      "llm_imports": 0,
-      "recommendation": "keep_both"
-    },
-    {
-      "original": "orchestrators/ecommerce.py",
-      "llm_version": "orchestrators/ecommerce_llm.py",
-      "original_imports": 1,
-      "llm_imports": 0,
-      "recommendation": "keep_both"
-    },
-    {
-      "original": "orchestrators/form.py",
-      "llm_version": "orchestrators/form_llm.py",
-      "original_imports": 16,
-      "llm_imports": 0,
-      "recommendation": "keep_both"
-    },
-    {
-      "original": "orchestrators/auth.py",
-      "llm_version": "orchestrators/auth_llm.py",
-      "original_imports": 1,
-      "llm_imports": 0,
-      "recommendation": "keep_both"
-    },
-    {
-      "original": "dsl/executor.py",
-      "llm_version": "dsl/executor_llm.py",
       "original_imports": 5,
-      "llm_imports": 0,
+      "llm_imports": 1,
       "recommendation": "keep_both"
     }
   ],
@@ -165,18 +110,20 @@
       "module": "curllm_core.runtime",
       "imports_count": 6,
       "exports_count": 3,
-      "imported_by_count": 1,
+      "imported_by_count": 2,
       "imported_by": [
-        "execution/executor.py"
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py"
       ]
     },
     "browser_setup.py": {
       "module": "curllm_core.browser_setup",
       "imports_count": 13,
       "exports_count": 10,
-      "imported_by_count": 1,
+      "imported_by_count": 2,
       "imported_by": [
-        "execution/executor.py"
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py"
       ]
     },
     "vision_form_analysis.py": {
@@ -192,7 +139,7 @@
       "module": "curllm_core.config",
       "imports_count": 5,
       "exports_count": 2,
-      "imported_by_count": 19,
+      "imported_by_count": 22,
       "imported_by": [
         "config_logger.py",
         "llm_planner.py",
@@ -214,20 +161,22 @@
       "module": "curllm_core.validation_utils",
       "imports_count": 2,
       "exports_count": 1,
-      "imported_by_count": 1,
+      "imported_by_count": 2,
       "imported_by": [
-        "execution/executor.py"
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py"
       ]
     },
     "vision.py": {
       "module": "curllm_core.vision",
       "imports_count": 3,
       "exports_count": 4,
-      "imported_by_count": 4,
+      "imported_by_count": 5,
       "imported_by": [
         "hierarchical_planner.py",
-        "streamware/components/form/smart_orchestrator.py",
-        "execution/executor.py",
+        "streamware/components/form/smart_orchestrator/smart_form_orchestrator.py",
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py",
         "hierarchical/planner.py"
       ]
     },
@@ -235,20 +184,22 @@
       "module": "curllm_core.proxy",
       "imports_count": 11,
       "exports_count": 7,
-      "imported_by_count": 2,
+      "imported_by_count": 3,
       "imported_by": [
         "server.py",
-        "execution/executor.py"
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py"
       ]
     },
     "captcha_widget.py": {
       "module": "curllm_core.captcha_widget",
       "imports_count": 3,
       "exports_count": 2,
-      "imported_by_count": 2,
+      "imported_by_count": 3,
       "imported_by": [
         "navigation.py",
-        "execution/executor.py"
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py"
       ]
     },
     "context_optimizer.py": {
@@ -280,9 +231,10 @@
       "module": "curllm_core.config_logger",
       "imports_count": 5,
       "exports_count": 6,
-      "imported_by_count": 1,
+      "imported_by_count": 2,
       "imported_by": [
-        "execution/executor.py"
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py"
       ]
     },
     "semantic_query.py": {
@@ -296,7 +248,7 @@
       "module": "curllm_core.llm",
       "imports_count": 3,
       "exports_count": 4,
-      "imported_by_count": 71,
+      "imported_by_count": 105,
       "imported_by": [
         "dynamic_detector.py",
         "url_resolver.py",
@@ -309,23 +261,26 @@
       "module": "curllm_core.captcha",
       "imports_count": 6,
       "exports_count": 6,
-      "imported_by_count": 10,
+      "imported_by_count": 11,
       "imported_by": [
         "navigation.py",
         "slider_plugin.py",
         "remediation.py",
         "streamware/components/captcha/solve.py",
-        "streamware/components/form/smart_orchestrator.py"
+        "streamware/components/form/orchestrator.py"
       ]
     },
     "url_resolver.py": {
       "module": "curllm_core.url_resolver",
       "imports_count": 4,
       "exports_count": 0,
-      "imported_by_count": 2,
+      "imported_by_count": 5,
       "imported_by": [
         "url_resolution/resolver.py",
-        "orchestration/orchestrator.py"
+        "orchestration/orchestrator/orchestrator_config.py",
+        "orchestration/orchestrator/orchestrator.py",
+        "orchestration/orchestrator/step_result.py",
+        "orchestration/orchestrator/execute_command.py"
       ]
     },
     "extraction_orchestrator.py": {
@@ -360,8 +315,9 @@
       "module": "curllm_core.hierarchical_planner",
       "imports_count": 12,
       "exports_count": 0,
-      "imported_by_count": 1,
+      "imported_by_count": 2,
       "imported_by": [
+        "hierarchical/planner_llm/should_use_hierarchical_llm.py",
         "running/runner.py"
       ]
     },
@@ -369,16 +325,17 @@
       "module": "curllm_core.actions",
       "imports_count": 5,
       "exports_count": 2,
-      "imported_by_count": 1,
+      "imported_by_count": 2,
       "imported_by": [
-        "execution/executor.py"
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py"
       ]
     },
     "url_types.py": {
       "module": "curllm_core.url_types",
       "imports_count": 6,
       "exports_count": 3,
-      "imported_by_count": 10,
+      "imported_by_count": 16,
       "imported_by": [
         "url_resolver.py",
         "goal_detector_llm.py",
@@ -400,11 +357,12 @@
       "module": "curllm_core.llm_config",
       "imports_count": 6,
       "exports_count": 23,
-      "imported_by_count": 3,
+      "imported_by_count": 4,
       "imported_by": [
         "executor.py",
         "llm_factory.py",
-        "execution/executor.py"
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py"
       ]
     },
     "goal_detector_llm.py": {
@@ -422,7 +380,7 @@
       "exports_count": 4,
       "imported_by_count": 1,
       "imported_by": [
-        "execution/executor.py"
+        "execution/executor/curllm_executor.py"
       ]
     },
     "result_corrector.py": {
@@ -431,7 +389,7 @@
       "exports_count": 7,
       "imported_by_count": 1,
       "imported_by": [
-        "execution/executor.py"
+        "execution/executor/curllm_executor.py"
       ]
     },
     "intent_detector.py": {
@@ -447,9 +405,10 @@
       "module": "curllm_core.planner_progress",
       "imports_count": 5,
       "exports_count": 1,
-      "imported_by_count": 1,
+      "imported_by_count": 2,
       "imported_by": [
-        "execution/executor.py"
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py"
       ]
     },
     "iterative_extractor.py": {
@@ -491,7 +450,7 @@
       "module": "curllm_core.diagnostics",
       "imports_count": 8,
       "exports_count": 3,
-      "imported_by_count": 16,
+      "imported_by_count": 17,
       "imported_by": [
         "navigation.py",
         "streamware/helpers.py",
@@ -529,9 +488,10 @@
       "module": "curllm_core.dom_utils",
       "imports_count": 0,
       "exports_count": 1,
-      "imported_by_count": 1,
+      "imported_by_count": 2,
       "imported_by": [
-        "execution/executor.py"
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py"
       ]
     },
     "atomic_functions.py": {
@@ -554,7 +514,7 @@
       "module": "curllm_core.extraction",
       "imports_count": 1,
       "exports_count": 0,
-      "imported_by_count": 11,
+      "imported_by_count": 13,
       "imported_by": [
         "extraction_orchestrator.py",
         "task_runner_fallback.py",
@@ -567,9 +527,10 @@
       "module": "curllm_core.result_store",
       "imports_count": 10,
       "exports_count": 11,
-      "imported_by_count": 2,
+      "imported_by_count": 3,
       "imported_by": [
-        "execution/executor.py",
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py",
         "running/runner.py"
       ]
     },
@@ -577,9 +538,13 @@
       "module": "curllm_core.llm_element_finder",
       "imports_count": 4,
       "exports_count": 0,
-      "imported_by_count": 1,
+      "imported_by_count": 5,
       "imported_by": [
-        "orchestration/orchestrator.py"
+        "element_finder/finder/find_element_with_llm.py",
+        "orchestration/orchestrator/orchestrator_config.py",
+        "orchestration/orchestrator/orchestrator.py",
+        "orchestration/orchestrator/step_result.py",
+        "orchestration/orchestrator/execute_command.py"
       ]
     },
     "tool_retry.py": {
@@ -604,10 +569,11 @@
       "module": "curllm_core.navigation",
       "imports_count": 17,
       "exports_count": 1,
-      "imported_by_count": 2,
+      "imported_by_count": 3,
       "imported_by": [
         "actions.py",
-        "execution/executor.py"
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py"
       ]
     },
     "dom_statistics.py": {
@@ -632,20 +598,24 @@
       "module": "curllm_core.orchestrator_steps",
       "imports_count": 11,
       "exports_count": 15,
-      "imported_by_count": 1,
+      "imported_by_count": 4,
       "imported_by": [
-        "orchestration/orchestrator.py"
+        "orchestration/orchestrator/orchestrator_config.py",
+        "orchestration/orchestrator/orchestrator.py",
+        "orchestration/orchestrator/step_result.py",
+        "orchestration/orchestrator/execute_command.py"
       ]
     },
     "human_verify.py": {
       "module": "curllm_core.human_verify",
       "imports_count": 3,
       "exports_count": 2,
-      "imported_by_count": 4,
+      "imported_by_count": 5,
       "imported_by": [
         "navigation.py",
         "remediation.py",
-        "execution/executor.py",
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py",
         "running/runner.py"
       ]
     },
@@ -653,58 +623,62 @@
       "module": "curllm_core.llm_field_filler",
       "imports_count": 7,
       "exports_count": 0,
-      "imported_by_count": 1,
+      "imported_by_count": 2,
       "imported_by": [
-        "execution/executor.py"
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py"
       ]
     },
     "command_parser.py": {
       "module": "curllm_core.command_parser",
       "imports_count": 4,
       "exports_count": 0,
-      "imported_by_count": 5,
+      "imported_by_count": 9,
       "imported_by": [
         "orchestrator_steps.py",
         "planning/planner.py",
         "deprecated/cli_orchestrator.py",
-        "orchestration/orchestrator.py",
-        "orchestration/models.py"
+        "orchestration/models.py",
+        "orchestration/orchestrator/orchestrator_config.py"
       ]
     },
     "captcha_slider.py": {
       "module": "curllm_core.captcha_slider",
       "imports_count": 2,
       "exports_count": 2,
-      "imported_by_count": 6,
+      "imported_by_count": 7,
       "imported_by": [
         "navigation.py",
         "slider_plugin.py",
         "remediation.py",
-        "execution/executor.py",
-        "running/runner.py"
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py"
       ]
     },
     "page_context.py": {
       "module": "curllm_core.page_context",
       "imports_count": 3,
       "exports_count": 1,
-      "imported_by_count": 4,
+      "imported_by_count": 6,
       "imported_by": [
         "extraction_orchestrator.py",
         "shortcuts.py",
-        "execution/executor.py",
-        "running/runner.py"
+        "element_finder/finder/llm_element_finder.py",
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py"
       ]
     },
     "task_planner.py": {
       "module": "curllm_core.task_planner",
       "imports_count": 6,
       "exports_count": 0,
-      "imported_by_count": 3,
+      "imported_by_count": 7,
       "imported_by": [
         "orchestrator_steps.py",
-        "orchestration/orchestrator.py",
-        "orchestration/models.py"
+        "orchestration/models.py",
+        "orchestration/orchestrator/orchestrator_config.py",
+        "orchestration/orchestrator/orchestrator.py",
+        "orchestration/orchestrator/orchestrator_result.py"
       ]
     },
     "task_runner_steps.py": {
@@ -720,13 +694,13 @@
       "module": "curllm_core.form_fill",
       "imports_count": 6,
       "exports_count": 2,
-      "imported_by_count": 6,
+      "imported_by_count": 9,
       "imported_by": [
-        "execution/executor.py",
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py",
         "hierarchical/planner.py",
         "running/runner.py",
-        "deprecated/llm_form_orchestrator.py",
-        "dsl/executor.py"
+        "deprecated/llm_form_orchestrator.py"
       ]
     },
     "executor.py": {
@@ -745,34 +719,36 @@
       "module": "curllm_core.rerun_cmd",
       "imports_count": 5,
       "exports_count": 1,
-      "imported_by_count": 2,
+      "imported_by_count": 3,
       "imported_by": [
         "planner_progress.py",
-        "execution/executor.py"
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py"
       ]
     },
     "page_utils.py": {
       "module": "curllm_core.page_utils",
       "imports_count": 1,
       "exports_count": 3,
-      "imported_by_count": 6,
+      "imported_by_count": 7,
       "imported_by": [
         "navigation.py",
         "task_runner_steps.py",
         "task_runner_tools.py",
         "remediation.py",
-        "execution/executor.py"
+        "execution/executor/_should_validate.py"
       ]
     },
     "slider_plugin.py": {
       "module": "curllm_core.slider_plugin",
       "imports_count": 7,
       "exports_count": 2,
-      "imported_by_count": 4,
+      "imported_by_count": 5,
       "imported_by": [
         "navigation.py",
         "remediation.py",
-        "execution/executor.py",
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py",
         "running/runner.py"
       ]
     },
@@ -780,13 +756,13 @@
       "module": "curllm_core.orchestrator",
       "imports_count": 5,
       "exports_count": 0,
-      "imported_by_count": 7,
+      "imported_by_count": 11,
       "imported_by": [
         "cli_orchestrator.py",
         "shortcuts.py",
+        "streamware/components/form/smart_orchestrator/smart_fill_form.py",
         "running/runner.py",
-        "deprecated/cli_orchestrator.py",
-        "orchestration/execute.py"
+        "deprecated/cli_orchestrator.py"
       ]
     },
     "cli_orchestrator.py": {
@@ -823,32 +799,28 @@
         "multi_criteria_filter.py"
       ]
     },
-    "form_fill_llm.py": {
-      "module": "curllm_core.form_fill_llm",
-      "imports_count": 11,
-      "exports_count": 7,
-      "imported_by_count": 0,
-      "imported_by": []
-    },
     "stealth.py": {
       "module": "curllm_core.stealth",
       "imports_count": 1,
       "exports_count": 4,
-      "imported_by_count": 3,
+      "imported_by_count": 7,
       "imported_by": [
         "streamware/components/browser/setup.py",
-        "execution/executor.py",
-        "orchestration/orchestrator.py"
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py",
+        "orchestration/orchestrator/orchestrator_config.py",
+        "orchestration/orchestrator/orchestrator.py"
       ]
     },
     "screenshots.py": {
       "module": "curllm_core.screenshots",
       "imports_count": 9,
       "exports_count": 7,
-      "imported_by_count": 2,
+      "imported_by_count": 3,
       "imported_by": [
         "navigation.py",
-        "execution/executor.py"
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py"
       ]
     },
     "remediation.py": {
@@ -862,9 +834,10 @@
       "module": "curllm_core.headers",
       "imports_count": 3,
       "exports_count": 1,
-      "imported_by_count": 1,
+      "imported_by_count": 2,
       "imported_by": [
-        "execution/executor.py"
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py"
       ]
     },
     "llm_container_validator.py": {
@@ -883,13 +856,6 @@
       "imported_by_count": 0,
       "imported_by": []
     },
-    "dom_selectors.py": {
-      "module": "curllm_core.dom_selectors",
-      "imports_count": 6,
-      "exports_count": 4,
-      "imported_by_count": 0,
-      "imported_by": []
-    },
     "multi_criteria_filter.py": {
       "module": "curllm_core.multi_criteria_filter",
       "imports_count": 11,
@@ -903,9 +869,10 @@
       "module": "curllm_core.bql_utils",
       "imports_count": 0,
       "exports_count": 1,
-      "imported_by_count": 1,
+      "imported_by_count": 2,
       "imported_by": [
-        "execution/executor.py"
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py"
       ]
     },
     "llm_heuristics.py": {
@@ -931,9 +898,10 @@
       "module": "curllm_core.task_runner",
       "imports_count": 2,
       "exports_count": 0,
-      "imported_by_count": 2,
+      "imported_by_count": 3,
       "imported_by": [
-        "execution/executor.py",
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py",
         "running/runner.py"
       ]
     },
@@ -950,25 +918,27 @@
       "module": "curllm_core.agent_factory",
       "imports_count": 4,
       "exports_count": 3,
-      "imported_by_count": 1,
+      "imported_by_count": 2,
       "imported_by": [
-        "execution/executor.py"
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py"
       ]
     },
     "result_evaluator.py": {
       "module": "curllm_core.result_evaluator",
       "imports_count": 3,
       "exports_count": 1,
-      "imported_by_count": 1,
+      "imported_by_count": 2,
       "imported_by": [
-        "execution/executor.py"
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py"
       ]
     },
     "logger.py": {
       "module": "curllm_core.logger",
       "imports_count": 2,
       "exports_count": 0,
-      "imported_by_count": 22,
+      "imported_by_count": 23,
       "imported_by": [
         "captcha_widget.py",
         "llm_planner.py",
@@ -991,10 +961,11 @@
       "module": "curllm_core.bql",
       "imports_count": 9,
       "exports_count": 33,
-      "imported_by_count": 3,
+      "imported_by_count": 4,
       "imported_by": [
         "bql_extraction_orchestrator.py",
-        "execution/executor.py",
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py",
         "running/runner.py"
       ]
     },
@@ -1002,18 +973,22 @@
       "module": "curllm_core.result_validator",
       "imports_count": 5,
       "exports_count": 0,
-      "imported_by_count": 1,
+      "imported_by_count": 4,
       "imported_by": [
-        "orchestration/orchestrator.py"
+        "orchestration/orchestrator/orchestrator_config.py",
+        "orchestration/orchestrator/orchestrator.py",
+        "orchestration/orchestrator/step_result.py",
+        "orchestration/orchestrator/execute_command.py"
       ]
     },
     "llm_factory.py": {
       "module": "curllm_core.llm_factory",
       "imports_count": 10,
       "exports_count": 23,
-      "imported_by_count": 2,
+      "imported_by_count": 3,
       "imported_by": [
-        "execution/executor.py",
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py",
         "extraction/extractor.py"
       ]
     },
@@ -1021,9 +996,10 @@
       "module": "curllm_core.product_extract",
       "imports_count": 4,
       "exports_count": 1,
-      "imported_by_count": 2,
+      "imported_by_count": 3,
       "imported_by": [
-        "execution/executor.py",
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py",
         "running/runner.py"
       ]
     },
@@ -1031,26 +1007,56 @@
       "module": "curllm_core.wordpress",
       "imports_count": 5,
       "exports_count": 8,
-      "imported_by_count": 1,
+      "imported_by_count": 2,
       "imported_by": [
-        "execution/executor.py"
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py"
       ]
     },
     "url_resolution/resolver.py": {
       "module": "curllm_core.url_resolution.resolver",
       "imports_count": 27,
       "exports_count": 24,
-      "imported_by_count": 2,
+      "imported_by_count": 5,
       "imported_by": [
         "url_resolver.py",
-        "orchestration/orchestrator.py"
+        "orchestration/orchestrator/orchestrator_config.py",
+        "orchestration/orchestrator/orchestrator.py",
+        "orchestration/orchestrator/step_result.py",
+        "orchestration/orchestrator/execute_command.py"
       ]
+    },
+    "url_resolution/goal_detector_llm/goal_detection_result.py": {
+      "module": "curllm_core.url_resolution.goal_detector_llm.goal_detection_result",
+      "imports_count": 5,
+      "exports_count": 1,
+      "imported_by_count": 2,
+      "imported_by": [
+        "url_resolution/goal_detector_llm/goal_detector_hybrid.py",
+        "url_resolution/goal_detector_llm/detect_navigation_goal.py"
+      ]
+    },
+    "url_resolution/goal_detector_llm/goal_detector_hybrid.py": {
+      "module": "curllm_core.url_resolution.goal_detector_llm.goal_detector_hybrid",
+      "imports_count": 9,
+      "exports_count": 6,
+      "imported_by_count": 1,
+      "imported_by": [
+        "url_resolution/goal_detector_llm/detect_navigation_goal.py"
+      ]
+    },
+    "url_resolution/goal_detector_llm/detect_navigation_goal.py": {
+      "module": "curllm_core.url_resolution.goal_detector_llm.detect_navigation_goal",
+      "imports_count": 7,
+      "exports_count": 1,
+      "imported_by_count": 0,
+      "imported_by": []
     },
     "streamware/exceptions.py": {
       "module": "curllm_core.streamware.exceptions",
       "imports_count": 0,
       "exports_count": 6,
-      "imported_by_count": 13,
+      "imported_by_count": 16,
       "imported_by": [
         "streamware/registry.py",
         "streamware/uri.py",
@@ -1073,7 +1079,7 @@
       "module": "curllm_core.streamware.registry",
       "imports_count": 9,
       "exports_count": 9,
-      "imported_by_count": 13,
+      "imported_by_count": 16,
       "imported_by": [
         "streamware/helpers.py",
         "streamware/llm_bridge.py",
@@ -1086,7 +1092,7 @@
       "module": "curllm_core.streamware.uri",
       "imports_count": 7,
       "exports_count": 10,
-      "imported_by_count": 19,
+      "imported_by_count": 20,
       "imported_by": [
         "extraction_orchestrator.py",
         "task_runner_fallback.py",
@@ -1128,7 +1134,7 @@
       "module": "curllm_core.streamware.core",
       "imports_count": 10,
       "exports_count": 14,
-      "imported_by_count": 68,
+      "imported_by_count": 100,
       "imported_by": [
         "dynamic_detector.py",
         "url_resolver.py",
@@ -1192,7 +1198,7 @@
       "module": "curllm_core.streamware.components.curllm",
       "imports_count": 15,
       "exports_count": 22,
-      "imported_by_count": 59,
+      "imported_by_count": 88,
       "imported_by": [
         "dynamic_detector.py",
         "url_resolver.py",
@@ -1233,26 +1239,26 @@
       "module": "curllm_core.streamware.components.captcha.detect",
       "imports_count": 4,
       "exports_count": 2,
-      "imported_by_count": 17,
+      "imported_by_count": 20,
       "imported_by": [
         "dynamic_detector.py",
         "iterative_extractor.py",
         "task_runner_early.py",
         "url_resolution/resolver.py",
-        "streamware/components/captcha/solve.py"
+        "url_resolution/goal_detector_llm/goal_detector_hybrid.py"
       ]
     },
     "streamware/components/captcha/solve.py": {
       "module": "curllm_core.streamware.components.captcha.solve",
       "imports_count": 10,
       "exports_count": 9,
-      "imported_by_count": 11,
+      "imported_by_count": 15,
       "imported_by": [
         "url_resolver.py",
         "navigation.py",
         "remediation.py",
         "url_resolution/resolver.py",
-        "streamware/components/form/smart_orchestrator.py"
+        "streamware/components/form/orchestrator.py"
       ]
     },
     "streamware/components/captcha/vision_solve.py": {
@@ -1261,7 +1267,7 @@
       "exports_count": 8,
       "imported_by_count": 1,
       "imported_by": [
-        "streamware/components/form/smart_orchestrator.py"
+        "streamware/components/form/smart_orchestrator/smart_form_orchestrator.py"
       ]
     },
     "streamware/components/currency/translator.py": {
@@ -1271,28 +1277,55 @@
       "imported_by_count": 0,
       "imported_by": []
     },
+    "streamware/components/decision_llm/llm_decision_component.py": {
+      "module": "curllm_core.streamware.components.decision_llm.llm_decision_component",
+      "imports_count": 10,
+      "exports_count": 5,
+      "imported_by_count": 0,
+      "imported_by": []
+    },
+    "streamware/components/decision_llm/llm_action_planner.py": {
+      "module": "curllm_core.streamware.components.decision_llm.llm_action_planner",
+      "imports_count": 11,
+      "exports_count": 4,
+      "imported_by_count": 1,
+      "imported_by": [
+        "streamware/components/decision_llm/llm_decision_component.py"
+      ]
+    },
+    "streamware/components/decision_llm/llm_field_analyzer.py": {
+      "module": "curllm_core.streamware.components.decision_llm.llm_field_analyzer",
+      "imports_count": 10,
+      "exports_count": 6,
+      "imported_by_count": 2,
+      "imported_by": [
+        "streamware/components/decision_llm/llm_decision_component.py",
+        "streamware/components/decision_llm/llm_action_planner.py"
+      ]
+    },
     "streamware/components/form/fill.py": {
       "module": "curllm_core.streamware.components.form.fill",
       "imports_count": 3,
       "exports_count": 2,
-      "imported_by_count": 10,
+      "imported_by_count": 13,
       "imported_by": [
         "llm_field_filler.py",
         "form_fill.py",
         "streamware/components/form/tools.py",
         "streamware/components/form/orchestrator.py",
-        "execution/executor.py"
+        "execution/executor/_should_validate.py"
       ]
     },
     "streamware/components/form/submit.py": {
       "module": "curllm_core.streamware.components.form.submit",
       "imports_count": 6,
       "exports_count": 7,
-      "imported_by_count": 3,
+      "imported_by_count": 4,
       "imported_by": [
         "llm_field_filler.py",
         "streamware/components/form/tools.py",
-        "streamware/components/form/orchestrator.py"
+        "streamware/components/form/orchestrator.py",
+        "streamware/components/form/submit_llm/submit_form_llm.py"
       ]
     },
     "streamware/components/form/tools.py": {
@@ -1310,33 +1343,26 @@
       "module": "curllm_core.streamware.components.form.detect",
       "imports_count": 4,
       "exports_count": 3,
-      "imported_by_count": 17,
+      "imported_by_count": 20,
       "imported_by": [
         "dynamic_detector.py",
         "iterative_extractor.py",
         "task_runner_early.py",
         "url_resolution/resolver.py",
-        "streamware/components/captcha/solve.py"
+        "url_resolution/goal_detector_llm/goal_detector_hybrid.py"
       ]
-    },
-    "streamware/components/form/smart_orchestrator.py": {
-      "module": "curllm_core.streamware.components.form.smart_orchestrator",
-      "imports_count": 10,
-      "exports_count": 23,
-      "imported_by_count": 0,
-      "imported_by": []
     },
     "streamware/components/form/orchestrator.py": {
       "module": "curllm_core.streamware.components.form.orchestrator",
       "imports_count": 27,
       "exports_count": 9,
-      "imported_by_count": 7,
+      "imported_by_count": 11,
       "imported_by": [
         "cli_orchestrator.py",
         "shortcuts.py",
+        "streamware/components/form/smart_orchestrator/smart_fill_form.py",
         "running/runner.py",
-        "deprecated/cli_orchestrator.py",
-        "orchestration/execute.py"
+        "deprecated/cli_orchestrator.py"
       ]
     },
     "streamware/components/form/map_fields.py": {
@@ -1348,13 +1374,51 @@
         "streamware/components/form/orchestrator.py"
       ]
     },
+    "streamware/components/form/smart_orchestrator/smart_fill_form.py": {
+      "module": "curllm_core.streamware.components.form.smart_orchestrator.smart_fill_form",
+      "imports_count": 8,
+      "exports_count": 1,
+      "imported_by_count": 0,
+      "imported_by": []
+    },
+    "streamware/components/form/smart_orchestrator/smart_form_orchestrator.py": {
+      "module": "curllm_core.streamware.components.form.smart_orchestrator.smart_form_orchestrator",
+      "imports_count": 10,
+      "exports_count": 22,
+      "imported_by_count": 1,
+      "imported_by": [
+        "streamware/components/form/smart_orchestrator/smart_fill_form.py"
+      ]
+    },
+    "streamware/components/form/submit_llm/llm_submit_detector.py": {
+      "module": "curllm_core.streamware.components.form.submit_llm.llm_submit_detector",
+      "imports_count": 5,
+      "exports_count": 5,
+      "imported_by_count": 0,
+      "imported_by": []
+    },
+    "streamware/components/form/submit_llm/llm_success_evaluator.py": {
+      "module": "curllm_core.streamware.components.form.submit_llm.llm_success_evaluator",
+      "imports_count": 7,
+      "exports_count": 5,
+      "imported_by_count": 0,
+      "imported_by": []
+    },
+    "streamware/components/form/submit_llm/submit_form_llm.py": {
+      "module": "curllm_core.streamware.components.form.submit_llm.submit_form_llm",
+      "imports_count": 6,
+      "exports_count": 1,
+      "imported_by_count": 0,
+      "imported_by": []
+    },
     "streamware/components/navigation/actions.py": {
       "module": "curllm_core.streamware.components.navigation.actions",
       "imports_count": 4,
       "exports_count": 6,
-      "imported_by_count": 1,
+      "imported_by_count": 2,
       "imported_by": [
-        "execution/executor.py"
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py"
       ]
     },
     "streamware/components/extraction/llm_patterns.py": {
@@ -1379,13 +1443,13 @@
       "module": "curllm_core.streamware.components.extraction.extractor",
       "imports_count": 9,
       "exports_count": 6,
-      "imported_by_count": 5,
+      "imported_by_count": 7,
       "imported_by": [
         "orchestrator_steps.py",
         "multi_criteria_filter.py",
         "extraction/extractor.py",
-        "running/runner.py",
-        "dsl/executor.py"
+        "extraction/extractor_llm/extract_with_llm.py",
+        "extraction/extractor_llm/llm_extract.py"
       ]
     },
     "streamware/components/extraction/container.py": {
@@ -1422,14 +1486,17 @@
       "module": "curllm_core.streamware.components.extraction.llm_extractor",
       "imports_count": 16,
       "exports_count": 17,
-      "imported_by_count": 0,
-      "imported_by": []
+      "imported_by_count": 2,
+      "imported_by": [
+        "extraction/extractor_llm/extract_with_llm.py",
+        "extraction/extractor_llm/llm_extract.py"
+      ]
     },
     "streamware/components/extraction/selector.py": {
       "module": "curllm_core.streamware.components.extraction.selector",
       "imports_count": 7,
       "exports_count": 2,
-      "imported_by_count": 13,
+      "imported_by_count": 14,
       "imported_by": [
         "extraction_orchestrator.py",
         "task_runner_early.py",
@@ -1455,22 +1522,23 @@
       "module": "curllm_core.streamware.components.llm.planner",
       "imports_count": 6,
       "exports_count": 10,
-      "imported_by_count": 7,
+      "imported_by_count": 14,
       "imported_by": [
         "hierarchical_planner.py",
         "orchestrator_steps.py",
         "task_runner.py",
-        "execution/executor.py",
-        "running/runner.py"
+        "streamware/components/decision_llm/llm_decision_component.py",
+        "execution/executor/_should_validate.py"
       ]
     },
     "streamware/components/llm/factory.py": {
       "module": "curllm_core.streamware.components.llm.factory",
       "imports_count": 8,
       "exports_count": 4,
-      "imported_by_count": 2,
+      "imported_by_count": 3,
       "imported_by": [
-        "execution/executor.py",
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py",
         "extraction/extractor.py"
       ]
     },
@@ -1478,13 +1546,13 @@
       "module": "curllm_core.streamware.components.dom.analyze",
       "imports_count": 4,
       "exports_count": 4,
-      "imported_by_count": 5,
+      "imported_by_count": 8,
       "imported_by": [
+        "streamware/components/decision_llm/llm_decision_component.py",
+        "streamware/components/decision_llm/llm_action_planner.py",
         "streamware/components/extraction/llm_extractor.py",
-        "execution/executor.py",
-        "hierarchical/planner.py",
-        "dsl/executor.py",
-        "dom_toolkit/orchestrator/task_router.py"
+        "execution/executor/curllm_executor.py",
+        "hierarchical/planner.py"
       ]
     },
     "streamware/components/dom/query.py": {
@@ -1498,21 +1566,23 @@
       "module": "curllm_core.streamware.components.dom.context",
       "imports_count": 3,
       "exports_count": 3,
-      "imported_by_count": 6,
+      "imported_by_count": 9,
       "imported_by": [
         "extraction_orchestrator.py",
         "hierarchical_planner.py",
         "shortcuts.py",
-        "execution/executor.py",
-        "running/runner.py"
+        "element_finder/finder/llm_element_finder.py",
+        "execution/executor/_should_validate.py"
       ]
     },
     "streamware/components/vision/analyzer.py": {
       "module": "curllm_core.streamware.components.vision.analyzer",
       "imports_count": 8,
       "exports_count": 8,
-      "imported_by_count": 3,
+      "imported_by_count": 5,
       "imported_by": [
+        "streamware/components/decision_llm/llm_decision_component.py",
+        "streamware/components/decision_llm/llm_action_planner.py",
         "streamware/components/extraction/llm_extractor.py",
         "dsl/executor.py",
         "dom_toolkit/orchestrator/task_router.py"
@@ -1522,18 +1592,19 @@
       "module": "curllm_core.streamware.components.screenshot.capture",
       "imports_count": 6,
       "exports_count": 4,
-      "imported_by_count": 3,
+      "imported_by_count": 4,
       "imported_by": [
         "screenshots.py",
         "streamware/components/form/tools.py",
-        "streamware/components/form/orchestrator.py"
+        "streamware/components/form/orchestrator.py",
+        "streamware/components/form/submit_llm/submit_form_llm.py"
       ]
     },
     "streamware/components/bql/parser.py": {
       "module": "curllm_core.streamware.components.bql.parser",
       "imports_count": 7,
       "exports_count": 21,
-      "imported_by_count": 10,
+      "imported_by_count": 14,
       "imported_by": [
         "orchestrator_steps.py",
         "multi_criteria_filter.py",
@@ -1559,45 +1630,47 @@
       "module": "curllm_core.streamware.components.bql.utils",
       "imports_count": 2,
       "exports_count": 6,
-      "imported_by_count": 6,
+      "imported_by_count": 7,
       "imported_by": [
         "navigation.py",
         "task_runner_steps.py",
         "task_runner_tools.py",
         "remediation.py",
-        "execution/executor.py"
+        "execution/executor/_should_validate.py"
       ]
     },
     "streamware/components/bql/orchestrator.py": {
       "module": "curllm_core.streamware.components.bql.orchestrator",
       "imports_count": 7,
       "exports_count": 16,
-      "imported_by_count": 7,
+      "imported_by_count": 11,
       "imported_by": [
         "cli_orchestrator.py",
         "shortcuts.py",
+        "streamware/components/form/smart_orchestrator/smart_fill_form.py",
         "running/runner.py",
-        "deprecated/cli_orchestrator.py",
-        "orchestration/execute.py"
+        "deprecated/cli_orchestrator.py"
       ]
     },
     "streamware/components/browser/proxy.py": {
       "module": "curllm_core.streamware.components.browser.proxy",
       "imports_count": 9,
       "exports_count": 12,
-      "imported_by_count": 2,
+      "imported_by_count": 3,
       "imported_by": [
         "server.py",
-        "execution/executor.py"
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py"
       ]
     },
     "streamware/components/browser/setup.py": {
       "module": "curllm_core.streamware.components.browser.setup",
       "imports_count": 11,
       "exports_count": 9,
-      "imported_by_count": 2,
+      "imported_by_count": 3,
       "imported_by": [
-        "execution/executor.py",
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py",
         "extraction/extractor.py"
       ]
     },
@@ -1605,24 +1678,26 @@
       "module": "curllm_core.streamware.components.browser.stealth",
       "imports_count": 3,
       "exports_count": 10,
-      "imported_by_count": 3,
+      "imported_by_count": 7,
       "imported_by": [
         "streamware/components/browser/setup.py",
-        "execution/executor.py",
-        "orchestration/orchestrator.py"
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py",
+        "orchestration/orchestrator/orchestrator_config.py",
+        "orchestration/orchestrator/orchestrator.py"
       ]
     },
     "planning/planner.py": {
       "module": "curllm_core.planning.planner",
       "imports_count": 11,
       "exports_count": 18,
-      "imported_by_count": 7,
+      "imported_by_count": 14,
       "imported_by": [
         "hierarchical_planner.py",
         "orchestrator_steps.py",
         "task_runner.py",
-        "execution/executor.py",
-        "running/runner.py"
+        "streamware/components/decision_llm/llm_decision_component.py",
+        "execution/executor/_should_validate.py"
       ]
     },
     "tools/base.py": {
@@ -1642,7 +1717,7 @@
       "module": "curllm_core.tools.registry",
       "imports_count": 8,
       "exports_count": 11,
-      "imported_by_count": 13,
+      "imported_by_count": 16,
       "imported_by": [
         "streamware/helpers.py",
         "streamware/llm_bridge.py",
@@ -1655,13 +1730,13 @@
       "module": "curllm_core.tools.orchestrator",
       "imports_count": 6,
       "exports_count": 6,
-      "imported_by_count": 7,
+      "imported_by_count": 11,
       "imported_by": [
         "cli_orchestrator.py",
         "shortcuts.py",
+        "streamware/components/form/smart_orchestrator/smart_fill_form.py",
         "running/runner.py",
-        "deprecated/cli_orchestrator.py",
-        "orchestration/execute.py"
+        "deprecated/cli_orchestrator.py"
       ]
     },
     "tools/forms/price_filter.py": {
@@ -1707,9 +1782,10 @@
       "module": "curllm_core.cli.setup",
       "imports_count": 5,
       "exports_count": 12,
-      "imported_by_count": 2,
+      "imported_by_count": 3,
       "imported_by": [
-        "execution/executor.py",
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py",
         "extraction/extractor.py"
       ]
     },
@@ -1733,117 +1809,211 @@
         "streamware/components/decision.py"
       ]
     },
-    "element_finder/finder.py": {
-      "module": "curllm_core.element_finder.finder",
-      "imports_count": 9,
-      "exports_count": 23,
-      "imported_by_count": 5,
-      "imported_by": [
-        "llm_element_finder.py",
-        "streamware/components/extraction/llm_extractor.py",
-        "element_finder/find.py",
-        "orchestration/orchestrator.py",
-        "dynamic/selectors.py"
-      ]
-    },
     "element_finder/find.py": {
       "module": "curllm_core.element_finder.find",
       "imports_count": 3,
       "exports_count": 1,
-      "imported_by_count": 5,
+      "imported_by_count": 13,
       "imported_by": [
         "llm_element_finder.py",
         "streamware/components/extraction/llm_extractor.py",
-        "orchestration/orchestrator.py",
-        "dynamic/selectors.py",
-        "dynamic/urls.py"
+        "element_finder/finder/find_element_with_llm.py",
+        "dom/helpers/execute_search.py",
+        "dom/helpers/find_search_input.py"
       ]
     },
-    "execution/executor.py": {
-      "module": "curllm_core.execution.executor",
-      "imports_count": 61,
-      "exports_count": 23,
+    "element_finder/finder/find_element_with_llm.py": {
+      "module": "curllm_core.element_finder.finder.find_element_with_llm",
+      "imports_count": 11,
+      "exports_count": 1,
+      "imported_by_count": 1,
+      "imported_by": [
+        "llm_element_finder.py"
+      ]
+    },
+    "element_finder/finder/element_match.py": {
+      "module": "curllm_core.element_finder.finder.element_match",
+      "imports_count": 9,
+      "exports_count": 1,
+      "imported_by_count": 2,
+      "imported_by": [
+        "element_finder/finder/find_element_with_llm.py",
+        "element_finder/finder/llm_element_finder.py"
+      ]
+    },
+    "element_finder/finder/llm_element_finder.py": {
+      "module": "curllm_core.element_finder.finder.llm_element_finder",
+      "imports_count": 11,
+      "exports_count": 20,
       "imported_by_count": 5,
       "imported_by": [
-        "server.py",
-        "executor.py",
-        "streamware/components/curllm.py",
-        "streamware/components/bql/orchestrator.py",
-        "cli/doctor.py"
+        "element_finder/finder/find_element_with_llm.py",
+        "orchestration/orchestrator/orchestrator_config.py",
+        "orchestration/orchestrator/orchestrator.py",
+        "orchestration/orchestrator/step_result.py",
+        "orchestration/orchestrator/execute_command.py"
       ]
+    },
+    "element_finder/finder/page_context.py": {
+      "module": "curllm_core.element_finder.finder.page_context",
+      "imports_count": 9,
+      "exports_count": 1,
+      "imported_by_count": 6,
+      "imported_by": [
+        "extraction_orchestrator.py",
+        "shortcuts.py",
+        "element_finder/finder/llm_element_finder.py",
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py"
+      ]
+    },
+    "execution/executor/_should_validate.py": {
+      "module": "curllm_core.execution.executor._should_validate",
+      "imports_count": 57,
+      "exports_count": 1,
+      "imported_by_count": 0,
+      "imported_by": []
+    },
+    "execution/executor/curllm_executor.py": {
+      "module": "curllm_core.execution.executor.curllm_executor",
+      "imports_count": 61,
+      "exports_count": 22,
+      "imported_by_count": 0,
+      "imported_by": []
     },
     "field_filling/filler.py": {
       "module": "curllm_core.field_filling.filler",
       "imports_count": 8,
       "exports_count": 7,
-      "imported_by_count": 4,
+      "imported_by_count": 5,
       "imported_by": [
         "llm_field_filler.py",
-        "execution/executor.py",
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py",
         "dsl/executor.py",
         "form_fill/filler.py"
       ]
-    },
-    "hierarchical/planner_llm.py": {
-      "module": "curllm_core.hierarchical.planner_llm",
-      "imports_count": 7,
-      "exports_count": 11,
-      "imported_by_count": 0,
-      "imported_by": []
     },
     "hierarchical/planner.py": {
       "module": "curllm_core.hierarchical.planner",
       "imports_count": 12,
       "exports_count": 12,
-      "imported_by_count": 7,
+      "imported_by_count": 14,
       "imported_by": [
         "hierarchical_planner.py",
         "orchestrator_steps.py",
         "task_runner.py",
-        "execution/executor.py",
-        "running/runner.py"
+        "streamware/components/decision_llm/llm_decision_component.py",
+        "execution/executor/_should_validate.py"
+      ]
+    },
+    "hierarchical/planner_llm/extract_strategic_context.py": {
+      "module": "curllm_core.hierarchical.planner_llm.extract_strategic_context",
+      "imports_count": 6,
+      "exports_count": 2,
+      "imported_by_count": 2,
+      "imported_by": [
+        "hierarchical_planner.py",
+        "hierarchical/planner_llm/llm_hierarchical_planner.py"
+      ]
+    },
+    "hierarchical/planner_llm/should_use_hierarchical_llm.py": {
+      "module": "curllm_core.hierarchical.planner_llm.should_use_hierarchical_llm",
+      "imports_count": 7,
+      "exports_count": 1,
+      "imported_by_count": 0,
+      "imported_by": []
+    },
+    "hierarchical/planner_llm/llm_hierarchical_planner.py": {
+      "module": "curllm_core.hierarchical.planner_llm.llm_hierarchical_planner",
+      "imports_count": 8,
+      "exports_count": 7,
+      "imported_by_count": 1,
+      "imported_by": [
+        "hierarchical/planner_llm/should_use_hierarchical_llm.py"
       ]
     },
     "extraction/extractor.py": {
       "module": "curllm_core.extraction.extractor",
       "imports_count": 10,
       "exports_count": 19,
-      "imported_by_count": 4,
+      "imported_by_count": 6,
       "imported_by": [
         "orchestrator_steps.py",
         "multi_criteria_filter.py",
-        "running/runner.py",
-        "dsl/executor.py"
+        "extraction/extractor_llm/extract_with_llm.py",
+        "extraction/extractor_llm/llm_extract.py",
+        "running/runner.py"
       ]
     },
-    "extraction/extractor_llm.py": {
-      "module": "curllm_core.extraction.extractor_llm",
-      "imports_count": 9,
-      "exports_count": 14,
+    "extraction/extractor_llm/extract_with_llm.py": {
+      "module": "curllm_core.extraction.extractor_llm.extract_with_llm",
+      "imports_count": 8,
+      "exports_count": 1,
       "imported_by_count": 0,
       "imported_by": []
+    },
+    "extraction/extractor_llm/llm_extract.py": {
+      "module": "curllm_core.extraction.extractor_llm.llm_extract",
+      "imports_count": 8,
+      "exports_count": 1,
+      "imported_by_count": 2,
+      "imported_by": [
+        "iterative_extractor.py",
+        "extraction/extractor_llm/extract_with_llm.py"
+      ]
+    },
+    "extraction/extractor_llm/extraction_result.py": {
+      "module": "curllm_core.extraction.extractor_llm.extraction_result",
+      "imports_count": 7,
+      "exports_count": 1,
+      "imported_by_count": 1,
+      "imported_by": [
+        "extraction/extractor_llm/llm_extractor.py"
+      ]
+    },
+    "extraction/extractor_llm/extraction_request.py": {
+      "module": "curllm_core.extraction.extractor_llm.extraction_request",
+      "imports_count": 7,
+      "exports_count": 1,
+      "imported_by_count": 1,
+      "imported_by": [
+        "extraction/extractor_llm/llm_extractor.py"
+      ]
+    },
+    "extraction/extractor_llm/llm_extractor.py": {
+      "module": "curllm_core.extraction.extractor_llm.llm_extractor",
+      "imports_count": 11,
+      "exports_count": 10,
+      "imported_by_count": 2,
+      "imported_by": [
+        "extraction/extractor_llm/extract_with_llm.py",
+        "extraction/extractor_llm/llm_extract.py"
+      ]
     },
     "running/runner.py": {
       "module": "curllm_core.running.runner",
       "imports_count": 54,
       "exports_count": 3,
-      "imported_by_count": 3,
+      "imported_by_count": 4,
       "imported_by": [
         "task_runner.py",
         "cli/flow.py",
-        "execution/executor.py"
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py"
       ]
     },
     "result_validation/validator.py": {
       "module": "curllm_core.result_validation.validator",
       "imports_count": 10,
       "exports_count": 9,
-      "imported_by_count": 4,
+      "imported_by_count": 8,
       "imported_by": [
         "dynamic_container_detector.py",
         "multi_criteria_filter.py",
-        "orchestration/orchestrator.py",
-        "dsl/executor.py"
+        "orchestration/orchestrator/orchestrator_config.py",
+        "orchestration/orchestrator/orchestrator.py",
+        "orchestration/orchestrator/step_result.py"
       ]
     },
     "deprecated/extraction_registry.py": {
@@ -1901,6 +2071,13 @@
       "imported_by_count": 0,
       "imported_by": []
     },
+    "deprecated/dom_selectors.py": {
+      "module": "curllm_core.deprecated.dom_selectors",
+      "imports_count": 6,
+      "exports_count": 4,
+      "imported_by_count": 0,
+      "imported_by": []
+    },
     "deprecated/llm_form_orchestrator.py": {
       "module": "curllm_core.deprecated.llm_form_orchestrator",
       "imports_count": 10,
@@ -1926,48 +2103,197 @@
       "module": "curllm_core.detection.detector",
       "imports_count": 9,
       "exports_count": 18,
-      "imported_by_count": 6,
+      "imported_by_count": 7,
       "imported_by": [
         "iterative_extractor.py",
         "task_runner_early.py",
         "url_resolution/resolver.py",
-        "streamware/components/extraction/llm_extractor.py",
-        "running/runner.py"
+        "url_resolution/goal_detector_llm/detect_navigation_goal.py",
+        "streamware/components/extraction/llm_extractor.py"
       ]
     },
-    "dom/helpers.py": {
-      "module": "curllm_core.dom.helpers",
+    "dom/helpers/execute_search.py": {
+      "module": "curllm_core.dom.helpers.execute_search",
       "imports_count": 11,
-      "exports_count": 19,
+      "exports_count": 1,
+      "imported_by_count": 0,
+      "imported_by": []
+    },
+    "dom/helpers/has_content_type.py": {
+      "module": "curllm_core.dom.helpers.has_content_type",
+      "imports_count": 11,
+      "exports_count": 1,
+      "imported_by_count": 0,
+      "imported_by": []
+    },
+    "dom/helpers/find_elements_by_role.py": {
+      "module": "curllm_core.dom.helpers.find_elements_by_role",
+      "imports_count": 11,
+      "exports_count": 1,
+      "imported_by_count": 0,
+      "imported_by": []
+    },
+    "dom/helpers/find_inputs.py": {
+      "module": "curllm_core.dom.helpers.find_inputs",
+      "imports_count": 11,
+      "exports_count": 1,
+      "imported_by_count": 1,
+      "imported_by": [
+        "dom/helpers/find_search_input.py"
+      ]
+    },
+    "dom/helpers/find_links_by_location.py": {
+      "module": "curllm_core.dom.helpers.find_links_by_location",
+      "imports_count": 12,
+      "exports_count": 1,
+      "imported_by_count": 0,
+      "imported_by": []
+    },
+    "dom/helpers/find_buttons.py": {
+      "module": "curllm_core.dom.helpers.find_buttons",
+      "imports_count": 11,
+      "exports_count": 1,
+      "imported_by_count": 0,
+      "imported_by": []
+    },
+    "dom/helpers/analyze_page_type.py": {
+      "module": "curllm_core.dom.helpers.analyze_page_type",
+      "imports_count": 10,
+      "exports_count": 1,
       "imported_by_count": 2,
       "imported_by": [
-        "url_resolver_llm.py",
-        "url_resolution/resolver.py"
+        "streamware/components/extraction/llm_extractor.py",
+        "dom/helpers/has_content_type.py"
       ]
+    },
+    "dom/helpers/_find_link_with_llm.py": {
+      "module": "curllm_core.dom.helpers._find_link_with_llm",
+      "imports_count": 13,
+      "exports_count": 1,
+      "imported_by_count": 1,
+      "imported_by": [
+        "dom/helpers/find_link_for_goal.py"
+      ]
+    },
+    "dom/helpers/find_links_by_text.py": {
+      "module": "curllm_core.dom.helpers.find_links_by_text",
+      "imports_count": 12,
+      "exports_count": 1,
+      "imported_by_count": 1,
+      "imported_by": [
+        "dom/helpers/_find_link_keyword_fallback.py"
+      ]
+    },
+    "dom/helpers/link_info.py": {
+      "module": "curllm_core.dom.helpers.link_info",
+      "imports_count": 10,
+      "exports_count": 1,
+      "imported_by_count": 9,
+      "imported_by": [
+        "dom/helpers/find_links_by_location.py",
+        "dom/helpers/_find_link_with_llm.py",
+        "dom/helpers/find_links_by_text.py",
+        "dom/helpers/extract_all_links.py",
+        "dom/helpers/find_links_by_aria.py"
+      ]
+    },
+    "dom/helpers/find_search_input.py": {
+      "module": "curllm_core.dom.helpers.find_search_input",
+      "imports_count": 12,
+      "exports_count": 1,
+      "imported_by_count": 1,
+      "imported_by": [
+        "dom/helpers/execute_search.py"
+      ]
+    },
+    "dom/helpers/extract_all_links.py": {
+      "module": "curllm_core.dom.helpers.extract_all_links",
+      "imports_count": 11,
+      "exports_count": 1,
+      "imported_by_count": 6,
+      "imported_by": [
+        "dom/helpers/find_links_by_location.py",
+        "dom/helpers/_find_link_with_llm.py",
+        "dom/helpers/find_links_by_text.py",
+        "dom/helpers/find_links_by_aria.py",
+        "dom/helpers/find_links_by_url_pattern.py"
+      ]
+    },
+    "dom/helpers/find_links_by_aria.py": {
+      "module": "curllm_core.dom.helpers.find_links_by_aria",
+      "imports_count": 12,
+      "exports_count": 1,
+      "imported_by_count": 1,
+      "imported_by": [
+        "dom/helpers/_find_link_keyword_fallback.py"
+      ]
+    },
+    "dom/helpers/element_info.py": {
+      "module": "curllm_core.dom.helpers.element_info",
+      "imports_count": 10,
+      "exports_count": 1,
+      "imported_by_count": 4,
+      "imported_by": [
+        "dom/helpers/find_elements_by_role.py",
+        "dom/helpers/find_inputs.py",
+        "dom/helpers/find_buttons.py",
+        "dom/helpers/find_search_input.py"
+      ]
+    },
+    "dom/helpers/find_link_for_goal.py": {
+      "module": "curllm_core.dom.helpers.find_link_for_goal",
+      "imports_count": 14,
+      "exports_count": 1,
+      "imported_by_count": 1,
+      "imported_by": [
+        "dynamic/urls.py"
+      ]
+    },
+    "dom/helpers/find_links_by_url_pattern.py": {
+      "module": "curllm_core.dom.helpers.find_links_by_url_pattern",
+      "imports_count": 12,
+      "exports_count": 1,
+      "imported_by_count": 1,
+      "imported_by": [
+        "dom/helpers/_find_link_keyword_fallback.py"
+      ]
+    },
+    "dom/helpers/_find_link_statistical.py": {
+      "module": "curllm_core.dom.helpers._find_link_statistical",
+      "imports_count": 12,
+      "exports_count": 1,
+      "imported_by_count": 1,
+      "imported_by": [
+        "dom/helpers/find_link_for_goal.py"
+      ]
+    },
+    "dom/helpers/_find_link_keyword_fallback.py": {
+      "module": "curllm_core.dom.helpers._find_link_keyword_fallback",
+      "imports_count": 14,
+      "exports_count": 1,
+      "imported_by_count": 1,
+      "imported_by": [
+        "dom/helpers/find_link_for_goal.py"
+      ]
+    },
+    "dom/helpers/try_direct_urls.py": {
+      "module": "curllm_core.dom.helpers.try_direct_urls",
+      "imports_count": 10,
+      "exports_count": 1,
+      "imported_by_count": 0,
+      "imported_by": []
     },
     "orchestration/execute.py": {
       "module": "curllm_core.orchestration.execute",
       "imports_count": 4,
       "exports_count": 1,
-      "imported_by_count": 4,
+      "imported_by_count": 5,
       "imported_by": [
         "actions.py",
         "orchestrator.py",
-        "execution/executor.py",
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py",
         "running/runner.py"
-      ]
-    },
-    "orchestration/orchestrator.py": {
-      "module": "curllm_core.orchestration.orchestrator",
-      "imports_count": 40,
-      "exports_count": 17,
-      "imported_by_count": 6,
-      "imported_by": [
-        "cli_orchestrator.py",
-        "shortcuts.py",
-        "running/runner.py",
-        "deprecated/cli_orchestrator.py",
-        "orchestration/execute.py"
       ]
     },
     "orchestration/models.py": {
@@ -1979,37 +2305,77 @@
         "orchestration/execute.py"
       ]
     },
-    "orchestrators/social_llm.py": {
-      "module": "curllm_core.orchestrators.social_llm",
-      "imports_count": 10,
-      "exports_count": 16,
-      "imported_by_count": 0,
-      "imported_by": []
+    "orchestration/orchestrator/orchestrator_config.py": {
+      "module": "curllm_core.orchestration.orchestrator.orchestrator_config",
+      "imports_count": 28,
+      "exports_count": 1,
+      "imported_by_count": 2,
+      "imported_by": [
+        "orchestration/orchestrator/orchestrator.py",
+        "orchestration/orchestrator/execute_command.py"
+      ]
+    },
+    "orchestration/orchestrator/orchestrator.py": {
+      "module": "curllm_core.orchestration.orchestrator.orchestrator",
+      "imports_count": 34,
+      "exports_count": 13,
+      "imported_by_count": 10,
+      "imported_by": [
+        "cli_orchestrator.py",
+        "shortcuts.py",
+        "streamware/components/form/smart_orchestrator/smart_fill_form.py",
+        "running/runner.py",
+        "deprecated/cli_orchestrator.py"
+      ]
+    },
+    "orchestration/orchestrator/orchestrator_result.py": {
+      "module": "curllm_core.orchestration.orchestrator.orchestrator_result",
+      "imports_count": 9,
+      "exports_count": 1,
+      "imported_by_count": 2,
+      "imported_by": [
+        "orchestration/orchestrator/orchestrator.py",
+        "orchestration/orchestrator/execute_command.py"
+      ]
+    },
+    "orchestration/orchestrator/step_result.py": {
+      "module": "curllm_core.orchestration.orchestrator.step_result",
+      "imports_count": 27,
+      "exports_count": 1,
+      "imported_by_count": 2,
+      "imported_by": [
+        "orchestration/orchestrator/orchestrator.py",
+        "orchestration/orchestrator/orchestrator_result.py"
+      ]
+    },
+    "orchestration/orchestrator/execute_command.py": {
+      "module": "curllm_core.orchestration.orchestrator.execute_command",
+      "imports_count": 30,
+      "exports_count": 1,
+      "imported_by_count": 1,
+      "imported_by": [
+        "orchestrator.py"
+      ]
     },
     "orchestrators/social.py": {
       "module": "curllm_core.orchestrators.social",
       "imports_count": 9,
       "exports_count": 19,
-      "imported_by_count": 1,
+      "imported_by_count": 2,
       "imported_by": [
-        "orchestrators/master.py"
+        "orchestrators/master.py",
+        "orchestrators/social_llm/llm_social_orchestrator.py"
       ]
     },
     "orchestrators/auth.py": {
       "module": "curllm_core.orchestrators.auth",
       "imports_count": 10,
       "exports_count": 21,
-      "imported_by_count": 1,
+      "imported_by_count": 2,
       "imported_by": [
-        "orchestrators/master.py"
+        "orchestrators/master.py",
+        "orchestrators/auth_llm/llm_auth_orchestrator.py"
       ]
-    },
-    "orchestrators/ecommerce_llm.py": {
-      "module": "curllm_core.orchestrators.ecommerce_llm",
-      "imports_count": 10,
-      "exports_count": 14,
-      "imported_by_count": 0,
-      "imported_by": []
     },
     "orchestrators/live.py": {
       "module": "curllm_core.orchestrators.live",
@@ -2024,7 +2390,7 @@
       "module": "curllm_core.orchestrators.extraction",
       "imports_count": 6,
       "exports_count": 16,
-      "imported_by_count": 12,
+      "imported_by_count": 14,
       "imported_by": [
         "extraction_orchestrator.py",
         "task_runner_fallback.py",
@@ -2032,13 +2398,6 @@
         "task_runner_early.py",
         "extraction.py"
       ]
-    },
-    "orchestrators/form_llm.py": {
-      "module": "curllm_core.orchestrators.form_llm",
-      "imports_count": 9,
-      "exports_count": 11,
-      "imported_by_count": 0,
-      "imported_by": []
     },
     "orchestrators/master.py": {
       "module": "curllm_core.orchestrators.master",
@@ -2051,7 +2410,7 @@
       "module": "curllm_core.orchestrators.form",
       "imports_count": 7,
       "exports_count": 12,
-      "imported_by_count": 16,
+      "imported_by_count": 22,
       "imported_by": [
         "hierarchical_planner.py",
         "llm_field_filler.py",
@@ -2069,12 +2428,197 @@
         "orchestrators/master.py"
       ]
     },
-    "orchestrators/auth_llm.py": {
-      "module": "curllm_core.orchestrators.auth_llm",
-      "imports_count": 9,
-      "exports_count": 16,
+    "orchestrators/ecommerce_llm/llme_commerce_orchestrator.py": {
+      "module": "curllm_core.orchestrators.ecommerce_llm.llme_commerce_orchestrator",
+      "imports_count": 13,
+      "exports_count": 10,
       "imported_by_count": 0,
       "imported_by": []
+    },
+    "orchestrators/ecommerce_llm/checkout_step.py": {
+      "module": "curllm_core.orchestrators.ecommerce_llm.checkout_step",
+      "imports_count": 8,
+      "exports_count": 1,
+      "imported_by_count": 1,
+      "imported_by": [
+        "orchestrators/ecommerce_llm/llme_commerce_orchestrator.py"
+      ]
+    },
+    "orchestrators/ecommerce_llm/shopping_intent.py": {
+      "module": "curllm_core.orchestrators.ecommerce_llm.shopping_intent",
+      "imports_count": 8,
+      "exports_count": 1,
+      "imported_by_count": 1,
+      "imported_by": [
+        "orchestrators/ecommerce_llm/llme_commerce_orchestrator.py"
+      ]
+    },
+    "orchestrators/ecommerce_llm/shopping_result.py": {
+      "module": "curllm_core.orchestrators.ecommerce_llm.shopping_result",
+      "imports_count": 8,
+      "exports_count": 2,
+      "imported_by_count": 1,
+      "imported_by": [
+        "orchestrators/ecommerce_llm/llme_commerce_orchestrator.py"
+      ]
+    },
+    "orchestrators/auth_llm/auth_result.py": {
+      "module": "curllm_core.orchestrators.auth_llm.auth_result",
+      "imports_count": 7,
+      "exports_count": 1,
+      "imported_by_count": 1,
+      "imported_by": [
+        "orchestrators/auth_llm/llm_auth_orchestrator.py"
+      ]
+    },
+    "orchestrators/auth_llm/auth_credentials.py": {
+      "module": "curllm_core.orchestrators.auth_llm.auth_credentials",
+      "imports_count": 7,
+      "exports_count": 1,
+      "imported_by_count": 1,
+      "imported_by": [
+        "orchestrators/auth_llm/llm_auth_orchestrator.py"
+      ]
+    },
+    "orchestrators/auth_llm/llm_auth_orchestrator.py": {
+      "module": "curllm_core.orchestrators.auth_llm.llm_auth_orchestrator",
+      "imports_count": 11,
+      "exports_count": 13,
+      "imported_by_count": 0,
+      "imported_by": []
+    },
+    "orchestrators/auth_llm/auth_method.py": {
+      "module": "curllm_core.orchestrators.auth_llm.auth_method",
+      "imports_count": 7,
+      "exports_count": 1,
+      "imported_by_count": 0,
+      "imported_by": []
+    },
+    "orchestrators/form_llm/form_field.py": {
+      "module": "curllm_core.orchestrators.form_llm.form_field",
+      "imports_count": 7,
+      "exports_count": 1,
+      "imported_by_count": 2,
+      "imported_by": [
+        "hierarchical/planner.py",
+        "deprecated/llm_form_orchestrator.py"
+      ]
+    },
+    "orchestrators/form_llm/llm_form_orchestrator.py": {
+      "module": "curllm_core.orchestrators.form_llm.llm_form_orchestrator",
+      "imports_count": 10,
+      "exports_count": 8,
+      "imported_by_count": 0,
+      "imported_by": []
+    },
+    "orchestrators/form_llm/form_result.py": {
+      "module": "curllm_core.orchestrators.form_llm.form_result",
+      "imports_count": 7,
+      "exports_count": 2,
+      "imported_by_count": 2,
+      "imported_by": [
+        "result_validator.py",
+        "orchestrators/form_llm/llm_form_orchestrator.py"
+      ]
+    },
+    "orchestrators/social_llm/llm_social_orchestrator.py": {
+      "module": "curllm_core.orchestrators.social_llm.llm_social_orchestrator",
+      "imports_count": 13,
+      "exports_count": 13,
+      "imported_by_count": 0,
+      "imported_by": []
+    },
+    "orchestrators/social_llm/social_result.py": {
+      "module": "curllm_core.orchestrators.social_llm.social_result",
+      "imports_count": 8,
+      "exports_count": 1,
+      "imported_by_count": 1,
+      "imported_by": [
+        "orchestrators/social_llm/llm_social_orchestrator.py"
+      ]
+    },
+    "orchestrators/social_llm/social_intent.py": {
+      "module": "curllm_core.orchestrators.social_llm.social_intent",
+      "imports_count": 8,
+      "exports_count": 1,
+      "imported_by_count": 1,
+      "imported_by": [
+        "orchestrators/social_llm/llm_social_orchestrator.py"
+      ]
+    },
+    "orchestrators/social_llm/social_platform.py": {
+      "module": "curllm_core.orchestrators.social_llm.social_platform",
+      "imports_count": 8,
+      "exports_count": 1,
+      "imported_by_count": 1,
+      "imported_by": [
+        "orchestrators/social_llm/llm_social_orchestrator.py"
+      ]
+    },
+    "form_fill_llm/_trigger_field_events.py": {
+      "module": "curllm_core.form_fill_llm._trigger_field_events",
+      "imports_count": 9,
+      "exports_count": 1,
+      "imported_by_count": 2,
+      "imported_by": [
+        "form_fill_llm/llm_form_fill.py",
+        "form_fill_llm/smart_form_fill.py"
+      ]
+    },
+    "form_fill_llm/form_fill_result.py": {
+      "module": "curllm_core.form_fill_llm.form_fill_result",
+      "imports_count": 10,
+      "exports_count": 1,
+      "imported_by_count": 2,
+      "imported_by": [
+        "form_fill_llm/llm_form_fill.py",
+        "form_fill_llm/smart_form_fill.py"
+      ]
+    },
+    "form_fill_llm/llm_form_fill.py": {
+      "module": "curllm_core.form_fill_llm.llm_form_fill",
+      "imports_count": 13,
+      "exports_count": 1,
+      "imported_by_count": 1,
+      "imported_by": [
+        "execution/executor/curllm_executor.py"
+      ]
+    },
+    "form_fill_llm/smart_form_fill.py": {
+      "module": "curllm_core.form_fill_llm.smart_form_fill",
+      "imports_count": 12,
+      "exports_count": 1,
+      "imported_by_count": 0,
+      "imported_by": []
+    },
+    "form_fill_llm/field_mapping.py": {
+      "module": "curllm_core.form_fill_llm.field_mapping",
+      "imports_count": 9,
+      "exports_count": 1,
+      "imported_by_count": 3,
+      "imported_by": [
+        "form_fill_llm/form_fill_result.py",
+        "form_fill_llm/llm_form_fill.py",
+        "form_fill_llm/smart_form_fill.py"
+      ]
+    },
+    "form_fill_llm/_simple_parse.py": {
+      "module": "curllm_core.form_fill_llm._simple_parse",
+      "imports_count": 10,
+      "exports_count": 1,
+      "imported_by_count": 1,
+      "imported_by": [
+        "form_fill_llm/_extract_values_with_llm.py"
+      ]
+    },
+    "form_fill_llm/_extract_values_with_llm.py": {
+      "module": "curllm_core.form_fill_llm._extract_values_with_llm",
+      "imports_count": 12,
+      "exports_count": 1,
+      "imported_by_count": 1,
+      "imported_by": [
+        "form_fill_llm/llm_form_fill.py"
+      ]
     },
     "validation/composite.py": {
       "module": "curllm_core.validation.composite",
@@ -2108,13 +2652,6 @@
         "validation/composite.py"
       ]
     },
-    "validation/task_validator.py": {
-      "module": "curllm_core.validation.task_validator",
-      "imports_count": 10,
-      "exports_count": 23,
-      "imported_by_count": 0,
-      "imported_by": []
-    },
     "validation/structural.py": {
       "module": "curllm_core.validation.structural",
       "imports_count": 5,
@@ -2133,11 +2670,56 @@
         "validation/composite.py"
       ]
     },
+    "validation/task_validator/validation_strategy.py": {
+      "module": "curllm_core.validation.task_validator.validation_strategy",
+      "imports_count": 10,
+      "exports_count": 1,
+      "imported_by_count": 1,
+      "imported_by": [
+        "validation/task_validator/task_validator.py"
+      ]
+    },
+    "validation/task_validator/validate_task.py": {
+      "module": "curllm_core.validation.task_validator.validate_task",
+      "imports_count": 12,
+      "exports_count": 1,
+      "imported_by_count": 0,
+      "imported_by": []
+    },
+    "validation/task_validator/task_validator.py": {
+      "module": "curllm_core.validation.task_validator.task_validator",
+      "imports_count": 13,
+      "exports_count": 19,
+      "imported_by_count": 1,
+      "imported_by": [
+        "validation/task_validator/validate_task.py"
+      ]
+    },
+    "validation/task_validator/validation_check.py": {
+      "module": "curllm_core.validation.task_validator.validation_check",
+      "imports_count": 10,
+      "exports_count": 1,
+      "imported_by_count": 2,
+      "imported_by": [
+        "validation/task_validator/task_validator.py",
+        "validation/task_validator/validation_report.py"
+      ]
+    },
+    "validation/task_validator/validation_report.py": {
+      "module": "curllm_core.validation.task_validator.validation_report",
+      "imports_count": 11,
+      "exports_count": 1,
+      "imported_by_count": 2,
+      "imported_by": [
+        "validation/task_validator/validate_task.py",
+        "validation/task_validator/task_validator.py"
+      ]
+    },
     "parsing/parser.py": {
       "module": "curllm_core.parsing.parser",
       "imports_count": 11,
       "exports_count": 15,
-      "imported_by_count": 10,
+      "imported_by_count": 14,
       "imported_by": [
         "orchestrator_steps.py",
         "multi_criteria_filter.py",
@@ -2188,47 +2770,52 @@
       "module": "curllm_core.llm_dsl.element_finder",
       "imports_count": 9,
       "exports_count": 13,
-      "imported_by_count": 4,
+      "imported_by_count": 8,
       "imported_by": [
         "llm_element_finder.py",
         "element_finder/find.py",
-        "orchestration/orchestrator.py",
-        "dynamic/selectors.py"
+        "element_finder/finder/find_element_with_llm.py",
+        "orchestration/orchestrator/orchestrator_config.py",
+        "orchestration/orchestrator/orchestrator.py"
       ]
     },
     "llm_dsl/atoms.py": {
       "module": "curllm_core.llm_dsl.atoms",
       "imports_count": 10,
       "exports_count": 16,
-      "imported_by_count": 2,
+      "imported_by_count": 8,
       "imported_by": [
-        "form_fill_llm.py",
-        "llm_dsl/executor.py"
+        "form_fill_llm/_trigger_field_events.py",
+        "form_fill_llm/form_fill_result.py",
+        "form_fill_llm/llm_form_fill.py",
+        "form_fill_llm/smart_form_fill.py",
+        "form_fill_llm/field_mapping.py"
       ]
     },
     "transparent/orchestrator.py": {
       "module": "curllm_core.transparent.orchestrator",
       "imports_count": 7,
       "exports_count": 23,
-      "imported_by_count": 7,
+      "imported_by_count": 11,
       "imported_by": [
         "cli_orchestrator.py",
         "shortcuts.py",
+        "streamware/components/form/smart_orchestrator/smart_fill_form.py",
         "running/runner.py",
-        "deprecated/cli_orchestrator.py",
-        "orchestration/execute.py"
+        "deprecated/cli_orchestrator.py"
       ]
     },
     "dsl/validator.py": {
       "module": "curllm_core.dsl.validator",
       "imports_count": 9,
       "exports_count": 10,
-      "imported_by_count": 4,
+      "imported_by_count": 8,
       "imported_by": [
         "dynamic_container_detector.py",
         "multi_criteria_filter.py",
-        "orchestration/orchestrator.py",
-        "dsl/executor.py"
+        "orchestration/orchestrator/orchestrator_config.py",
+        "orchestration/orchestrator/orchestrator.py",
+        "orchestration/orchestrator/step_result.py"
       ]
     },
     "dsl/knowledge_base.py": {
@@ -2244,7 +2831,7 @@
       "module": "curllm_core.dsl.parser",
       "imports_count": 14,
       "exports_count": 13,
-      "imported_by_count": 10,
+      "imported_by_count": 14,
       "imported_by": [
         "orchestrator_steps.py",
         "multi_criteria_filter.py",
@@ -2266,12 +2853,21 @@
         "cli/doctor.py"
       ]
     },
-    "dsl/executor_llm.py": {
-      "module": "curllm_core.dsl.executor_llm",
-      "imports_count": 12,
-      "exports_count": 14,
+    "dsl/executor_llm/llmdsl_executor.py": {
+      "module": "curllm_core.dsl.executor_llm.llmdsl_executor",
+      "imports_count": 13,
+      "exports_count": 13,
       "imported_by_count": 0,
       "imported_by": []
+    },
+    "dsl/executor_llm/llm_execution_result.py": {
+      "module": "curllm_core.dsl.executor_llm.llm_execution_result",
+      "imports_count": 10,
+      "exports_count": 1,
+      "imported_by_count": 1,
+      "imported_by": [
+        "dsl/executor_llm/llmdsl_executor.py"
+      ]
     },
     "dom_toolkit/statistics/frequency.py": {
       "module": "curllm_core.dom_toolkit.statistics.frequency",
@@ -2298,7 +2894,7 @@
       "module": "curllm_core.dom_toolkit.analyzers.selectors",
       "imports_count": 4,
       "exports_count": 5,
-      "imported_by_count": 8,
+      "imported_by_count": 9,
       "imported_by": [
         "extraction_orchestrator.py",
         "task_runner_early.py",
@@ -2343,10 +2939,11 @@
       "module": "curllm_core.form_fill.filler",
       "imports_count": 12,
       "exports_count": 13,
-      "imported_by_count": 3,
+      "imported_by_count": 4,
       "imported_by": [
         "llm_field_filler.py",
-        "execution/executor.py",
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py",
         "dsl/executor.py"
       ]
     },
@@ -2354,7 +2951,7 @@
       "module": "curllm_core.form_fill.parser",
       "imports_count": 3,
       "exports_count": 2,
-      "imported_by_count": 10,
+      "imported_by_count": 14,
       "imported_by": [
         "orchestrator_steps.py",
         "multi_criteria_filter.py",
@@ -2377,9 +2974,10 @@
       "module": "curllm_core.form_fill.field_filler",
       "imports_count": 0,
       "exports_count": 3,
-      "imported_by_count": 2,
+      "imported_by_count": 3,
       "imported_by": [
-        "execution/executor.py",
+        "execution/executor/_should_validate.py",
+        "execution/executor/curllm_executor.py",
         "form_fill/filler.py"
       ]
     },
@@ -2387,7 +2985,7 @@
       "module": "curllm_core.dynamic.selectors",
       "imports_count": 8,
       "exports_count": 9,
-      "imported_by_count": 8,
+      "imported_by_count": 9,
       "imported_by": [
         "extraction_orchestrator.py",
         "task_runner_early.py",
