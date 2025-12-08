@@ -961,11 +961,11 @@ Search term:"""
             return False
         
         try:
-            # Use atomic helper for search
-            success = await dom_helpers.execute_search(self.page, search_term)
+            # Use atomic helper for search with LLM
+            success = await dom_helpers.execute_search(self.page, search_term, llm=self.llm)
             
             if success:
-                self._log(f"Search submitted: {search_term}")
+                self._log(f"🔎 Search submitted: {search_term}")
                 return True
             else:
                 self._log("No search input found or search failed")

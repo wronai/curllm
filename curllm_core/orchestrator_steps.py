@@ -191,6 +191,12 @@ class StepExecutor:
             except Exception as e:
                 self._log("step", f"  Fill failed: {e}")
         
+        # For optional fields (name, phone), skip instead of failing
+        optional_fields = {"name", "phone", "company", "subject", "website"}
+        if field_type in optional_fields:
+            self._log("step", f"  ⚠️ Optional field {field_type} not found, skipping")
+            return {"field": field_type, "filled": False, "skipped": True}
+        
         raise Exception(f"Could not find {field_type} field")
     
     async def _execute_fill_form(
@@ -359,9 +365,13 @@ class StepExecutor:
         
         # Security/CAPTCHA indicators (treated separately)
         security_indicators = [
-            "captcha", "recaptcha", "kod jednorazowy", "nonce",
-            "robot", "weryfikacja", "verification code",
-            "nieprawidłowy kod", "nieprawidlowy kod"
+            "captcha", "recaptcha", "hcaptcha", "turnstile",
+            "kod jednorazowy", "nonce", "robot", "weryfikacja",
+            "verification code", "nieprawidłowy kod", "nieprawidlowy kod",
+            "access denied", "blocked", "bot detected", "bot protection",
+            "cloudflare", "ddos protection", "please wait", "checking your browser",
+            "nie jesteś robotem", "nie jestes robotem", "are you human",
+            "security check", "verify you are human", "antibot"
         ]
         
         has_security = any(ind in content for ind in security_indicators)

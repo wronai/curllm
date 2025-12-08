@@ -62,6 +62,7 @@ VISUAL_MODE=false
 STEALTH_MODE=false
 CAPTCHA_SOLVER=false
 USE_BQL=false
+USE_V1=false  # v2 is now default, use --v1 for legacy
 PROXY_ARG=""
 SESSION_ID=""
 
@@ -84,6 +85,7 @@ AUTOMATION OPTIONS:
     --stealth              Enable stealth mode (anti-bot detection)
     --captcha              Enable CAPTCHA solving
     --bql                  Use BQL (Browser Query Language) mode
+    --v1                   Use legacy v1 API (hardcoded selectors, deprecated)
     --model MODEL          LLM model to use (default: qwen2.5:7b)
     --auto-restart-old-model
                           If the run log or /health shows old default model (qwen2.5:7b),
@@ -947,6 +949,8 @@ while [[ $# -gt 0 ]]; do
             CAPTCHA_SOLVER=true; shift;;
         --bql)
             USE_BQL=true; shift;;
+        --v1)
+            USE_V1=true; shift;;
         --model)
             CURLLM_MODEL="$2"; shift 2;;
         --auto-restart-old-model)
@@ -1124,6 +1128,7 @@ main() {
     "stealth_mode": $STEALTH_MODE,
     "captcha_solver": $CAPTCHA_SOLVER,
     "use_bql": $USE_BQL,
+    "use_v1": $USE_V1,
     "model": "$CURLLM_MODEL",
     "headers": $HEADERS_JSON,
     "proxy": $PROXY_JSON,

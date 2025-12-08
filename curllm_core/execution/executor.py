@@ -98,7 +98,7 @@ class CurllmExecutor:
         proxy: Optional[Dict] = None,
         session_id: Optional[str] = None,
         wordpress_config: Optional[Dict] = None,
-        use_v2: bool = False,  # Use LLM-driven v2 API instead of hardcoded selectors
+        use_v2: bool = True,  # v2 LLM-driven API is now default
     ) -> Dict[str, Any]:
         # Parse optional runtime params embedded in JSON instruction
         instruction, runtime = parse_runtime_from_instruction(instruction)
@@ -611,7 +611,7 @@ class CurllmExecutor:
     def _parse_form_pairs(self, instruction: str | None) -> Dict[str, str]:
         return _parse_form_pairs_func(instruction)
 
-    async def _deterministic_form_fill(self, instruction: str, page, run_logger: RunLogger | None = None, domain_dir: Optional[str] = None, use_v2: bool = False) -> Optional[Dict[str, Any]]:
+    async def _deterministic_form_fill(self, instruction: str, page, run_logger: RunLogger | None = None, domain_dir: Optional[str] = None, use_v2: bool = True) -> Optional[Dict[str, Any]]:
         """
         Fill form using deterministic approach, with optional LLM-guided fallback.
         

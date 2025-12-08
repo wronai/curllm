@@ -9,11 +9,14 @@ Features:
 """
 
 from .analyzer import VisionAnalyzer, analyze_image
-from .form_analysis import analyze_form_fields_vision, VisionFormAnalyzer
+
+# Re-export from main module to avoid duplication
+from curllm_core.vision_form_analysis import (
+    analyze_form_fields_vision,
+)
 
 __all__ = [
     'VisionAnalyzer',
     'analyze_image',
     'analyze_form_fields_vision',
-    'VisionFormAnalyzer'
 ]

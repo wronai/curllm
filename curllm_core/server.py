@@ -38,7 +38,8 @@ def execute():
     stealth_mode = data.get('stealth_mode', False)
     captcha_solver = data.get('captcha_solver', False)
     use_bql = data.get('use_bql', False)
-    use_v2 = data.get('use_v2', False)  # LLM-driven v2 API
+    use_v1 = data.get('use_v1', False)  # Legacy v1 API (deprecated)
+    use_v2 = not use_v1  # v2 is now default
     headers = data.get('headers', {})
     proxy = data.get('proxy')
     session_id = data.get('session_id')

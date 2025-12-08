@@ -30,6 +30,8 @@
 
 **curllm** is a powerful CLI tool that combines browser automation with local LLMs (like Ollama's Qwen, Llama, Mistral) to intelligently extract data, fill forms, and automate web workflows - all running **locally** on your machine with **complete privacy**.
 
+> 🆕 **v2 is now default!** LLM-driven element detection without hardcoded selectors. Use `--v1` for legacy behavior.
+
 ```bash
 # Extract products with prices from any e-commerce site
 curllm "https://shop.example.com" -d "Find all products under $100"

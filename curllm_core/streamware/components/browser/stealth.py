@@ -1,6 +1,8 @@
 """
 Stealth Mode - Anti-detection for browser automation.
 """
+import asyncio
+import random
 from typing import List
 
 
@@ -163,3 +165,40 @@ def get_stealth_headers() -> dict:
         "Sec-Fetch-User": "?1",
         "Cache-Control": "max-age=0",
     }
+
+
+async def human_delay(min_ms: int = 100, max_ms: int = 500) -> None:
+    """Wait random time like human would."""
+    delay = random.randint(min_ms, max_ms) / 1000
+    await asyncio.sleep(delay)
+
+
+async def human_type(page, selector: str, text: str, delay_per_char: int = 50) -> None:
+    """Type text with human-like delays."""
+    el = await page.query_selector(selector)
+    if el:
+        await el.click()
+        await human_delay(100, 300)
+        for char in text:
+            await el.type(char, delay=random.randint(30, delay_per_char + 50))
+            if random.random() < 0.05:  # 5% chance of small pause
+                await human_delay(200, 500)
+
+
+async def human_scroll(page, direction: str = "down", amount: int = 300) -> None:
+    """Scroll with human-like behavior."""
+    if direction == "down":
+        await page.evaluate(f"window.scrollBy(0, {amount})")
+    else:
+        await page.evaluate(f"window.scrollBy(0, -{amount})")
+    await human_delay(100, 300)
+
+
+async def human_move_mouse(page, x: int = None, y: int = None) -> None:
+    """Move mouse randomly or to specific position."""
+    if x is None:
+        x = random.randint(100, 800)
+    if y is None:
+        y = random.randint(100, 600)
+    await page.mouse.move(x, y)
+    await human_delay(50, 150)

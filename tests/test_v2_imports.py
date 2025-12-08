@@ -165,3 +165,19 @@ class TestFormFillResult:
         assert result.success is True
         assert result.filled_fields['email'] == 'test@example.com'
         assert result.submitted is True
+
+
+class TestCLIV1Flag:
+    """Test CLI --v1 flag (v2 is now default)."""
+    
+    def test_cli_help_contains_v1(self):
+        """Test that CLI help mentions --v1 for legacy mode."""
+        import subprocess
+        result = subprocess.run(
+            ['./curllm', '--help'],
+            capture_output=True,
+            text=True,
+            cwd='/home/tom/github/wronai/curllm'
+        )
+        assert '--v1' in result.stdout
+        assert 'legacy' in result.stdout.lower() or 'deprecated' in result.stdout.lower()
