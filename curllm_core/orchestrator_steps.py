@@ -180,8 +180,21 @@ class StepExecutor:
             try:
                 el = await self.page.query_selector(field_match.selector)
                 if el and await el.is_visible():
-                    await el.click()
-                    await el.fill(value)
+                    input_type = (await el.get_attribute("type")) or ""
+                    input_type = input_type.lower()
+                    # Checkbox / radio: treat as toggle, not text fill
+                    if input_type in {"checkbox", "radio"}:
+                        is_checked = False
+                        try:
+                            is_checked = await el.is_checked()
+                        except Exception:
+                            # Some elements may not support is_checked; ignore
+                            pass
+                        if not is_checked:
+                            await el.click()
+                    else:
+                        await el.click()
+                        await el.fill(value)
                     return {
                         "field": field_type,
                         "filled": True,
@@ -191,8 +204,8 @@ class StepExecutor:
             except Exception as e:
                 self._log("step", f"  Fill failed: {e}")
         
-        # For optional fields (name, phone), skip instead of failing
-        optional_fields = {"name", "phone", "company", "subject", "website"}
+        # For optional fields (name, phone, and some auxiliaries), skip instead of failing
+        optional_fields = {"name", "phone", "company", "subject", "website", "consent", "agreement", "terms", "privacy"}
         if field_type in optional_fields:
             self._log("step", f"  ⚠️ Optional field {field_type} not found, skipping")
             return {"field": field_type, "filled": False, "skipped": True}
@@ -408,7 +421,19 @@ class StepExecutor:
         if has_security:
             is_verified = False
             reason = "security_block"
+        elif verify_type == "submit":
+            # For form submission, require explicit DOM success (alert/response element)
+            if bool(success_dom) and not has_error:
+                is_verified = True
+                reason = "success"
+            elif has_error:
+                is_verified = False
+                reason = "form_error"
+            else:
+                is_verified = False
+                reason = "no_confirmation"
         elif has_success and not has_error:
+            # Non-submit verification (e.g. generic content checks)
             is_verified = True
             reason = "success"
         elif has_error:

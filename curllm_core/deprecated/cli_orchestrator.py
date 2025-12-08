@@ -162,6 +162,8 @@ async def main():
             print(f"   {sr.step_index + 1}. {status} {sr.step_type} ({sr.duration_ms}ms)")
             if sr.error:
                 print(f"      Error: {sr.error}")
+            if sr.step_type == "screenshot" and sr.screenshot_path:
+                print(f"      Screenshot: {sr.screenshot_path}")
     
     if result.final_url:
         print(f"\n🌐 Final URL: {result.final_url}")
