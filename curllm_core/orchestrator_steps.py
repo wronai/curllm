@@ -347,14 +347,14 @@ class StepExecutor:
                 "expected": expected
             }
         
-        # Success indicators (PL + EN)
+        # Success indicators (PL + EN) - focused on explicit form submission messages
         success_indicators = [
             "dziękujemy", "dziekujemy", "thank you", "thanks",
-            "sukces", "success", "udało się", "udalo sie",
-            "wysłano", "wyslano", "sent", "submitted",
-            "wiadomość została", "wiadomosc zostala", "message has been",
-            "otrzymaliśmy", "otrzymalismy", "received",
-            "skontaktujemy", "will contact", "get back to you"
+            "wysłano", "wyslano",
+            "wiadomość została", "wiadomosc zostala",
+            "wiadomość wysłana", "wiadomosc wyslana",
+            "message has been sent", "your message has been sent",
+            "form submitted", "submission received"
         ]
         
         # Error indicators (PL + EN)
@@ -374,9 +374,34 @@ class StepExecutor:
             "security check", "verify you are human", "antibot"
         ]
         
+        # DOM-level success detection (common success containers)
+        success_dom = await self.page.evaluate(
+            """
+            () => {
+                const selectors = [
+                    '.forminator-response-message.forminator-success',
+                    '.wpcf7-mail-sent-ok',
+                    '.wpcf7-response-output.wpcf7-mail-sent-ok',
+                    '.alert.alert-success',
+                    '.alert-success',
+                    '.woocommerce-message',
+                    '.notice-success'
+                ];
+                for (const sel of selectors) {
+                    const el = document.querySelector(sel);
+                    if (el && el.innerText && el.innerText.trim().length > 0) {
+                        return el.innerText.toLowerCase();
+                    }
+                }
+                return null;
+            }
+            """
+        )
+        
         has_security = any(ind in content for ind in security_indicators)
         
-        has_success = any(ind in content for ind in success_indicators)
+        has_success_text = any(ind in content for ind in success_indicators)
+        has_success = bool(success_dom) or has_success_text
         has_error = any(ind in content for ind in error_indicators)
         
         # Determine verification result
@@ -394,7 +419,8 @@ class StepExecutor:
             reason = "no_confirmation"
         
         self._log("step", f"  📋 Verification check:")
-        self._log("step", f"     Success indicators found: {has_success}")
+        self._log("step", f"     Success (DOM) present: {bool(success_dom)}")
+        self._log("step", f"     Success indicators found: {has_success_text}")
         self._log("step", f"     Error indicators found: {has_error}")
         self._log("step", f"     Security block detected: {has_security}")
         self._log("step", f"     Result: {'✅ VERIFIED' if is_verified else '⚠️ NOT VERIFIED'} ({reason})")

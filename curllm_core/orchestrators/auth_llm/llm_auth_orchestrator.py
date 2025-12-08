@@ -1,53 +1,11 @@
-"""
-LLM-Driven Authentication Orchestrator - No hardcoded selectors
-
-Uses LLM to:
-1. Detect login forms dynamically
-2. Find credential fields by context
-3. Handle 2FA intelligently
-4. Detect CAPTCHA and auth errors
-
-Replaces hardcoded PLATFORM_SELECTORS.
-"""
-
 import logging
 from typing import Any, Dict, Optional
 from dataclasses import dataclass
 from enum import Enum
-
 from curllm_core.llm_dsl import AtomicFunctions
 
-logger = logging.getLogger(__name__)
-
-
-class AuthMethod(Enum):
-    """Authentication methods - detected by LLM"""
-    STANDARD = "standard"
-    TWO_FACTOR = "2fa"
-    OAUTH = "oauth"
-    SSO = "sso"
-    MAGIC_LINK = "magic_link"
-
-
-@dataclass
-class AuthCredentials:
-    """Credentials parsed by LLM"""
-    email: Optional[str] = None
-    password: Optional[str] = None
-    otp_code: Optional[str] = None
-    remember: bool = False
-
-
-@dataclass
-class AuthResult:
-    """Authentication result"""
-    success: bool
-    method: str
-    message: Optional[str] = None
-    needs_2fa: bool = False
-    needs_captcha: bool = False
-    error: Optional[str] = None
-
+from .auth_credentials import AuthCredentials
+from .auth_result import AuthResult
 
 class LLMAuthOrchestrator:
     """
