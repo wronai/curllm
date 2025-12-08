@@ -2,42 +2,42 @@
 HARDCODED VALUES ANALYSIS REPORT
 ================================================================================
 
-Total files with hardcoded values: 147
-Total findings: 1818
-  - High severity: 226
+Total files with hardcoded values: 152
+Total findings: 1937
+  - High severity: 228
   - Medium severity: 2
-  - Low severity: 1590
+  - Low severity: 1707
 
 FINDINGS BY TYPE:
 ----------------------------------------
-  label: 818 occurrences
-  selector: 777 occurrences
-  xpath: 165 occurrences
-  url: 56 occurrences
+  selector: 867 occurrences
+  label: 845 occurrences
+  xpath: 166 occurrences
+  url: 57 occurrences
   regex: 2 occurrences
 
 TOP 20 FILES TO REFACTOR (by score):
 ----------------------------------------
-   1. curllm_core/form_fill.py (score: 150, findings: 142)
-   2. curllm_core/orchestrators/social.py (score: 89, findings: 55)
-   3. curllm_core/form_fill/js_scripts.py (score: 70, findings: 66)
+   1. curllm_core/form_fill.py (score: 132, findings: 124)
+   2. curllm_core/dom_selectors.py (score: 107, findings: 107)
+   3. curllm_core/orchestrators/social.py (score: 89, findings: 55)
    4. curllm_core/orchestrators/auth.py (score: 59, findings: 59)
    5. curllm_core/form_fill/filler.py (score: 57, findings: 57)
-   6. curllm_core/extraction/extractor.py (score: 51, findings: 51)
-   7. curllm_core/proxy.py (score: 45, findings: 15)
-   8. curllm_core/streamware/components/form/smart_orchestrator.py (score: 45, findings: 45)
-   9. curllm_core/streamware/patterns.py (score: 43, findings: 15)
-  10. curllm_core/llm_config.py (score: 39, findings: 13)
-  11. curllm_core/streamware/components/currency/translator.py (score: 38, findings: 36)
-  12. curllm_core/streamware/components/form/orchestrator.py (score: 38, findings: 38)
-  13. curllm_core/hierarchical/planner.py (score: 38, findings: 38)
-  14. curllm_core/dsl/executor.py (score: 34, findings: 30)
-  15. curllm_core/iterative_extractor.py (score: 33, findings: 29)
-  16. curllm_core/field_filling/filler.py (score: 33, findings: 29)
-  17. curllm_core/orchestrators/form.py (score: 32, findings: 32)
-  18. curllm_core/orchestrators/ecommerce.py (score: 32, findings: 32)
-  19. curllm_core/streamware/components/dom_fix.py (score: 31, findings: 23)
-  20. curllm_core/element_finder/finder.py (score: 31, findings: 31)
+   6. curllm_core/form_fill/js_scripts.py (score: 52, findings: 48)
+   7. curllm_core/extraction/extractor.py (score: 51, findings: 51)
+   8. curllm_core/proxy.py (score: 45, findings: 15)
+   9. curllm_core/streamware/components/form/smart_orchestrator.py (score: 45, findings: 45)
+  10. curllm_core/streamware/patterns.py (score: 43, findings: 15)
+  11. curllm_core/llm_config.py (score: 39, findings: 13)
+  12. curllm_core/streamware/components/currency/translator.py (score: 38, findings: 36)
+  13. curllm_core/streamware/components/form/orchestrator.py (score: 38, findings: 38)
+  14. curllm_core/hierarchical/planner.py (score: 38, findings: 38)
+  15. curllm_core/dynamic/selectors.py (score: 38, findings: 38)
+  16. curllm_core/dsl/executor.py (score: 34, findings: 30)
+  17. curllm_core/iterative_extractor.py (score: 33, findings: 29)
+  18. curllm_core/field_filling/filler.py (score: 33, findings: 29)
+  19. curllm_core/orchestrators/ecommerce.py (score: 32, findings: 32)
+  20. curllm_core/streamware/components/dom_fix.py (score: 31, findings: 23)
 
 HIGH SEVERITY FINDINGS:
 ----------------------------------------
@@ -1115,6 +1115,16 @@ HIGH SEVERITY FINDINGS:
   File: curllm_core/streamware/components/captcha/vision_solve.py:79
   Type: xpath
   Value: //localhost...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/dynamic/urls.py:33
+  Type: url
+  Value: https://example.com/login...
+  Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
+
+  File: curllm_core/dynamic/urls.py:33
+  Type: xpath
+  Value: //example.com/login'...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
   File: curllm_core/config.py:13

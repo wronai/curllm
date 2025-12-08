@@ -115,6 +115,16 @@ GOOD_PATTERNS = [
     'element_finder',
     'DynamicPatternDetector',
     'analyze_page_type',
+    # Dynamic JavaScript patterns
+    '${k}',  # Template variable
+    '${',    # Template string
+    'keywords.forEach',
+    'findField(',
+    'score +=',
+    'FIND_FORM_FIELDS_JS',
+    'VALIDATE_FIELDS_JS',
+    'detect_',  # Dynamic detection functions
+    'find_',    # Dynamic find functions
 ]
 
 

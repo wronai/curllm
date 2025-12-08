@@ -389,7 +389,9 @@ Zobacz: TODO_TESTING_PLAN.md dla pełnego planu wykonania.
 
 
 
-
+podlinkuj wszystkie dokumentacje, aby zawieraloy odniesniea w menu do innnych i do plikow w kodzie w examples, itd
+dodaj więcej przykładów w examples/ wedle struktury examples/[nazwa projektu]/README.md
+i examples/[nazwa projektu]/[nazwa przykładu].[rozszerzenie]
 
 
 przenies dokumentacje do folderu docs/*
@@ -439,3 +441,94 @@ Optional. Custom API endpoint
 If your provider has a custom endpoint
 3.2 Example Usage
 llm_config = LLMConfig(provider="openai/gpt-4o-mini", api_token=os.getenv("OPENAI_API_KEY"))
+
+
+
+na koniec, gdy już mamy zwrocony JSON rezultat LLM powinien ocenić czy odpowiadaja instrukcji z polecenia i dać odpowiedź lub poprawić JSON jeśłi to kwestia formatowania, wykorzytsaj gotowe bilbioteki, które mogą tutaj się przydać, użyj DSL-który jest wykorzystywany w wypełnianiu formularzy również podczas ekstrakcji, aby sprawdzić jak przebiega orchestracja, czy działanie jest deterministyczne, jakie błedy są popełniane za pomocą decyzji z uzyciem jeyka opisowego DSL
+
+Wyciągnij wnioski i zaplanuj refaktoryzacje aby w oparciu o ten system mozliwe było
+wyodrebnianie danych i wypełnianie formularzy na dowolnej stronie www przy uzyciu 
+wielu algorytmów, które już są gotowe jako projekty OSS, użyj ich i stworz baze wiedzy dla LLM,
+ktore lepiej działają na danej stronie internetowej w celu późniejszego uzycia w pierwszej kolejnosci tych metod , technik i algorytmów, które lepiej sie sprawdzały ostatnim razem, a jesli do aktualnego zadania sie nie nadaja, to zoptymalizowac i zapisac DSL razem z calym URL, tak aby mozna bylo łatwo mapować na to co uzytkownik wpisuje w linii komend i szybko wykorzystac juz raz opracowany sposob działania poprzez zapisywanie ich jako jezyka DSL w pliku dsl/*.dsl
+
+
+
+https://www.soselectronic.com/pl-pl/products/sensirion/sdp810-500pa-2-232928
+curllm --visual --stealth "https://www.soselectronic.com/pl-pl/products/sensirion/sdp810-500pa-2-232928" -d "wyświetl wszystkie dane techniczne produktu"
+
+
+kontynuuj
+przeanalizuj wskazówki z folderu TODO/README.md i przejrzyj pliki
+zaadoptuj do naszego systemu, jeśli te wskazówki mają w tym systemie zastosowanie
+wyypracuj nowy plan refaktoringu na bazie docs/REFACTORING_PLAN.md
+
+Jak użytkownik może oceniać rezultaty i np napisać wskazówkę do poprawy systemu, aby przy kolejnym request były brane pod uwage
+wady wczesniejszej ekstrakcji danych lub wypełninia formularza aby LLM był w stanie zzadoptować algorytmy i wskazówki w nowym request
+Wdroz odpowiednie funkcje w komendach oraz w systemie, aby LLM był bardziej adaptacyjny tworzac generyczne małe zatomizowane funkcje samodzielnie
+w folderze functions/*.{py,js}
+
+
+
+
+
+kontynuuj , zatomizuj funkcje w functions , aby jedna funkcja była w jednym pliku, wszędzie tam, gdzie 
+jest używane regular ekspression i inne metody filktrowania wyodrebniaj jako funkcje, z mozliwoscia adaptacji,
+gdzie będzie możliwość w razie braku rezultatów zmiany tego regular expression przez LLM, 
+jesli w trakcie orchestracji ta funkcja nie zadziała poprawnie, atk aby LLM w oparciu 
+o kontekst stworzył poprawną funkcje regex
+
+
+
+ napraw:
+
+nie obsługuje poprawnie --yaml
+ curllm --stealth "https://www.soselectronic.com/pl-pl/products/sensirion/sdp810-500pa-2-232928" -d "wyświetl parametry techniczne" --yaml -o products.yaml
+
+nie obsluguje poprawnie html
+products.html
+products.yaml
+products.csv
+
+sparwdz poozstałe formaty przenalizuj jakie mozna jeszcze dodac, np xml
+
+
+
+chciałbym też móc wykonywać szersze kontekstowo zadnia, 
+takie ktore np porównują zebrane dane pomiedzy stronami, wyciąga wnioski pomiędzy np różnicami w cenie i opisami produktów
+chciałbym np zrobić porównywarke cen produktów za pomocą curllm w folderze pricing/ gdzie będzie z uzyciem docker zaimplementowana
+funkcjonalnosc porownywarki, ktora będzie miała liste url i jedno zapytanie dla wielu url jednoczesnie
+stworz odpowiedni plik README.md w folderze pricing/ z opisem jak uzywac
+Wyniki powinny byc w przegladarce jako usluga z uzyciem python, gdzie po wpisaniu prompt i podaniu kilku url, gdzie ma byc uruchomiony ten prompt
+otrzymam kilka wynikow w postaci tabel html i powinna być też drugi prompt dotyczący wszystkich wynikow jako drugi etap
+w wyniku czego powinna byc mozliwosc zobaczenia porownania cen z roznych sklepow internetowych i np napisania porownaj parametry i ceny produktow ze wszystkich sklepow
+
+
+Stwórz nowy komponent dla curllm, który będzie odpowiedzialny za walidację i poprawę adresów url
+Chciałbym aby w sytuacji gdy podano nieprawidłowy url została przeprowadzona 
+analiza strony www w celu znalezienia w kategoria lub poprzez okno search strony www 
+odpowiedniego zakresu danych, które aktualnie jest sprecyzowane w prompt, a które nie zostało odnalezione
+np wpisuję adres url do sklepu z zapytaniem  odnosnie konkretnej grupy produktów, ale 
+sklep zawiera dużo różnych produktów i np na stronie, która została podana nie ma tych produktów
+chciałbym aby ten component był w stanie odnależć na podstawie wyszukiwania lub sitemap odpowiedniej kategorii
+lub wyszukał jesli jest dostepne ten produkt czy fraze, o którą pytał user
+
+
+curllm --stealth "https://fatpc.pl/pl/c/DDR5/1169" -d "Find all products with prices under 500PLN"
+
+
+
+
+wykonaj make test i napraw błędy
+currllm nie powinien używać hardkodowanych selectorów, url, etykiet oraz innych hardkodowanych zmiennych, tylko funkcje, algorytmy ,
+statystyki i LLM w celu realziacji zadań, stwórz skrypt, który stworzy listę plików do refaktoryzacji
+sprawdzi pliki, czy nie ma tam hardkodowanych regexów czy selectorów i użyj już istniejących funkcji
+lub stwórz nowe dla poszukiwnaia odpowiedniego selectora z LLM-em, 
+który jest odpowiedzialny za inteligentne i generyczne zawsze działajace 
+wyszukiwanie odpowiednich danych z użyciem kontekstu
+np. używaj zatomizowanych algorytmow, statystyk, heurystyk oraz zapytan LLM, 
+aby w sposob dynamiczny i generyczny pozyskać odpowiednie url 
+w oparciu o dane z aktualnego kontekstu z drzewa DOM, sitemap itd
+
+
+curllm "Wejdź na prototypowanie.pl i wyślij wiadomość przez formularz z zapytaniem o dostępność usługi prototypowania 3d z adresem email info@softreck.com i nazwiskiem Sapletta"
+
