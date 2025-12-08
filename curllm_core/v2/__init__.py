@@ -61,6 +61,13 @@ from curllm_core.dsl.executor_llm import (
     LLMExecutionResult,
 )
 
+# LLM-driven URL resolution
+from curllm_core.url_resolution.goal_detector_llm import (
+    GoalDetectorHybrid,
+    GoalDetectionResult,
+    detect_navigation_goal,
+)
+
 __all__ = [
     # Core LLM-DSL
     'AtomicFunctions',
@@ -91,4 +98,9 @@ __all__ = [
     # DSL
     'LLMDSLExecutor',
     'LLMExecutionResult',
+    
+    # URL Resolution
+    'GoalDetectorHybrid',
+    'GoalDetectionResult',
+    'detect_navigation_goal',
 ]
