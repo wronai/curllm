@@ -1,8 +1,8 @@
 {
   "summary": {
-    "total_files": 225,
+    "total_files": 226,
     "llm_versions": 10,
-    "unused_files": 28,
+    "unused_files": 27,
     "duplicates": 9
   },
   "llm_versions": {
@@ -63,7 +63,6 @@
     "error_handler.py",
     "data_export.py",
     "rate_limiter.py",
-    "cli_orchestrator.py",
     "form_fill_llm.py",
     "dom_selectors.py",
     "streamware/llm_bridge.py",
@@ -297,7 +296,7 @@
       "module": "curllm_core.llm",
       "imports_count": 3,
       "exports_count": 4,
-      "imported_by_count": 70,
+      "imported_by_count": 71,
       "imported_by": [
         "dynamic_detector.py",
         "url_resolver.py",
@@ -526,15 +525,6 @@
         "running/runner.py"
       ]
     },
-    "form_detector.py": {
-      "module": "curllm_core.form_detector",
-      "imports_count": 4,
-      "exports_count": 3,
-      "imported_by_count": 1,
-      "imported_by": [
-        "deprecated/llm_form_orchestrator.py"
-      ]
-    },
     "dom_utils.py": {
       "module": "curllm_core.dom_utils",
       "imports_count": 0,
@@ -675,8 +665,8 @@
       "imported_by_count": 5,
       "imported_by": [
         "orchestrator_steps.py",
-        "cli_orchestrator.py",
         "planning/planner.py",
+        "deprecated/cli_orchestrator.py",
         "orchestration/orchestrator.py",
         "orchestration/models.py"
       ]
@@ -790,19 +780,19 @@
       "module": "curllm_core.orchestrator",
       "imports_count": 5,
       "exports_count": 0,
-      "imported_by_count": 6,
+      "imported_by_count": 7,
       "imported_by": [
         "cli_orchestrator.py",
         "shortcuts.py",
         "running/runner.py",
-        "orchestration/execute.py",
-        "orchestration/orchestrator.py"
+        "deprecated/cli_orchestrator.py",
+        "orchestration/execute.py"
       ]
     },
     "cli_orchestrator.py": {
       "module": "curllm_core.cli_orchestrator",
-      "imports_count": 8,
-      "exports_count": 2,
+      "imports_count": 4,
+      "exports_count": 0,
       "imported_by_count": 0,
       "imported_by": []
     },
@@ -1138,7 +1128,7 @@
       "module": "curllm_core.streamware.core",
       "imports_count": 10,
       "exports_count": 14,
-      "imported_by_count": 67,
+      "imported_by_count": 68,
       "imported_by": [
         "dynamic_detector.py",
         "url_resolver.py",
@@ -1202,7 +1192,7 @@
       "module": "curllm_core.streamware.components.curllm",
       "imports_count": 15,
       "exports_count": 22,
-      "imported_by_count": 58,
+      "imported_by_count": 59,
       "imported_by": [
         "dynamic_detector.py",
         "url_resolver.py",
@@ -1340,13 +1330,13 @@
       "module": "curllm_core.streamware.components.form.orchestrator",
       "imports_count": 27,
       "exports_count": 9,
-      "imported_by_count": 6,
+      "imported_by_count": 7,
       "imported_by": [
         "cli_orchestrator.py",
         "shortcuts.py",
         "running/runner.py",
-        "orchestration/execute.py",
-        "orchestration/orchestrator.py"
+        "deprecated/cli_orchestrator.py",
+        "orchestration/execute.py"
       ]
     },
     "streamware/components/form/map_fields.py": {
@@ -1528,15 +1518,6 @@
         "dom_toolkit/orchestrator/task_router.py"
       ]
     },
-    "streamware/components/vision/form_analysis.py": {
-      "module": "curllm_core.streamware.components.vision.form_analysis",
-      "imports_count": 6,
-      "exports_count": 10,
-      "imported_by_count": 1,
-      "imported_by": [
-        "hierarchical/planner.py"
-      ]
-    },
     "streamware/components/screenshot/capture.py": {
       "module": "curllm_core.streamware.components.screenshot.capture",
       "imports_count": 6,
@@ -1555,10 +1536,10 @@
       "imported_by_count": 10,
       "imported_by": [
         "orchestrator_steps.py",
-        "cli_orchestrator.py",
         "multi_criteria_filter.py",
         "streamware/components/bql/executor.py",
-        "planning/planner.py"
+        "planning/planner.py",
+        "deprecated/cli_orchestrator.py"
       ]
     },
     "streamware/components/bql/executor.py": {
@@ -1591,13 +1572,13 @@
       "module": "curllm_core.streamware.components.bql.orchestrator",
       "imports_count": 7,
       "exports_count": 16,
-      "imported_by_count": 6,
+      "imported_by_count": 7,
       "imported_by": [
         "cli_orchestrator.py",
         "shortcuts.py",
         "running/runner.py",
-        "orchestration/execute.py",
-        "orchestration/orchestrator.py"
+        "deprecated/cli_orchestrator.py",
+        "orchestration/execute.py"
       ]
     },
     "streamware/components/browser/proxy.py": {
@@ -1622,8 +1603,8 @@
     },
     "streamware/components/browser/stealth.py": {
       "module": "curllm_core.streamware.components.browser.stealth",
-      "imports_count": 1,
-      "exports_count": 6,
+      "imports_count": 3,
+      "exports_count": 10,
       "imported_by_count": 3,
       "imported_by": [
         "streamware/components/browser/setup.py",
@@ -1674,13 +1655,13 @@
       "module": "curllm_core.tools.orchestrator",
       "imports_count": 6,
       "exports_count": 6,
-      "imported_by_count": 6,
+      "imported_by_count": 7,
       "imported_by": [
         "cli_orchestrator.py",
         "shortcuts.py",
         "running/runner.py",
-        "orchestration/execute.py",
-        "orchestration/orchestrator.py"
+        "deprecated/cli_orchestrator.py",
+        "orchestration/execute.py"
       ]
     },
     "tools/forms/price_filter.py": {
@@ -1872,6 +1853,15 @@
       "imported_by_count": 0,
       "imported_by": []
     },
+    "deprecated/form_analysis.py": {
+      "module": "curllm_core.deprecated.form_analysis",
+      "imports_count": 6,
+      "exports_count": 10,
+      "imported_by_count": 1,
+      "imported_by": [
+        "hierarchical/planner.py"
+      ]
+    },
     "deprecated/prompt_dsl.py": {
       "module": "curllm_core.deprecated.prompt_dsl",
       "imports_count": 7,
@@ -1879,12 +1869,30 @@
       "imported_by_count": 0,
       "imported_by": []
     },
+    "deprecated/form_detector.py": {
+      "module": "curllm_core.deprecated.form_detector",
+      "imports_count": 4,
+      "exports_count": 3,
+      "imported_by_count": 1,
+      "imported_by": [
+        "deprecated/llm_form_orchestrator.py"
+      ]
+    },
     "deprecated/hybrid_selector_ranker.py": {
       "module": "curllm_core.deprecated.hybrid_selector_ranker",
       "imports_count": 5,
       "exports_count": 7,
       "imported_by_count": 0,
       "imported_by": []
+    },
+    "deprecated/cli_orchestrator.py": {
+      "module": "curllm_core.deprecated.cli_orchestrator",
+      "imports_count": 8,
+      "exports_count": 2,
+      "imported_by_count": 1,
+      "imported_by": [
+        "cli_orchestrator.py"
+      ]
     },
     "deprecated/hierarchical_planner_v2.py": {
       "module": "curllm_core.deprecated.hierarchical_planner_v2",
@@ -1953,13 +1961,13 @@
       "module": "curllm_core.orchestration.orchestrator",
       "imports_count": 40,
       "exports_count": 17,
-      "imported_by_count": 5,
+      "imported_by_count": 6,
       "imported_by": [
         "cli_orchestrator.py",
         "shortcuts.py",
         "running/runner.py",
-        "orchestration/execute.py",
-        "dsl/executor.py"
+        "deprecated/cli_orchestrator.py",
+        "orchestration/execute.py"
       ]
     },
     "orchestration/models.py": {
@@ -2132,10 +2140,10 @@
       "imported_by_count": 10,
       "imported_by": [
         "orchestrator_steps.py",
-        "cli_orchestrator.py",
         "multi_criteria_filter.py",
         "streamware/components/bql/executor.py",
-        "planning/planner.py"
+        "planning/planner.py",
+        "deprecated/cli_orchestrator.py"
       ]
     },
     "llm_dsl/selector_generator.py": {
@@ -2202,13 +2210,13 @@
       "module": "curllm_core.transparent.orchestrator",
       "imports_count": 7,
       "exports_count": 23,
-      "imported_by_count": 6,
+      "imported_by_count": 7,
       "imported_by": [
         "cli_orchestrator.py",
         "shortcuts.py",
         "running/runner.py",
-        "orchestration/execute.py",
-        "orchestration/orchestrator.py"
+        "deprecated/cli_orchestrator.py",
+        "orchestration/execute.py"
       ]
     },
     "dsl/validator.py": {
@@ -2239,10 +2247,10 @@
       "imported_by_count": 10,
       "imported_by": [
         "orchestrator_steps.py",
-        "cli_orchestrator.py",
         "multi_criteria_filter.py",
         "streamware/components/bql/executor.py",
-        "planning/planner.py"
+        "planning/planner.py",
+        "deprecated/cli_orchestrator.py"
       ]
     },
     "dsl/executor.py": {
@@ -2349,10 +2357,10 @@
       "imported_by_count": 10,
       "imported_by": [
         "orchestrator_steps.py",
-        "cli_orchestrator.py",
         "multi_criteria_filter.py",
         "streamware/components/bql/executor.py",
-        "planning/planner.py"
+        "planning/planner.py",
+        "deprecated/cli_orchestrator.py"
       ]
     },
     "form_fill/js_scripts.py": {
