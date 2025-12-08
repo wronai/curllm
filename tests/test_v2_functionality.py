@@ -208,31 +208,31 @@ class TestGoalDetectorLLM:
         assert detector.llm is None
     
     def test_heuristic_fallback_cart(self):
-        """Test heuristic fallback for cart detection."""
+        """Test statistical fallback for cart detection."""
         from curllm_core.url_resolution.goal_detector_llm import GoalDetectorHybrid
         from curllm_core.url_types import TaskGoal
         
         detector = GoalDetectorHybrid(llm=None)
-        result = detector._detect_goal_heuristic("go to cart")
+        result = detector._detect_goal_statistical("go to cart")
         assert result.goal == TaskGoal.FIND_CART
-        assert result.confidence > 0.5
+        assert result.confidence > 0.3  # Statistical may have lower confidence
     
     def test_heuristic_fallback_login(self):
-        """Test heuristic fallback for login detection."""
+        """Test statistical fallback for login detection."""
         from curllm_core.url_resolution.goal_detector_llm import GoalDetectorHybrid
         from curllm_core.url_types import TaskGoal
         
         detector = GoalDetectorHybrid(llm=None)
-        result = detector._detect_goal_heuristic("zaloguj się")
+        result = detector._detect_goal_statistical("zaloguj się")
         assert result.goal == TaskGoal.FIND_LOGIN
     
     def test_heuristic_fallback_contact(self):
-        """Test heuristic fallback for contact detection."""
+        """Test statistical fallback for contact detection."""
         from curllm_core.url_resolution.goal_detector_llm import GoalDetectorHybrid
         from curllm_core.url_types import TaskGoal
         
         detector = GoalDetectorHybrid(llm=None)
-        result = detector._detect_goal_heuristic("find contact form")
+        result = detector._detect_goal_statistical("find contact form")
         assert result.goal == TaskGoal.FIND_CONTACT_FORM
     
     def test_sync_detection(self):

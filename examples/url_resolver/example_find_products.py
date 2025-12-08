@@ -31,6 +31,7 @@ def get_llm():
         pass
     return None
 # Realne przykłady - strony główne sklepów
+# Note: X-kom and Allegro removed due to anti-bot protection in headless mode
 EXAMPLES = [
     {
         "name": "Morele.net - szukanie RAM DDR5",
@@ -39,22 +40,22 @@ EXAMPLES = [
         "expected": "Powinien znaleźć kategorię RAM DDR5 lub wyniki wyszukiwania"
     },
     {
-        "name": "X-kom - szukanie laptopów gamingowych",
-        "url": "https://www.x-kom.pl",
-        "instruction": "Pokaż laptopy gamingowe",
-        "expected": "Powinien nawigować do kategorii laptopów gaming"
-    },
-    {
-        "name": "Allegro - szukanie słuchawek",
-        "url": "https://allegro.pl",
-        "instruction": "Znajdź słuchawki bezprzewodowe Sony",
-        "expected": "Powinien użyć wyszukiwarki i znaleźć oferty"
-    },
-    {
         "name": "MediaExpert - szukanie telewizorów",
         "url": "https://www.mediaexpert.pl",
         "instruction": "Wylistuj telewizory 55 cali",
         "expected": "Powinien znaleźć kategorię TV 55\""
+    },
+    {
+        "name": "Empik - szukanie książek",
+        "url": "https://www.empik.com",
+        "instruction": "Znajdź książki fantasy",
+        "expected": "Powinien użyć wyszukiwarki lub kategorii"
+    },
+    {
+        "name": "Ceneo - porównanie cen",
+        "url": "https://www.ceneo.pl",
+        "instruction": "Szukaj smartfonów Samsung",
+        "expected": "Powinien użyć wyszukiwarki"
     },
 ]
 async def run_example(example: dict):

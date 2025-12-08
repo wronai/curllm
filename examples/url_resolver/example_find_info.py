@@ -27,16 +27,9 @@ def get_llm():
         pass
     return None
 
-# Realne przykłady - szukanie informacji
+# Note: X-kom and Allegro removed due to anti-bot protection in headless mode
 EXAMPLES = [
     # Polityka zwrotów
-    {
-        "name": "X-kom - polityka zwrotów",
-        "url": "https://www.x-kom.pl",
-        "instruction": "Jaka jest polityka zwrotów? Jak zwrócić produkt?",
-        "goal": TaskGoal.FIND_RETURNS,
-        "expected_keywords": ["zwrot", "reklamacja", "return"]
-    },
     {
         "name": "Morele - zwroty i reklamacje",
         "url": "https://www.morele.net",
@@ -44,19 +37,26 @@ EXAMPLES = [
         "goal": TaskGoal.FIND_RETURNS,
         "expected_keywords": ["zwrot", "reklamacja"]
     },
+    {
+        "name": "MediaExpert - zwroty",
+        "url": "https://www.mediaexpert.pl",
+        "instruction": "Jak zwrócić produkt?",
+        "goal": TaskGoal.FIND_RETURNS,
+        "expected_keywords": ["zwrot", "return"]
+    },
     
     # Informacje o dostawie
-    {
-        "name": "Allegro - koszty dostawy",
-        "url": "https://allegro.pl",
-        "instruction": "Ile kosztuje dostawa? Jakie są opcje wysyłki?",
-        "goal": TaskGoal.FIND_SHIPPING,
-        "expected_keywords": ["dostawa", "shipping", "wysyłka"]
-    },
     {
         "name": "MediaExpert - dostawa",
         "url": "https://www.mediaexpert.pl",
         "instruction": "Sprawdź czas dostawy i koszty wysyłki",
+        "goal": TaskGoal.FIND_SHIPPING,
+        "expected_keywords": ["dostawa", "wysyłka"]
+    },
+    {
+        "name": "Empik - dostawa",
+        "url": "https://www.empik.com",
+        "instruction": "Ile kosztuje wysyłka?",
         "goal": TaskGoal.FIND_SHIPPING,
         "expected_keywords": ["dostawa", "wysyłka"]
     },
@@ -68,15 +68,6 @@ EXAMPLES = [
         "instruction": "Mam pytanie - gdzie FAQ?",
         "goal": TaskGoal.FIND_FAQ,
         "expected_keywords": ["faq", "pytania", "pomoc"]
-    },
-    
-    # Gwarancja
-    {
-        "name": "RTV Euro AGD - gwarancja",
-        "url": "https://www.euro.com.pl",
-        "instruction": "Jakie są warunki gwarancji?",
-        "goal": TaskGoal.FIND_WARRANTY,
-        "expected_keywords": ["gwarancja", "warranty", "serwis"]
     },
     
     # Regulamin

@@ -28,7 +28,7 @@ def get_llm():
         pass
     return None
 
-# Przykłady z naturalnym językiem - bez podawania TaskGoal
+# Note: X-kom and Allegro removed due to anti-bot protection in headless mode
 EXAMPLES = [
     # Shopping
     {
@@ -37,14 +37,14 @@ EXAMPLES = [
         "description": "Szukanie produktów → wyszukiwarka sklepu"
     },
     {
-        "url": "https://www.x-kom.pl/laptopy",
+        "url": "https://www.empik.com",
         "instruction": "Dodaj do koszyka i przejdź do płatności",
         "description": "Koszyk/checkout → znajdzie link do koszyka"
     },
     
     # Informacje
     {
-        "url": "https://www.euro.com.pl",
+        "url": "https://www.mediaexpert.pl",
         "instruction": "Ile kosztuje dostawa? Jaki jest czas wysyłki?",
         "description": "Dostawa → strona z informacjami o dostawie"
     },
@@ -54,8 +54,8 @@ EXAMPLES = [
         "description": "Zwroty → strona z polityką zwrotów"
     },
     {
-        "url": "https://allegro.pl",
-        "instruction": "Mam pytanie do obsługi - gdzie FAQ?",
+        "url": "https://www.ceneo.pl",
+        "instruction": "Mam pytanie - gdzie FAQ?",
         "description": "FAQ/Help → centrum pomocy"
     },
     
@@ -78,18 +78,11 @@ EXAMPLES = [
         "description": "Kontakt → formularz kontaktowy"
     },
     
-    # Blog/treści
+    # Regulamin
     {
-        "url": "https://www.x-kom.pl",
-        "instruction": "Pokaż artykuły i poradniki na blogu",
-        "description": "Blog → sekcja z artykułami"
-    },
-    
-    # Praca
-    {
-        "url": "https://allegro.pl",
-        "instruction": "Szukam pracy - oferty rekrutacyjne",
-        "description": "Kariera → strona z ofertami pracy"
+        "url": "https://www.empik.com",
+        "instruction": "Pokaż regulamin sklepu",
+        "description": "Regulamin → strona z regulaminem"
     },
 ]
 async def run_example(example: dict):

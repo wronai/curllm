@@ -4,7 +4,7 @@ CurLLM Component - Web automation with LLM integration for Streamware
 
 import json
 import re
-from typing import Any, Optional, Dict, Iterator
+from typing import Any, Optional, Dict, Iterator, Callable
 from ..core import Component, StreamComponent
 from ..uri import StreamwareURI
 from ..registry import register
@@ -14,6 +14,8 @@ from ...executor import CurllmExecutor
 from ...config import config
 
 logger = get_logger(__name__)
+
+MIME_JSON = "application/json"
 
 
 @register("curllm")
@@ -33,8 +35,8 @@ class CurLLMComponent(Component):
         - execute: Direct executor call
     """
     
-    input_mime = "application/json"
-    output_mime = "application/json"
+    input_mime = MIME_JSON
+    output_mime = MIME_JSON
     
     def __init__(self, uri: StreamwareURI):
         super().__init__(uri)
@@ -49,21 +51,18 @@ class CurLLMComponent(Component):
         
     def process(self, data: Any) -> Any:
         """Process data based on CurLLM action"""
-        
-        if self.action == "browse":
-            return self._browse(data)
-        elif self.action == "extract":
-            return self._extract(data)
-        elif self.action == "fill_form":
-            return self._fill_form(data)
-        elif self.action == "screenshot":
-            return self._screenshot(data)
-        elif self.action == "bql":
-            return self._execute_bql(data)
-        elif self.action == "execute":
-            return self._execute(data)
-        else:
+        action_map: Dict[str, Callable[[Any], Any]] = {
+            "browse": self._browse,
+            "extract": self._extract,
+            "fill_form": self._fill_form,
+            "screenshot": self._screenshot,
+            "bql": self._execute_bql,
+            "execute": self._execute,
+        }
+        handler = action_map.get(self.action)
+        if not handler:
             raise ComponentError(f"Unknown CurLLM action: {self.action}")
+        return handler(data)
             
     def _browse(self, data: Any) -> Dict[str, Any]:
         """Browse to URL and interact with page"""
@@ -242,39 +241,32 @@ class CurLLMComponent(Component):
     
     def _extract_url_from_query(self, query: str) -> Optional[str]:
         """Extract URL from BQL query without regex - simple parsing"""
-        # Look for url: "..." or url: '...'
         url_markers = ['url:', 'URL:', 'Url:']
-        
         for marker in url_markers:
             if marker in query:
                 start_idx = query.find(marker) + len(marker)
                 rest = query[start_idx:].strip()
-                
-                # Find the URL value
-                if rest.startswith('"'):
-                    end_idx = rest.find('"', 1)
-                    if end_idx > 0:
-                        return rest[1:end_idx]
-                elif rest.startswith("'"):
-                    end_idx = rest.find("'", 1)
-                    if end_idx > 0:
-                        return rest[1:end_idx]
-                else:
-                    # URL without quotes - take until space or end
-                    end_idx = rest.find(' ')
-                    if end_idx > 0:
-                        return rest[:end_idx]
-                    return rest
-        
+                return self._extract_url_value(rest)
         return None
+
+    @staticmethod
+    def _extract_url_value(rest: str) -> Optional[str]:
+        if rest.startswith('"'):
+            end_idx = rest.find('"', 1)
+            return rest[1:end_idx] if end_idx > 0 else None
+        if rest.startswith("'"):
+            end_idx = rest.find("'", 1)
+            return rest[1:end_idx] if end_idx > 0 else None
+        end_idx = rest.find(' ')
+        return rest[:end_idx] if end_idx > 0 else rest
         
     def __del__(self):
         """Cleanup executor on component destruction"""
         if self.executor:
             try:
                 self.executor.cleanup()
-            except:
-                pass
+            except Exception as e:
+                logger.debug(f"Executor cleanup failed: {e}")
 
 
 @register("curllm-stream")
@@ -286,8 +278,8 @@ class CurLLMStreamComponent(StreamComponent):
         curllm-stream://action?param=value
     """
     
-    input_mime = "application/json"
-    output_mime = "application/json"
+    input_mime = MIME_JSON
+    output_mime = MIME_JSON
     
     def __init__(self, uri: StreamwareURI):
         super().__init__(uri)

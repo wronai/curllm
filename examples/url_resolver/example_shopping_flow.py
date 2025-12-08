@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from curllm_core.url_resolver import UrlResolver, TaskGoal
 from browser_helper import create_browser, close_browser
 
-# Realne przykłady - flow zakupowy
+# Note: X-kom and Allegro removed due to anti-bot protection in headless mode
 EXAMPLES = [
     # Koszyk
     {
@@ -31,38 +31,24 @@ EXAMPLES = [
         "goal": TaskGoal.FIND_CART
     },
     {
-        "name": "X-kom - koszyk",
-        "url": "https://www.x-kom.pl",
-        "instruction": "Przejdź do koszyka zakupowego",
-        "goal": TaskGoal.FIND_CART
-    },
-    {
-        "name": "Allegro - koszyk",
-        "url": "https://allegro.pl",
-        "instruction": "Otwórz koszyk",
+        "name": "Empik - koszyk",
+        "url": "https://www.empik.com",
+        "instruction": "Przejdź do koszyka",
         "goal": TaskGoal.FIND_CART
     },
     
     # Logowanie
     {
-        "name": "Morele - logowanie",
-        "url": "https://www.morele.net",
+        "name": "Empik - logowanie",
+        "url": "https://www.empik.com/ksiazki",
         "instruction": "Zaloguj się do konta",
         "goal": TaskGoal.FIND_LOGIN
     },
     {
-        "name": "Allegro - logowanie",
-        "url": "https://allegro.pl/kategoria/komputery",
+        "name": "Ceneo - logowanie",
+        "url": "https://www.ceneo.pl",
         "instruction": "Chcę się zalogować",
         "goal": TaskGoal.FIND_LOGIN
-    },
-    
-    # Rejestracja
-    {
-        "name": "X-kom - rejestracja",
-        "url": "https://www.x-kom.pl",
-        "instruction": "Załóż nowe konto",
-        "goal": TaskGoal.FIND_REGISTER
     },
     
     # Moje konto

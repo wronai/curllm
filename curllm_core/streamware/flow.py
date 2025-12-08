@@ -155,25 +155,13 @@ class Flow:
             ComponentError: If any component fails
         """
         if not self.components:
-            return
+            return iter(())
             
         current_stream = input_stream
         
         for i, component in enumerate(self.components):
             try:
-                if isinstance(component, StreamComponent):
-                    current_stream = component.stream(current_stream)
-                else:
-                    # Wrap non-streaming component
-                    def process_stream(stream, comp):
-                        if stream:
-                            for item in stream:
-                                yield comp.process(item)
-                        else:
-                            yield comp.process(None)
-                            
-                    current_stream = process_stream(current_stream, component)
-                    
+                current_stream = self._apply_component_stream(component, current_stream)
             except Exception as e:
                 logger.error(f"Error in streaming component {i+1}: {e}")
                 raise ComponentError(
@@ -183,6 +171,23 @@ class Flow:
         # Yield from final stream
         if current_stream:
             yield from current_stream
+        
+    def _apply_component_stream(
+        self, component: Component, current_stream: Optional[Iterator]
+    ) -> Iterator:
+        if isinstance(component, StreamComponent):
+            return component.stream(current_stream)
+        return self._wrap_non_stream_component(component, current_stream)
+
+    @staticmethod
+    def _wrap_non_stream_component(
+        component: Component, stream: Optional[Iterator]
+    ) -> Iterator:
+        if stream:
+            for item in stream:
+                yield component.process(item)
+        else:
+            yield component.process(None)
             
     async def run_async(self, input_data: Any = None) -> Any:
         """

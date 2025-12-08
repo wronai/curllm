@@ -22,40 +22,50 @@ from ..diagnostics import get_logger
 logger = get_logger(__name__)
 
 
-def cmd_run(args):
-    """Run a YAML flow"""
+def _configure_diagnostics(args):
     if args.verbose:
         enable_diagnostics("DEBUG")
     elif args.quiet:
         enable_diagnostics("ERROR")
     else:
         enable_diagnostics("INFO")
-    
-    # Parse variables
-    variables = {}
-    if args.var:
-        for var in args.var:
-            if '=' in var:
-                key, value = var.split('=', 1)
-                variables[key] = value
-            else:
-                logger.warning(f"Invalid variable format: {var} (use key=value)")
-    
-    # Parse input data
-    input_data = None
+
+
+def _parse_variables(args) -> Dict[str, Any]:
+    variables: Dict[str, Any] = {}
+    for var in args.var or []:
+        if '=' in var:
+            key, value = var.split('=', 1)
+            variables[key] = value
+        else:
+            logger.warning(f"Invalid variable format: {var} (use key=value)")
+    return variables
+
+
+def _load_input(args):
     if args.input:
         try:
-            input_data = json.loads(args.input)
+            return json.loads(args.input)
         except json.JSONDecodeError as e:
-            logger.error(f"Invalid JSON input: {e}")
-            return 1
-    elif args.input_file:
+            raise ValueError(f"Invalid JSON input: {e}") from e
+    if args.input_file:
         try:
             with open(args.input_file, 'r') as f:
-                input_data = json.load(f)
+                return json.load(f)
         except Exception as e:
-            logger.error(f"Error reading input file: {e}")
-            return 1
+            raise ValueError(f"Error reading input file: {e}") from e
+    return None
+
+
+def cmd_run(args):
+    """Run a YAML flow"""
+    _configure_diagnostics(args)
+    variables = _parse_variables(args)
+    try:
+        input_data = _load_input(args)
+    except ValueError as e:
+        logger.error(e)
+        return 1
     
     # Run flow
     try:
@@ -145,6 +155,9 @@ def cmd_list(args):
     return 0
 
 
+FLOW_ARG_HELP = "Path to YAML flow file"
+
+
 def cmd_info(args):
     """Show detailed flow information"""
     enable_diagnostics("WARNING")
@@ -161,7 +174,7 @@ def cmd_info(args):
         print(f"Trace: {spec.get('trace', False)}")
         
         if 'input' in spec:
-            print(f"\nInput:")
+            print("\nInput:")
             print(f"  Type: {spec['input'].get('type', 'unknown')}")
             if 'data' in spec['input']:
                 print(f"  Data keys: {list(spec['input']['data'].keys())}")
@@ -196,7 +209,7 @@ def main():
     
     # Run command
     run_parser = subparsers.add_parser('run', help='Run a YAML flow')
-    run_parser.add_argument('flow', help='Path to YAML flow file')
+    run_parser.add_argument('flow', help=FLOW_ARG_HELP)
     run_parser.add_argument('--var', '-v', action='append', help='Set variable (key=value)')
     run_parser.add_argument('--input', '-i', help='Input data as JSON string')
     run_parser.add_argument('--input-file', '-f', help='Input data from JSON file')
@@ -207,7 +220,7 @@ def main():
     
     # Validate command
     validate_parser = subparsers.add_parser('validate', help='Validate a YAML flow')
-    validate_parser.add_argument('flow', help='Path to YAML flow file')
+    validate_parser.add_argument('flow', help=FLOW_ARG_HELP)
     validate_parser.add_argument('--verbose', action='store_true', help='Verbose output')
     validate_parser.set_defaults(func=cmd_validate)
     
@@ -218,7 +231,7 @@ def main():
     
     # Info command
     info_parser = subparsers.add_parser('info', help='Show flow information')
-    info_parser.add_argument('flow', help='Path to YAML flow file')
+    info_parser.add_argument('flow', help=FLOW_ARG_HELP)
     info_parser.set_defaults(func=cmd_info)
     
     args = parser.parse_args()

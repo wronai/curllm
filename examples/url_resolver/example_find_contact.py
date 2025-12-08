@@ -31,18 +31,12 @@ def get_llm():
         pass
     return None
 
-# Realne przykłady - różne strony
+# Note: Allegro removed due to anti-bot protection in headless mode
 EXAMPLES = [
     {
         "name": "Morele.net - kontakt",
         "url": "https://www.morele.net",
         "instruction": "Wypełnij formularz kontaktowy",
-        "goal": TaskGoal.FIND_CONTACT_FORM
-    },
-    {
-        "name": "Allegro - pomoc/kontakt",
-        "url": "https://allegro.pl",
-        "instruction": "Napisz wiadomość do obsługi klienta",
         "goal": TaskGoal.FIND_CONTACT_FORM
     },
     {
@@ -55,6 +49,12 @@ EXAMPLES = [
         "name": "Ceneo - kontakt",
         "url": "https://www.ceneo.pl",
         "instruction": "Wyślij zapytanie do obsługi",
+        "goal": TaskGoal.FIND_CONTACT_FORM
+    },
+    {
+        "name": "Komputronik - kontakt",
+        "url": "https://www.komputronik.pl",
+        "instruction": "Napisz wiadomość do obsługi",
         "goal": TaskGoal.FIND_CONTACT_FORM
     },
 ]

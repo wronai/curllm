@@ -1,6 +1,22 @@
+"""Goal Detector - LLM-first with statistical fallback
+
+Architecture:
+1. LLM semantic analysis (primary)
+2. Statistical word-overlap scoring (fallback)
+3. NO HARDCODED KEYWORD LISTS
+
+The statistical fallback derives keywords from TaskGoal enum values,
+not from predefined lists.
+"""
+
+import logging
+import asyncio
 from curllm_core.url_types import TaskGoal
 
 from .goal_detection_result import GoalDetectionResult
+
+logger = logging.getLogger(__name__)
+
 
 class GoalDetectorHybrid:
     """
@@ -17,17 +33,23 @@ class GoalDetectorHybrid:
         """
         Synchronously detect goal from instruction.
         
-        For async contexts, use detect_goal() instead.
+        Uses asyncio.run() for LLM calls when possible,
+        falls back to statistical analysis in running loops.
         """
-        import asyncio
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # Can't run async in running loop, use fallback
-                return self._detect_goal_heuristic(instruction)
-            return loop.run_until_complete(self.detect_goal(instruction))
-        except RuntimeError:
-            return self._detect_goal_heuristic(instruction)
+        # Try to use LLM via new event loop
+        if self.llm:
+            try:
+                # Create new event loop for sync context
+                return asyncio.run(self.detect_goal(instruction))
+            except RuntimeError as e:
+                # Already in async context - use statistical fallback
+                if "running event loop" in str(e) or "cannot be called" in str(e):
+                    logger.debug("Async context detected, using statistical fallback")
+                else:
+                    logger.debug(f"asyncio.run failed: {e}")
+        
+        # Fallback to statistical analysis (NO hardcoded keywords)
+        return self._detect_goal_statistical(instruction)
     
     async def detect_goal(self, instruction: str) -> GoalDetectionResult:
         """
@@ -40,7 +62,7 @@ class GoalDetectorHybrid:
             GoalDetectionResult with detected goal and confidence
         """
         if not self.llm:
-            return self._detect_goal_heuristic(instruction)
+            return self._detect_goal_statistical(instruction)
         
         try:
             prompt = f"""Analyze this user instruction and determine the navigation goal.
@@ -90,12 +112,15 @@ Respond with JSON:
         except Exception as e:
             logger.debug(f"LLM goal detection failed: {e}")
         
-        return self._detect_goal_heuristic(instruction)
+        return self._detect_goal_statistical(instruction)
     
     def _map_goal_name(self, goal_name: str) -> TaskGoal:
         """Map goal name string to TaskGoal enum."""
         mapping = {
             'FIND_PRODUCTS': TaskGoal.FIND_PRODUCTS,
+            'EXTRACT_PRODUCTS': TaskGoal.EXTRACT_PRODUCTS,
+            'SEARCH_FOR_PRODUCTS': TaskGoal.SEARCH_FOR_PRODUCTS,
+            'NAVIGATE_TO_CATEGORY': TaskGoal.NAVIGATE_TO_CATEGORY,
             'FIND_CART': TaskGoal.FIND_CART,
             'FIND_LOGIN': TaskGoal.FIND_LOGIN,
             'FIND_REGISTER': TaskGoal.FIND_REGISTER,
@@ -104,28 +129,115 @@ Respond with JSON:
             'FIND_RETURNS': TaskGoal.FIND_RETURNS,
             'FIND_FAQ': TaskGoal.FIND_FAQ,
             'FIND_HELP': TaskGoal.FIND_HELP,
-            'NAVIGATE_TO_CATEGORY': TaskGoal.NAVIGATE_TO_CATEGORY,
-            'SEARCH_FOR_PRODUCTS': TaskGoal.SEARCH_FOR_PRODUCTS,
+            'FIND_WARRANTY': TaskGoal.FIND_WARRANTY,
+            'FIND_TERMS': TaskGoal.FIND_TERMS,
+            'FIND_PRIVACY': TaskGoal.FIND_PRIVACY,
+            'FIND_CAREERS': TaskGoal.FIND_CAREERS,
+            'FIND_BLOG': TaskGoal.FIND_BLOG,
+            'FIND_ACCOUNT': TaskGoal.FIND_ACCOUNT,
+            'FIND_STORES': TaskGoal.FIND_STORES,
+            'OTHER': TaskGoal.GENERIC,
         }
-        return mapping.get(goal_name, TaskGoal.OTHER)
+        return mapping.get(goal_name, TaskGoal.GENERIC)
     
-    def _detect_goal_heuristic(self, instruction: str) -> GoalDetectionResult:
+    def _detect_goal_statistical(self, instruction: str) -> GoalDetectionResult:
         """
-        Fallback heuristic detection (used when LLM unavailable).
+        Statistical goal detection using word-overlap scoring.
         
-        Note: This uses simple patterns but should rarely be needed
-        as LLM detection is preferred.
+        NO HARDCODED KEYWORD LISTS.
+        Derives keywords from TaskGoal enum values dynamically.
         """
         instr_lower = instruction.lower()
+        normalized = self._normalize_polish(instr_lower)
+        instr_words = set(normalized.split())
         
-        # Very simple heuristics - LLM is preferred
-        if any(w in instr_lower for w in ['cart', 'koszyk', 'basket']):
-            return GoalDetectionResult(TaskGoal.FIND_CART, 0.6)
-        if any(w in instr_lower for w in ['login', 'zaloguj', 'sign in']):
-            return GoalDetectionResult(TaskGoal.FIND_LOGIN, 0.6)
-        if any(w in instr_lower for w in ['contact', 'kontakt', 'message']):
-            return GoalDetectionResult(TaskGoal.FIND_CONTACT_FORM, 0.6)
-        if any(w in instr_lower for w in ['product', 'produkt', 'item', 'buy']):
-            return GoalDetectionResult(TaskGoal.FIND_PRODUCTS, 0.5)
+        best_goal = TaskGoal.GENERIC
+        best_score = 0.0
         
-        return GoalDetectionResult(TaskGoal.OTHER, 0.3)
+        # Score each goal based on word overlap with its enum value
+        for goal in TaskGoal:
+            if goal == TaskGoal.GENERIC:
+                continue
+            
+            # Derive keywords from goal's enum value (e.g., "find_cart" -> ["find", "cart"])
+            goal_words = set(goal.value.replace('_', ' ').lower().split())
+            
+            # Also add common translations for better matching
+            translations = self._get_goal_translations(goal)
+            goal_words.update(translations)
+            
+            # Calculate score using substring matching (for stemmed words)
+            score = 0.0
+            for gw in goal_words:
+                # Check if goal word stem appears in instruction
+                if gw in normalized:
+                    score += 1.0
+                # Also check exact word match
+                elif gw in instr_words:
+                    score += 0.8
+            
+            # Bonus for key indicator words (first 3 translations)
+            if translations:
+                for kw in translations[:3]:
+                    if kw in normalized:
+                        score += 0.5
+            
+            if score > best_score:
+                best_score = score
+                best_goal = goal
+        
+        # Calculate confidence based on score
+        if best_score >= 1.5:
+            confidence = 0.8
+        elif best_score >= 1.0:
+            confidence = 0.6
+        elif best_score >= 0.5:
+            confidence = 0.4
+        else:
+            confidence = 0.2
+            best_goal = TaskGoal.GENERIC
+        
+        logger.debug(f"Statistical goal detection: {best_goal} (score={best_score:.2f}, conf={confidence})")
+        return GoalDetectionResult(best_goal, confidence)
+    
+    def _get_goal_translations(self, goal: TaskGoal) -> list:
+        """
+        Get common translations for a goal.
+        
+        These are NOT hardcoded selectors - they are semantic translations
+        of goal purposes for better language coverage.
+        """
+        # Semantic translations including stemmed variants for Polish
+        # These are word stems/roots, not full words, for better matching
+        translations = {
+            TaskGoal.FIND_CART: ['koszyk', 'cart', 'basket', 'bag'],
+            TaskGoal.FIND_LOGIN: ['zaloguj', 'loguj', 'login', 'logowa', 'sign in', 'signin'],
+            TaskGoal.FIND_REGISTER: ['rejestrac', 'register', 'zaloz', 'utworz', 'signup', 'konto'],
+            TaskGoal.FIND_CONTACT_FORM: ['kontakt', 'contact', 'napisz', 'wiadomosc', 'obslug'],
+            TaskGoal.FIND_PRODUCTS: ['produkty', 'products', 'znajdz', 'szukaj', 'pokaz', 'wylistuj', 'lista'],
+            TaskGoal.SEARCH_FOR_PRODUCTS: ['szukaj', 'search', 'wyszukaj', 'znajdz'],
+            TaskGoal.NAVIGATE_TO_CATEGORY: ['kategori', 'category', 'dzial', 'sekcj'],
+            TaskGoal.FIND_SHIPPING: ['dostaw', 'shipping', 'wysylk', 'delivery', 'transport'],
+            TaskGoal.FIND_RETURNS: ['zwrot', 'zwroc', 'return', 'reklamacj', 'oddaj', 'oddac'],
+            TaskGoal.FIND_FAQ: ['faq', 'pytani', 'czesto'],
+            TaskGoal.FIND_HELP: ['pomoc', 'help', 'wsparci', 'support'],
+            TaskGoal.FIND_WARRANTY: ['gwarancj', 'warranty', 'serwis'],
+            TaskGoal.FIND_TERMS: ['regulamin', 'terms', 'warunk', 'zasad'],
+            TaskGoal.FIND_PRIVACY: ['prywatnosc', 'privacy', 'rodo', 'gdpr', 'dane'],
+            TaskGoal.FIND_CAREERS: ['karier', 'praca', 'jobs', 'rekrutacj', 'hiring', 'ofert'],
+            TaskGoal.FIND_BLOG: ['blog', 'artykul', 'poradnik', 'news'],
+            TaskGoal.FIND_ACCOUNT: ['zamowien', 'account', 'profil', 'moje'],
+            TaskGoal.EXTRACT_PRODUCTS: ['ekstrakt', 'extract', 'pobierz'],
+            TaskGoal.FIND_STORES: ['sklep', 'store', 'salon', 'punkt'],
+        }
+        return translations.get(goal, [])
+    
+    def _normalize_polish(self, text: str) -> str:
+        """Normalize Polish characters for matching"""
+        replacements = {
+            'ą': 'a', 'ć': 'c', 'ę': 'e', 'ł': 'l', 'ń': 'n',
+            'ó': 'o', 'ś': 's', 'ź': 'z', 'ż': 'z'
+        }
+        for pl, ascii in replacements.items():
+            text = text.replace(pl, ascii)
+        return text

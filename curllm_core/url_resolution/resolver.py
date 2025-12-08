@@ -18,6 +18,7 @@ Strategies:
 import re
 import json
 import logging
+import asyncio
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urljoin, urlparse, quote_plus
 
@@ -593,6 +594,10 @@ No explanation, just the URL or NONE."""
             try:
                 await self.page.goto(url, wait_until="domcontentloaded", timeout=30000)
                 steps.append(f"Navigated to {urlparse(url).hostname}")
+                
+                # Wait for SPA hydration before searching for links
+                await dom_helpers.ensure_page_ready(self.page, wait_ms=3000)
+                
             except Exception as e:
                 return ResolvedUrl(
                     original_url=url,
@@ -659,9 +664,19 @@ No explanation, just the URL or NONE."""
         goal = self.detect_goal(instruction)
         self._log(f"   Detected goal: {goal.value}")
         
-        # For specific goals (anything except GENERIC and EXTRACT_PRODUCTS), 
-        # use specialized resolution to find the right page
-        if goal not in [TaskGoal.GENERIC, TaskGoal.EXTRACT_PRODUCTS]:
+        # Goals that require finding a specific page link (not search)
+        LINK_BASED_GOALS = [
+            TaskGoal.FIND_CART, TaskGoal.FIND_LOGIN, TaskGoal.FIND_REGISTER,
+            TaskGoal.FIND_CONTACT_FORM, TaskGoal.FIND_SHIPPING, TaskGoal.FIND_RETURNS,
+            TaskGoal.FIND_FAQ, TaskGoal.FIND_HELP, TaskGoal.FIND_WARRANTY,
+            TaskGoal.FIND_TERMS, TaskGoal.FIND_PRIVACY, TaskGoal.FIND_CAREERS,
+            TaskGoal.FIND_BLOG, TaskGoal.FIND_ACCOUNT, TaskGoal.FIND_STORES,
+        ]
+        
+        # For link-based goals, use specialized resolution to find the right page
+        # Product-related goals (FIND_PRODUCTS, SEARCH_FOR_PRODUCTS, NAVIGATE_TO_CATEGORY)
+        # should use search flow instead
+        if goal in LINK_BASED_GOALS:
             return await self.resolve_for_goal(url, goal)
         
         steps = []
@@ -712,18 +727,45 @@ No explanation, just the URL or NONE."""
                 current_url = self.page.url
                 steps.append(f"Searched for: {search_term}")
                 
-                # Re-analyze after search
-                page_match = await self._analyze_page_match(instruction)
-                if page_match.matches_intent and page_match.confidence >= 0.6:
-                    self._log(f"✅ Found via search: {current_url}")
-                    return ResolvedUrl(
-                        original_url=url,
-                        resolved_url=current_url,
-                        resolution_method="search",
-                        success=True,
-                        steps_taken=steps,
-                        page_match=page_match,
-                    )
+                # Wait for dynamic content to load
+                await asyncio.sleep(0.5)
+                
+                # Re-analyze after search with error handling
+                try:
+                    page_match = await self._analyze_page_match(instruction)
+                    if page_match.matches_intent and page_match.confidence >= 0.6:
+                        self._log(f"✅ Found via search: {current_url}")
+                        return ResolvedUrl(
+                            original_url=url,
+                            resolved_url=current_url,
+                            resolution_method="search",
+                            success=True,
+                            steps_taken=steps,
+                            page_match=page_match,
+                        )
+                except Exception as e:
+                    error_msg = str(e).lower()
+                    # Only treat as success if context was destroyed (navigation happened)
+                    if "context was destroyed" in error_msg or "navigation" in error_msg:
+                        logger.debug(f"Context destroyed after search navigation: {e}")
+                        self._log(f"✅ Searched successfully: {current_url}")
+                        return ResolvedUrl(
+                            original_url=url,
+                            resolved_url=current_url,
+                            resolution_method="search",
+                            success=True,
+                            steps_taken=steps,
+                            page_match=PageMatchResult(
+                                matches_intent=True,
+                                confidence=0.7,
+                                page_type="search_results",
+                                reasoning="Search navigation completed"
+                            ),
+                        )
+                    else:
+                        # Other errors should not be silently treated as success
+                        logger.warning(f"Post-search analysis failed: {e}")
+                        # Continue to other strategies instead of returning success
         
         # Step 5: Try category navigation
         if page_match.categories_found:
@@ -900,17 +942,37 @@ Search term:"""
         return None
     
     def _extract_keywords(self, text: str) -> List[str]:
-        """Extract important keywords from text"""
+        """Extract important keywords from text, filtering out verbs and action words"""
         
-        # Common product/category terms
+        # Action words/verbs to filter out (Polish and English)
+        FILTER_WORDS = {
+            # Polish verbs
+            'znajdź', 'znajd', 'szukaj', 'pokaż', 'pokaz', 'wylistuj', 'wyświetl', 'wyswitl',
+            'kup', 'dodaj', 'otwórz', 'otworz', 'przejdź', 'przejdz', 'idź', 'idz',
+            'sprawdź', 'sprawdz', 'zobacz', 'pobierz', 'wyszukaj', 'chcę', 'chce',
+            'muszę', 'musze', 'potrzebuję', 'potrzebuje', 'jakie', 'jaki', 'ile',
+            # English verbs
+            'find', 'search', 'show', 'list', 'get', 'buy', 'add', 'open', 'go',
+            'check', 'see', 'browse', 'look', 'want', 'need',
+            # Common filler words
+            'mi', 'mnie', 'do', 'na', 'w', 'z', 'od', 'za', 'po', 'dla', 'się',
+            'jest', 'są', 'to', 'jak', 'gdzie', 'co', 'czy', 'i', 'lub', 'albo',
+            'the', 'a', 'an', 'to', 'for', 'of', 'in', 'on', 'at', 'by',
+        }
+        
+        # Common product/category terms (patterns)
         product_patterns = [
             r'DDR[345]',
             r'RAM\s*\d+GB',
             r'\d+GB\s*RAM',
+            r'\d+\s*GB',
+            r'\d+\s*TB',
+            r'\d+\s*cali?',
+            r'\d+\s*inch',
             r'SSD\s*\d+',
             r'procesor\w*',
             r'karta\s+graficzn\w*',
-            r'monitor\s*\d+',
+            r'monitor\w*',
             r'laptop\w*',
             r'smartfon\w*',
             r'telefon\w*',
@@ -919,30 +981,44 @@ Search term:"""
             r'telewizor\w*',
             r'pralk\w*',
             r'lodówk\w*',
+            r'pamięć\w*',
+            r'dysk\w*',
         ]
         
         keywords = []
         text_lower = text.lower()
         
-        # Find pattern matches
+        # Find pattern matches first (these are usually important)
         for pattern in product_patterns:
             matches = re.findall(pattern, text, re.IGNORECASE)
             keywords.extend(matches)
         
-        # Also extract capitalized words (likely product names)
+        # Extract capitalized words (likely product/brand names)
         words = re.findall(r'\b[A-Z][a-zA-Z0-9]+\b', text)
-        keywords.extend([w for w in words if len(w) > 2])
+        for w in words:
+            if len(w) > 2 and w.lower() not in FILTER_WORDS:
+                keywords.append(w)
         
         # Extract quoted terms
         quoted = re.findall(r'"([^"]+)"', text)
         keywords.extend(quoted)
+        
+        # Extract remaining significant words (nouns)
+        remaining_words = re.findall(r'\b[a-ząćęłńóśźżA-ZĄĆĘŁŃÓŚŹŻ]{3,}\b', text)
+        for w in remaining_words:
+            w_lower = w.lower()
+            if w_lower not in FILTER_WORDS and w not in keywords:
+                # Check if it looks like a noun (not ending in typical verb endings)
+                verb_endings = ['ać', 'eć', 'ić', 'ować', 'ywać', 'ywuj', 'uj', 'ij']
+                if not any(w_lower.endswith(end) for end in verb_endings):
+                    keywords.append(w)
         
         # Deduplicate while preserving order
         seen = set()
         unique = []
         for kw in keywords:
             kw_lower = kw.lower()
-            if kw_lower not in seen:
+            if kw_lower not in seen and kw_lower not in FILTER_WORDS:
                 seen.add(kw_lower)
                 unique.append(kw)
         

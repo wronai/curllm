@@ -42,63 +42,64 @@ class HTTPComponent(Component):
         if not url:
             raise ComponentError("Invalid HTTP URL")
             
-        # Get method from params or data
-        method = self.uri.get_param('method', 'get').lower()
-        if isinstance(data, dict) and 'method' in data:
-            method = data['method'].lower()
-            
-        # Get headers
-        headers = {}
-        for key, value in self.uri.params.items():
-            if key.startswith('header_'):
-                header_name = key[7:].replace('_', '-').title()
-                headers[header_name] = value
-                
-        if isinstance(data, dict) and 'headers' in data:
-            headers.update(data['headers'])
-            
-        # Get timeout
+        method = self._get_method(data)
+        headers = self._build_headers(data)
         timeout = self.uri.get_param('timeout', 30)
+        json_payload = data if isinstance(data, dict) and 'method' not in data else None
         
         try:
             logger.debug(f"HTTP {method.upper()} {url}")
             
-            if method == 'get':
-                response = requests.get(url, headers=headers, timeout=timeout)
-            elif method == 'post':
-                json_data = data if isinstance(data, dict) and 'method' not in data else None
-                response = requests.post(url, json=json_data, headers=headers, timeout=timeout)
-            elif method == 'put':
-                json_data = data if isinstance(data, dict) and 'method' not in data else None
-                response = requests.put(url, json=json_data, headers=headers, timeout=timeout)
-            elif method == 'delete':
-                response = requests.delete(url, headers=headers, timeout=timeout)
-            elif method == 'patch':
-                json_data = data if isinstance(data, dict) and 'method' not in data else None
-                response = requests.patch(url, json=json_data, headers=headers, timeout=timeout)
-            else:
+            request_map = {
+                'get': lambda: requests.get(url, headers=headers, timeout=timeout),
+                'delete': lambda: requests.delete(url, headers=headers, timeout=timeout),
+                'post': lambda: requests.post(url, json=json_payload, headers=headers, timeout=timeout),
+                'put': lambda: requests.put(url, json=json_payload, headers=headers, timeout=timeout),
+                'patch': lambda: requests.patch(url, json=json_payload, headers=headers, timeout=timeout),
+            }
+            sender = request_map.get(method)
+            if not sender:
                 raise ComponentError(f"Unsupported HTTP method: {method}")
+            
+            response = sender()
                 
             response.raise_for_status()
             
-            # Try to return JSON if possible
-            content_type = response.headers.get('Content-Type', '')
-            if 'application/json' in content_type:
-                return response.json()
-            elif 'text/' in content_type:
-                return response.text
-            else:
-                return {
-                    "status_code": response.status_code,
-                    "headers": dict(response.headers),
-                    "content": response.text[:1000],  # First 1KB
-                }
-                
+            return self._parse_response(response)
+            
         except requests.exceptions.RequestException as e:
             raise ConnectionError(f"HTTP request failed: {e}") from e
         except json.JSONDecodeError as e:
             # Return text if JSON decode fails
             return response.text
+
+    def _get_method(self, data: Any) -> str:
+        method = self.uri.get_param('method', 'get').lower()
+        if isinstance(data, dict) and 'method' in data:
+            method = data['method'].lower()
+        return method
+
+    def _build_headers(self, data: Any) -> Dict[str, Any]:
+        headers: Dict[str, Any] = {}
+        for key, value in self.uri.params.items():
+            if key.startswith('header_'):
+                header_name = key[7:].replace('_', '-').title()
+                headers[header_name] = value
+        if isinstance(data, dict) and 'headers' in data:
+            headers.update(data['headers'])
+        return headers
+
+    def _parse_response(self, response: requests.Response) -> Any:
+        content_type = response.headers.get('Content-Type', '')
+        if 'application/json' in content_type:
+            return response.json()
+        if 'text/' in content_type:
+            return response.text
+        return {
+            "status_code": response.status_code,
+            "headers": dict(response.headers),
+            "content": response.text[:1000],  # First 1KB
+        }
 
 
 @register("web")

@@ -18,6 +18,9 @@ class TaskGoal(Enum):
     """What the user wants to achieve"""
     # Shopping
     EXTRACT_PRODUCTS = "extract_products"
+    FIND_PRODUCTS = "find_products"
+    SEARCH_FOR_PRODUCTS = "search_for_products"
+    NAVIGATE_TO_CATEGORY = "navigate_to_category"
     FIND_CART = "find_cart"
     FIND_CHECKOUT = "find_checkout"
     FIND_WISHLIST = "find_wishlist"
