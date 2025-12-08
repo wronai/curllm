@@ -532,6 +532,17 @@ class Orchestrator:
         os.makedirs(self.config.log_dir, exist_ok=True)
         path = os.path.join(self.config.log_dir, f"{self.run_id}-{name}.png")
         await self.page.screenshot(path=path)
+        
+        # Add to screenshot manager for log tracking
+        if self.screenshot_manager:
+            from curllm_logs import ScreenshotInfo
+            ss_info = ScreenshotInfo(
+                path=path,
+                name=name,
+                description=f"Screenshot: {name}",
+            )
+            self.screenshot_manager.screenshots.append(ss_info)
+        
         return path
     
     def _log(self, level: str, message: str):
@@ -609,12 +620,21 @@ class Orchestrator:
             
             # Step results
             for sr in result.step_results:
+                # Extract metadata from step data (LLM-DSL returns method, selector, etc.)
+                selector_used = sr.data.get("selector") if sr.data else None
+                selector_confidence = sr.data.get("confidence", 0.0) if sr.data else 0.0
+                method_used = sr.data.get("method", "unknown") if sr.data else "unknown"
+                
                 step_log = StepLog(
                     index=sr.step_index,
                     step_type=sr.step_type,
                     description=sr.step_type,
                     status="completed" if sr.success else "failed",
                     duration_ms=sr.duration_ms,
+                    selector_used=selector_used,
+                    selector_confidence=selector_confidence,
+                    method=method_used,
+                    result_data=sr.data,
                     error_message=sr.error,
                     screenshot_after=sr.screenshot_path,
                 )

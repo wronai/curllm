@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 def default_log_dir() -> str:
@@ -13,8 +13,9 @@ def default_log_dir() -> str:
     """
     env_dir = os.getenv("CURLLM_LOG_DIR")
     try:
-        # /curllm_core/orchestration/orchestrator/orchestrator_config.py -> parents[4] == repo root (curllm)
-        repo_root = Path(__file__).resolve().parents[4]
+        # orchestrator_config.py -> orchestrator -> orchestration -> curllm_core -> curllm (repo root)
+        # parents[0] = orchestrator, parents[1] = orchestration, parents[2] = curllm_core, parents[3] = curllm
+        repo_root = Path(__file__).resolve().parents[3]
     except Exception:
         repo_root = None
 
@@ -43,7 +44,7 @@ class OrchestratorConfig:
     screenshot_on_success: bool = True
     screenshot_each_step: bool = False  # Capture after each step
     log_to_file: bool = True
-    log_dir: str = default_log_dir()
+    log_dir: str = field(default_factory=default_log_dir)  # Resolved at runtime
     screenshot_dir: str = "screenshots"
     dry_run: bool = False  # Parse and plan only, don't execute
     auto_captcha_visible: bool = True  # Auto-switch to visible mode on CAPTCHA

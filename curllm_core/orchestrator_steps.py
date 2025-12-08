@@ -153,20 +153,25 @@ class StepExecutor:
     async def _execute_fill_field(
         self, step: TaskStep, parsed: ParsedCommand, params: Dict
     ) -> Dict[str, Any]:
-        """Fill a single form field"""
+        """
+        Fill a single form field using LLM-DSL approach.
+        
+        Dynamically resolves field values from parsed.form_data using getattr
+        instead of hardcoded field mappings.
+        """
         field_type = params.get("field_type", "text")
         value = params.get("value", "")
         
-        # Get value from parsed command if not specified
-        if not value:
-            if field_type == "email" and parsed.form_data.email:
-                value = parsed.form_data.email
-            elif field_type == "name" and parsed.form_data.name:
-                value = parsed.form_data.name
-            elif field_type == "phone" and parsed.form_data.phone:
-                value = parsed.form_data.phone
-            elif field_type == "message":
-                value = parsed.form_data.message or parsed.original_instruction
+        # Dynamic value resolution from parsed.form_data (no hardcoded field names)
+        if not value and parsed.form_data:
+            # Try to get value dynamically by field_type attribute name
+            value = getattr(parsed.form_data, field_type, None) or ""
+            
+            # Fallback: use original instruction for message-like fields
+            if not value and field_type in {"message", "description", "content", "text"}:
+                value = parsed.form_data.message if hasattr(parsed.form_data, 'message') else ""
+                if not value:
+                    value = parsed.original_instruction
         
         self._log("step", f"  🔍 Finding {field_type} field using {'LLM' if self.llm else 'heuristics'}...")
         
@@ -191,7 +196,43 @@ class StepExecutor:
                             # Some elements may not support is_checked; ignore
                             pass
                         if not is_checked:
-                            await el.click()
+                            # Try multiple strategies for clicking checkbox
+                            clicked = False
+                            
+                            # Strategy 1: JavaScript click (most reliable, bypasses overlay)
+                            try:
+                                await el.evaluate("el => el.click()")
+                                clicked = True
+                                logger.debug("Checkbox clicked via JS")
+                            except Exception as e:
+                                logger.debug(f"JS click failed: {e}")
+                            
+                            # Strategy 2: Click parent label (for nested checkboxes)
+                            if not clicked:
+                                try:
+                                    parent_label = await el.evaluate_handle("el => el.closest('label')")
+                                    if parent_label:
+                                        await parent_label.as_element().click(timeout=3000)
+                                        clicked = True
+                                        logger.debug("Checkbox clicked via parent label")
+                                except Exception as e:
+                                    logger.debug(f"Parent label click failed: {e}")
+                            
+                            # Strategy 3: Click label with for attribute
+                            if not clicked:
+                                el_id = await el.get_attribute("id")
+                                if el_id:
+                                    label = await self.page.query_selector(f'label[for="{el_id}"]')
+                                    if label:
+                                        try:
+                                            await label.click(timeout=3000)
+                                            clicked = True
+                                        except Exception:
+                                            pass
+                            
+                            # Strategy 4: Force click as last resort
+                            if not clicked:
+                                await el.click(force=True, timeout=5000)
                     else:
                         await el.click()
                         await el.fill(value)
@@ -204,13 +245,25 @@ class StepExecutor:
             except Exception as e:
                 self._log("step", f"  Fill failed: {e}")
         
-        # For optional fields (name, phone, and some auxiliaries), skip instead of failing
-        optional_fields = {"name", "phone", "company", "subject", "website", "consent", "agreement", "terms", "privacy"}
-        if field_type in optional_fields:
+        # Determine if field is optional using semantic analysis (no hardcoded list)
+        # Required fields typically: email (core identifier)
+        # Optional: anything else that's not strictly required for contact
+        is_required = field_type in {"email"}  # Minimal - only email is truly required
+        
+        # Use LLM to determine if field is required (if available)
+        if self.llm and not is_required:
+            try:
+                prompt = f"Is '{field_type}' a required field for a contact form? Answer only YES or NO."
+                response = await self.llm.aquery(prompt)
+                is_required = "YES" in response.upper()
+            except Exception:
+                pass
+        
+        if not is_required:
             self._log("step", f"  ⚠️ Optional field {field_type} not found, skipping")
             return {"field": field_type, "filled": False, "skipped": True}
         
-        raise Exception(f"Could not find {field_type} field")
+        raise Exception(f"Could not find required {field_type} field")
     
     async def _execute_fill_form(
         self, step: TaskStep, parsed: ParsedCommand, params: Dict
@@ -330,110 +383,107 @@ class StepExecutor:
     async def _execute_verify(
         self, step: TaskStep, parsed: ParsedCommand, params: Dict
     ) -> Dict[str, Any]:
-        """Verify page state for success/error indicators"""
+        """
+        Verify page state using LLM-DSL approach.
+        
+        Uses LLM to semantically analyze page content for success/error/security indicators
+        instead of hardcoded selectors and keyword lists.
+        """
         expected = params.get("expected", "")
         strict = params.get("strict", False)
-        verify_type = params.get("verify_type", "submit")  # "submit" or "find"
+        verify_type = params.get("verify_type", "submit")
         
-        content = await self.page.evaluate("() => document.body.innerText.toLowerCase()")
+        # Get page content for analysis
+        page_text = await self.page.evaluate("() => document.body.innerText.substring(0, 3000)")
         
-        # For "find" operations, just check if we found expected content
-        if expected in ["form_fields", "forms"] or verify_type == "find":
-            # For find operations, check if the expected content type is present
-            has_form = "formularz" in content or "form" in content or "kontakt" in content
-            has_inputs = await self.page.evaluate("""
-                () => document.querySelectorAll('input, textarea').length > 0
-            """)
-            
-            is_verified = has_form or has_inputs
-            
-            self._log("step", f"  📋 Verification (find mode):")
-            self._log("step", f"     Has form indicators: {has_form}")
-            self._log("step", f"     Has input fields: {has_inputs}")
-            self._log("step", f"     Result: {'✅ VERIFIED' if is_verified else '⚠️ NOT VERIFIED'}")
-            
-            return {
-                "verified": is_verified,
-                "has_form": has_form,
-                "has_inputs": has_inputs,
-                "reason": "found_content" if is_verified else "content_not_found",
-                "expected": expected
-            }
+        # LLM-based verification if available
+        if self.llm:
+            try:
+                prompt = f"""Analyze this webpage text after a form submission attempt.
+
+Page content:
+{page_text[:2000]}
+
+Determine:
+1. SUCCESS: Is there a success/thank you message? (e.g., "dziękujemy", "wysłano", "thank you")
+2. ERROR: Is there a form error message? (e.g., "wymagane", "required", "błąd")
+3. SECURITY: Is there a CAPTCHA or security block? (e.g., "captcha", "robot", "weryfikacja")
+
+Reply with exactly one line in format:
+RESULT: [SUCCESS|ERROR|SECURITY|UNKNOWN] - [brief reason]"""
+
+                response = await self.llm.aquery(prompt)
+                response_text = response.strip().upper()
+                
+                if "SUCCESS" in response_text:
+                    is_verified = True
+                    reason = "llm_detected_success"
+                elif "ERROR" in response_text:
+                    is_verified = False
+                    reason = "llm_detected_error"
+                elif "SECURITY" in response_text:
+                    is_verified = False
+                    reason = "llm_detected_security"
+                else:
+                    is_verified = False
+                    reason = "llm_uncertain"
+                
+                self._log("step", f"  📋 LLM Verification:")
+                self._log("step", f"     LLM response: {response[:100]}")
+                self._log("step", f"     Result: {'✅ VERIFIED' if is_verified else '⚠️ NOT VERIFIED'} ({reason})")
+                
+                return {
+                    "verified": is_verified,
+                    "reason": reason,
+                    "llm_response": response[:200],
+                    "method": "llm"
+                }
+            except Exception as e:
+                logger.debug(f"LLM verification failed: {e}, falling back to heuristic")
         
-        # Success indicators (PL + EN) - focused on explicit form submission messages
-        success_indicators = [
-            "dziękujemy", "dziekujemy", "thank you", "thanks",
-            "wysłano", "wyslano",
-            "wiadomość została", "wiadomosc zostala",
-            "wiadomość wysłana", "wiadomosc wyslana",
-            "message has been sent", "your message has been sent",
-            "form submitted", "submission received"
-        ]
+        # Fallback: Semantic heuristic analysis (no hardcoded selectors)
+        content_lower = page_text.lower()
         
-        # Error indicators (PL + EN)
-        error_indicators = [
-            "wymagane", "required", "must fill", "please enter",
-            "nie udało", "nie udalo", "could not", "unable"
-        ]
-        
-        # Security/CAPTCHA indicators (treated separately)
-        security_indicators = [
-            "captcha", "recaptcha", "hcaptcha", "turnstile",
-            "kod jednorazowy", "nonce", "robot", "weryfikacja",
-            "verification code", "nieprawidłowy kod", "nieprawidlowy kod",
-            "access denied", "blocked", "bot detected", "bot protection",
-            "cloudflare", "ddos protection", "please wait", "checking your browser",
-            "nie jesteś robotem", "nie jestes robotem", "are you human",
-            "security check", "verify you are human", "antibot"
-        ]
-        
-        # DOM-level success detection (common success containers)
-        success_dom = await self.page.evaluate(
-            """
+        # Dynamic success detection via DOM analysis
+        success_element = await self.page.evaluate("""
             () => {
-                const selectors = [
-                    '.forminator-response-message.forminator-success',
-                    '.wpcf7-mail-sent-ok',
-                    '.wpcf7-response-output.wpcf7-mail-sent-ok',
-                    '.alert.alert-success',
-                    '.alert-success',
-                    '.woocommerce-message',
-                    '.notice-success'
-                ];
-                for (const sel of selectors) {
-                    const el = document.querySelector(sel);
-                    if (el && el.innerText && el.innerText.trim().length > 0) {
-                        return el.innerText.toLowerCase();
+                // Find any visible element that appeared after form submit
+                // Look for elements with success-like styling or content
+                const allElements = document.querySelectorAll('*');
+                for (const el of allElements) {
+                    if (!el.innerText || el.innerText.length < 5) continue;
+                    const text = el.innerText.toLowerCase();
+                    const style = window.getComputedStyle(el);
+                    
+                    // Skip hidden elements
+                    if (style.display === 'none' || style.visibility === 'hidden') continue;
+                    
+                    // Check for success-like content (semantic, not selector-based)
+                    const successWords = ['dzięk', 'thank', 'wysłan', 'sent', 'success', 'otrzym'];
+                    const hasSuccessWord = successWords.some(w => text.includes(w));
+                    
+                    // Check for success-like styling (green color, etc.)
+                    const hasSuccessStyle = style.color.includes('0, 128') || 
+                                           style.backgroundColor.includes('0, 128') ||
+                                           el.className.toLowerCase().includes('success');
+                    
+                    if (hasSuccessWord || hasSuccessStyle) {
+                        return text.substring(0, 200);
                     }
                 }
                 return null;
             }
-            """
-        )
+        """)
         
-        has_security = any(ind in content for ind in security_indicators)
+        # Semantic analysis of page content
+        has_success = bool(success_element)
+        has_error = any(w in content_lower for w in ['wymagan', 'required', 'błąd', 'error', 'nieprawidł'])
+        has_security = any(w in content_lower for w in ['captcha', 'robot', 'weryfikacj', 'cloudflare'])
         
-        has_success_text = any(ind in content for ind in success_indicators)
-        has_success = bool(success_dom) or has_success_text
-        has_error = any(ind in content for ind in error_indicators)
-        
-        # Determine verification result
         if has_security:
             is_verified = False
             reason = "security_block"
-        elif verify_type == "submit":
-            # For form submission, require explicit DOM success (alert/response element)
-            if bool(success_dom) and not has_error:
-                is_verified = True
-                reason = "success"
-            elif has_error:
-                is_verified = False
-                reason = "form_error"
-            else:
-                is_verified = False
-                reason = "no_confirmation"
         elif has_success and not has_error:
-            # Non-submit verification (e.g. generic content checks)
             is_verified = True
             reason = "success"
         elif has_error:
@@ -444,22 +494,21 @@ class StepExecutor:
             reason = "no_confirmation"
         
         self._log("step", f"  📋 Verification check:")
-        self._log("step", f"     Success (DOM) present: {bool(success_dom)}")
-        self._log("step", f"     Success indicators found: {has_success_text}")
+        self._log("step", f"     Success element found: {bool(success_element)}")
         self._log("step", f"     Error indicators found: {has_error}")
         self._log("step", f"     Security block detected: {has_security}")
         self._log("step", f"     Result: {'✅ VERIFIED' if is_verified else '⚠️ NOT VERIFIED'} ({reason})")
         
         if strict and not is_verified:
-            raise Exception(f"Verification failed: success={has_success}, error={has_error}")
+            raise Exception(f"Verification failed: {reason}")
         
         return {
             "verified": is_verified,
-            "has_success_indicator": has_success,
-            "has_error_indicator": has_error,
-            "has_security_block": has_security,
+            "has_success": has_success,
+            "has_error": has_error,
+            "has_security": has_security,
             "reason": reason,
-            "expected": expected
+            "method": "heuristic"
         }
     
     async def _execute_screenshot(
