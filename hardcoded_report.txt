@@ -2,42 +2,42 @@
 HARDCODED VALUES ANALYSIS REPORT
 ================================================================================
 
-Total files with hardcoded values: 152
-Total findings: 1937
-  - High severity: 228
+Total files with hardcoded values: 146
+Total findings: 1754
+  - High severity: 199
   - Medium severity: 2
-  - Low severity: 1707
+  - Low severity: 1553
 
 FINDINGS BY TYPE:
 ----------------------------------------
-  selector: 867 occurrences
-  label: 845 occurrences
-  xpath: 166 occurrences
-  url: 57 occurrences
+  label: 810 occurrences
+  selector: 748 occurrences
+  xpath: 143 occurrences
+  url: 51 occurrences
   regex: 2 occurrences
 
 TOP 20 FILES TO REFACTOR (by score):
 ----------------------------------------
    1. curllm_core/form_fill.py (score: 132, findings: 124)
-   2. curllm_core/dom_selectors.py (score: 107, findings: 107)
-   3. curllm_core/orchestrators/social.py (score: 89, findings: 55)
-   4. curllm_core/orchestrators/auth.py (score: 59, findings: 59)
-   5. curllm_core/form_fill/filler.py (score: 57, findings: 57)
-   6. curllm_core/form_fill/js_scripts.py (score: 52, findings: 48)
-   7. curllm_core/extraction/extractor.py (score: 51, findings: 51)
-   8. curllm_core/proxy.py (score: 45, findings: 15)
-   9. curllm_core/streamware/components/form/smart_orchestrator.py (score: 45, findings: 45)
-  10. curllm_core/streamware/patterns.py (score: 43, findings: 15)
-  11. curllm_core/llm_config.py (score: 39, findings: 13)
-  12. curllm_core/streamware/components/currency/translator.py (score: 38, findings: 36)
-  13. curllm_core/streamware/components/form/orchestrator.py (score: 38, findings: 38)
-  14. curllm_core/hierarchical/planner.py (score: 38, findings: 38)
-  15. curllm_core/dynamic/selectors.py (score: 38, findings: 38)
-  16. curllm_core/dsl/executor.py (score: 34, findings: 30)
-  17. curllm_core/iterative_extractor.py (score: 33, findings: 29)
-  18. curllm_core/field_filling/filler.py (score: 33, findings: 29)
-  19. curllm_core/orchestrators/ecommerce.py (score: 32, findings: 32)
-  20. curllm_core/streamware/components/dom_fix.py (score: 31, findings: 23)
+   2. curllm_core/orchestrators/social.py (score: 89, findings: 55)
+   3. curllm_core/orchestrators/auth.py (score: 59, findings: 59)
+   4. curllm_core/form_fill/filler.py (score: 57, findings: 57)
+   5. curllm_core/form_fill/js_scripts.py (score: 52, findings: 48)
+   6. curllm_core/extraction/extractor.py (score: 51, findings: 51)
+   7. curllm_core/proxy.py (score: 45, findings: 15)
+   8. curllm_core/streamware/components/form/smart_orchestrator.py (score: 45, findings: 45)
+   9. curllm_core/streamware/components/currency/translator.py (score: 38, findings: 36)
+  10. curllm_core/streamware/components/form/orchestrator.py (score: 38, findings: 38)
+  11. curllm_core/hierarchical/planner.py (score: 38, findings: 38)
+  12. curllm_core/dynamic/selectors.py (score: 38, findings: 38)
+  13. curllm_core/dsl/executor.py (score: 34, findings: 30)
+  14. curllm_core/iterative_extractor.py (score: 33, findings: 29)
+  15. curllm_core/field_filling/filler.py (score: 33, findings: 29)
+  16. curllm_core/orchestrators/ecommerce.py (score: 32, findings: 32)
+  17. curllm_core/streamware/components/dom_fix.py (score: 31, findings: 23)
+  18. curllm_core/element_finder/finder.py (score: 31, findings: 31)
+  19. curllm_core/orchestrators/form.py (score: 31, findings: 31)
+  20. curllm_core/streamware/flow.py (score: 30, findings: 10)
 
 HIGH SEVERITY FINDINGS:
 ----------------------------------------
@@ -230,141 +230,6 @@ HIGH SEVERITY FINDINGS:
   File: curllm_core/proxy.py:131
   Type: xpath
   Value: //..."...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/streamware/patterns.py:22
-  Type: xpath
-  Value: //pattern...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/streamware/patterns.py:25
-  Type: xpath
-  Value: //jsonpath...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/streamware/patterns.py:26
-  Type: xpath
-  Value: //field...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/streamware/patterns.py:27
-  Type: xpath
-  Value: //batch...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/streamware/patterns.py:112
-  Type: xpath
-  Value: //strategy...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/streamware/patterns.py:146
-  Type: xpath
-  Value: //parallel...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/streamware/patterns.py:183
-  Type: xpath
-  Value: //condition...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/streamware/patterns.py:269
-  Type: xpath
-  Value: //condition...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/streamware/patterns.py:358
-  Type: xpath
-  Value: //collect...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/streamware/patterns.py:373
-  Type: xpath
-  Value: //parallel...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/streamware/patterns.py:386
-  Type: xpath
-  Value: //high-priority")...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/streamware/patterns.py:387
-  Type: xpath
-  Value: //low.log")...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/streamware/patterns.py:388
-  Type: xpath
-  Value: //default.log")...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/streamware/patterns.py:390
-  Type: xpath
-  Value: //router"...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/llm_config.py:37
-  Type: url
-  Value: https://api.openai.com/v1...
-  Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
-
-  File: curllm_core/llm_config.py:37
-  Type: xpath
-  Value: //api.openai.com/v1"...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/llm_config.py:38
-  Type: url
-  Value: https://api.anthropic.com...
-  Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
-
-  File: curllm_core/llm_config.py:38
-  Type: xpath
-  Value: //api.anthropic.com"...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/llm_config.py:39
-  Type: url
-  Value: https://generativelanguage.googleapis.com/v1beta...
-  Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
-
-  File: curllm_core/llm_config.py:39
-  Type: xpath
-  Value: //generativelanguage.googleapis.com/v1beta"...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/llm_config.py:40
-  Type: url
-  Value: https://generativelanguage.googleapis.com/v1beta...
-  Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
-
-  File: curllm_core/llm_config.py:40
-  Type: xpath
-  Value: //generativelanguage.googleapis.com/v1beta"...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/llm_config.py:41
-  Type: url
-  Value: https://api.groq.com/openai/v1...
-  Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
-
-  File: curllm_core/llm_config.py:41
-  Type: xpath
-  Value: //api.groq.com/openai/v1"...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/llm_config.py:42
-  Type: url
-  Value: https://api.deepseek.com/v1...
-  Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
-
-  File: curllm_core/llm_config.py:42
-  Type: xpath
-  Value: //api.deepseek.com/v1"...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/llm_config.py:43
-  Type: xpath
-  Value: //localhost...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
   File: curllm_core/streamware/components/currency/translator.py:176
@@ -1125,16 +990,6 @@ HIGH SEVERITY FINDINGS:
   File: curllm_core/dynamic/urls.py:33
   Type: xpath
   Value: //example.com/login'...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/config.py:13
-  Type: xpath
-  Value: //localhost...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/config.py:15
-  Type: xpath
-  Value: //localhost...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
   File: curllm_core/metrics.py:12

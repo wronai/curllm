@@ -95,10 +95,13 @@ class CommandParser:
     
     # Domain extraction patterns
     DOMAIN_PATTERNS = [
-        r'(?:wejdź na|wejdz na|otwórz|otworz|przejdź do|przejdz do|idź na|idz na|odwiedź|odwiedz)\s+(?:stronę\s+|strone\s+)?(?:https?://)?([a-zA-Z0-9][-a-zA-Z0-9]*(?:\.[a-zA-Z0-9][-a-zA-Z0-9]*)+)',
-        r'(?:na|do|w)\s+(?:sklepie?\s+|serwisie?\s+)?(?:https?://)?([a-zA-Z0-9][-a-zA-Z0-9]*\.[a-z]{2,}(?:\.[a-z]{2,})?)',
+        # Full URLs with protocol
         r'(https?://[^\s]+)',
-        r'\b([a-zA-Z0-9][-a-zA-Z0-9]*\.(?:pl|com|net|eu|org|io|co)(?:\.[a-z]{2,})?)\b',
+        # Domain with path (e.g., httpbin.org/forms/post)
+        r'(?:wejdź na|wejdz na|otwórz|otworz|przejdź do|przejdz do|idź na|idz na|odwiedź|odwiedz)\s+(?:stronę\s+|strone\s+)?(?:https?://)?([a-zA-Z0-9][-a-zA-Z0-9]*(?:\.[a-zA-Z0-9][-a-zA-Z0-9]*)+(?:/[^\s]*)?)',
+        r'(?:na|do|w)\s+(?:sklepie?\s+|serwisie?\s+)?(?:https?://)?([a-zA-Z0-9][-a-zA-Z0-9]*\.[a-z]{2,}(?:\.[a-z]{2,})?(?:/[^\s]*)?)',
+        # Just domain
+        r'\b([a-zA-Z0-9][-a-zA-Z0-9]*\.(?:pl|com|net|eu|org|io|co)(?:\.[a-z]{2,})?(?:/[^\s]*)?)\b',
     ]
     
     # Email pattern
@@ -302,16 +305,20 @@ class CommandParser:
             if match:
                 matched = match.group(1) if match.lastindex else match.group(0)
                 
-                # Clean up
-                matched = matched.strip('.,;:')
+                # Clean up trailing punctuation
+                matched = matched.rstrip('.,;:')
                 
-                # Check if it's a full URL
+                # Check if it's a full URL with protocol
                 if matched.startswith('http'):
                     parsed = urlparse(matched)
                     return parsed.netloc, matched
                 else:
-                    # It's just a domain
-                    return matched, f"https://{matched}"
+                    # It might be domain or domain+path
+                    full_url = f"https://{matched}"
+                    parsed = urlparse(full_url)
+                    # Extract just the domain (netloc)
+                    domain = parsed.netloc if parsed.netloc else matched.split('/')[0]
+                    return domain, full_url
         
         return None, None
     

@@ -104,6 +104,13 @@ SKIP_PATTERNS = [
     '.html',
     '.css',
     '.js',
+    # Configuration/definition files (intentionally contain selectors)
+    'dom_selectors.py',  # Centralized selector definitions with LLM fallback
+    'url_patterns.py',   # URL pattern definitions
+    'patterns.py',       # Pattern definitions
+    'constants.py',      # Constants file
+    'config.py',         # Configuration
+    'llm_config.py',     # LLM configuration
 ]
 
 # Known good patterns (dynamic detection)

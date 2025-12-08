@@ -56,3 +56,11 @@ py-modules = ["curllm_server", "bql_parser", "curllm_web"]
 
 [tool.setuptools.packages.find]
 include = ["curllm_core*", "curllm_logs*", "functions*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "asyncio: mark test as async",
+    "slow: mark test as slow running",
+]

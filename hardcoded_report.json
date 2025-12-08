@@ -1,7 +1,7 @@
 {
   "summary": {
-    "total_files": 152,
-    "total_findings": 1937
+    "total_files": 146,
+    "total_findings": 1754
   },
   "files": [
     {
@@ -1121,975 +1121,6 @@
           "type": "label",
           "value": "\"email\"",
           "context": "const emailField = document.querySelector('[data-curllm-target=\"email\"]');",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        }
-      ]
-    },
-    {
-      "path": "curllm_core/dom_selectors.py",
-      "score": 107,
-      "findings": [
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 31,
-          "type": "label",
-          "value": "'email'",
-          "context": "'email': [",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 32,
-          "type": "selector",
-          "value": "'input[type=\"email\"]'",
-          "context": "'input[type=\"email\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 32,
-          "type": "label",
-          "value": "\"email\"",
-          "context": "'input[type=\"email\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 33,
-          "type": "label",
-          "value": "\"email\"",
-          "context": "'input[name*=\"email\" i]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 35,
-          "type": "label",
-          "value": "\"email\"",
-          "context": "'input[placeholder*=\"email\" i]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 37,
-          "type": "selector",
-          "value": "'input[autocomplete=\"email\"]'",
-          "context": "'input[autocomplete=\"email\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 37,
-          "type": "label",
-          "value": "\"email\"",
-          "context": "'input[autocomplete=\"email\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 38,
-          "type": "selector",
-          "value": "'#email'",
-          "context": "'#email', '#mail', '#e-mail',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 38,
-          "type": "selector",
-          "value": "'#mail'",
-          "context": "'#email', '#mail', '#e-mail',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 38,
-          "type": "selector",
-          "value": "'#e-mail'",
-          "context": "'#email', '#mail', '#e-mail',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 42,
-          "type": "label",
-          "value": "'name'",
-          "context": "'name': [",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 43,
-          "type": "label",
-          "value": "\"name\"",
-          "context": "'input[name*=\"name\" i]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 45,
-          "type": "label",
-          "value": "\"nazwisko\"",
-          "context": "'input[name*=\"nazwisko\" i]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 46,
-          "type": "label",
-          "value": "\"imię\"",
-          "context": "'input[placeholder*=\"imię\" i]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 47,
-          "type": "label",
-          "value": "\"name\"",
-          "context": "'input[placeholder*=\"name\" i]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 48,
-          "type": "selector",
-          "value": "'input[autocomplete=\"name\"]'",
-          "context": "'input[autocomplete=\"name\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 48,
-          "type": "label",
-          "value": "\"name\"",
-          "context": "'input[autocomplete=\"name\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 49,
-          "type": "selector",
-          "value": "'#name'",
-          "context": "'#name', '#imie', '#nazwisko',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 49,
-          "type": "selector",
-          "value": "'#imie'",
-          "context": "'#name', '#imie', '#nazwisko',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 49,
-          "type": "selector",
-          "value": "'#nazwisko'",
-          "context": "'#name', '#imie', '#nazwisko',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 53,
-          "type": "label",
-          "value": "'phone'",
-          "context": "'phone': [",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 54,
-          "type": "selector",
-          "value": "'input[type=\"tel\"]'",
-          "context": "'input[type=\"tel\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 55,
-          "type": "label",
-          "value": "\"phone\"",
-          "context": "'input[name*=\"phone\" i]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 56,
-          "type": "label",
-          "value": "\"telefon\"",
-          "context": "'input[name*=\"telefon\" i]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 58,
-          "type": "label",
-          "value": "\"telefon\"",
-          "context": "'input[placeholder*=\"telefon\" i]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 59,
-          "type": "label",
-          "value": "\"phone\"",
-          "context": "'input[placeholder*=\"phone\" i]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 60,
-          "type": "selector",
-          "value": "'input[autocomplete=\"tel\"]'",
-          "context": "'input[autocomplete=\"tel\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 61,
-          "type": "selector",
-          "value": "'#phone'",
-          "context": "'#phone', '#telefon', '#tel',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 61,
-          "type": "selector",
-          "value": "'#telefon'",
-          "context": "'#phone', '#telefon', '#tel',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 61,
-          "type": "selector",
-          "value": "'#tel'",
-          "context": "'#phone', '#telefon', '#tel',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 65,
-          "type": "label",
-          "value": "'message'",
-          "context": "'message': [",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 66,
-          "type": "label",
-          "value": "\"message\"",
-          "context": "'textarea[name*=\"message\" i]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 70,
-          "type": "label",
-          "value": "\"wiadomość\"",
-          "context": "'textarea[placeholder*=\"wiadomość\" i]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 71,
-          "type": "label",
-          "value": "\"message\"",
-          "context": "'textarea[placeholder*=\"message\" i]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 73,
-          "type": "selector",
-          "value": "'#message'",
-          "context": "'#message', '#wiadomosc',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 73,
-          "type": "selector",
-          "value": "'#wiadomosc'",
-          "context": "'#message', '#wiadomosc',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 82,
-          "type": "selector",
-          "value": "'#subject'",
-          "context": "'#subject', '#temat',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 82,
-          "type": "selector",
-          "value": "'#temat'",
-          "context": "'#subject', '#temat',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 87,
-          "type": "selector",
-          "value": "'input[type=\"password\"]'",
-          "context": "'input[type=\"password\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 90,
-          "type": "selector",
-          "value": "'input[autocomplete=\"current-password\"]'",
-          "context": "'input[autocomplete=\"current-password\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 91,
-          "type": "selector",
-          "value": "'input[autocomplete=\"new-password\"]'",
-          "context": "'input[autocomplete=\"new-password\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 99,
-          "type": "selector",
-          "value": "'input[autocomplete=\"username\"]'",
-          "context": "'input[autocomplete=\"username\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 100,
-          "type": "selector",
-          "value": "'#username'",
-          "context": "'#username', '#login', '#user',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 100,
-          "type": "selector",
-          "value": "'#login'",
-          "context": "'#username', '#login', '#user',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 100,
-          "type": "selector",
-          "value": "'#user'",
-          "context": "'#username', '#login', '#user',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 111,
-          "type": "selector",
-          "value": "'button[type=\"submit\"]'",
-          "context": "'button[type=\"submit\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 112,
-          "type": "selector",
-          "value": "'input[type=\"submit\"]'",
-          "context": "'input[type=\"submit\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 115,
-          "type": "selector",
-          "value": "'.submit-button'",
-          "context": "'.submit-button', '.btn-submit', '.button-submit',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 115,
-          "type": "selector",
-          "value": "'.btn-submit'",
-          "context": "'.submit-button', '.btn-submit', '.button-submit',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 115,
-          "type": "selector",
-          "value": "'.button-submit'",
-          "context": "'.submit-button', '.btn-submit', '.button-submit',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 119,
-          "type": "selector",
-          "value": "'button[type=\"submit\"]'",
-          "context": "'button[type=\"submit\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 123,
-          "type": "selector",
-          "value": "'input[type=\"submit\"",
-          "context": "'input[type=\"submit\"][value*=\"log\" i]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 124,
-          "type": "selector",
-          "value": "'input[type=\"submit\"",
-          "context": "'input[type=\"submit\"][value*=\"zaloguj\" i]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 128,
-          "type": "selector",
-          "value": "'button[type=\"submit\"]'",
-          "context": "'button[type=\"submit\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 135,
-          "type": "selector",
-          "value": "'button[type=\"submit\"]'",
-          "context": "'button[type=\"submit\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 138,
-          "type": "selector",
-          "value": "'.search-button'",
-          "context": "'.search-button', '.btn-search',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 138,
-          "type": "selector",
-          "value": "'.btn-search'",
-          "context": "'.search-button', '.btn-search',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 149,
-          "type": "selector",
-          "value": "'.error'",
-          "context": "'.error',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 150,
-          "type": "selector",
-          "value": "'.invalid'",
-          "context": "'.invalid',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 151,
-          "type": "selector",
-          "value": "'.forminator-error-message'",
-          "context": "'.forminator-error-message',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 152,
-          "type": "selector",
-          "value": "'.wpcf7-not-valid-tip'",
-          "context": "'.wpcf7-not-valid-tip',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 153,
-          "type": "selector",
-          "value": "'.elementor-field-required'",
-          "context": "'.elementor-field-required',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 154,
-          "type": "label",
-          "value": "id=\"true\"",
-          "context": "'[aria-invalid=\"true\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 155,
-          "type": "selector",
-          "value": "'.error-message'",
-          "context": "'.error-message',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 156,
-          "type": "selector",
-          "value": "'.validation-error'",
-          "context": "'.validation-error',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 157,
-          "type": "selector",
-          "value": "'.field-error'",
-          "context": "'.field-error',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 161,
-          "type": "selector",
-          "value": "'.wpcf7-mail-sent-ok'",
-          "context": "'.wpcf7-mail-sent-ok',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 162,
-          "type": "selector",
-          "value": "'.wpcf7-response-output'",
-          "context": "'.wpcf7-response-output',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 163,
-          "type": "selector",
-          "value": "'.elementor-message-success'",
-          "context": "'.elementor-message-success',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 164,
-          "type": "selector",
-          "value": "'.success-message'",
-          "context": "'.success-message',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 165,
-          "type": "selector",
-          "value": "'.thank-you-message'",
-          "context": "'.thank-you-message',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 166,
-          "type": "selector",
-          "value": "'.form-success'",
-          "context": "'.form-success',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 171,
-          "type": "selector",
-          "value": "'.g-recaptcha'",
-          "context": "'.g-recaptcha',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 172,
-          "type": "selector",
-          "value": "'.h-captcha'",
-          "context": "'.h-captcha',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 173,
-          "type": "selector",
-          "value": "'.cf-turnstile'",
-          "context": "'.cf-turnstile',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 188,
-          "type": "selector",
-          "value": "'input[type=\"search\"]'",
-          "context": "'input[type=\"search\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 189,
-          "type": "selector",
-          "value": "'input[name=\"q\"]'",
-          "context": "'input[name=\"q\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 189,
-          "type": "label",
-          "value": "name=\"q\"",
-          "context": "'input[name=\"q\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 190,
-          "type": "selector",
-          "value": "'input[name=\"s\"]'",
-          "context": "'input[name=\"s\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 190,
-          "type": "label",
-          "value": "name=\"s\"",
-          "context": "'input[name=\"s\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 191,
-          "type": "selector",
-          "value": "'input[name=\"search\"]'",
-          "context": "'input[name=\"search\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 191,
-          "type": "label",
-          "value": "name=\"search\"",
-          "context": "'input[name=\"search\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 192,
-          "type": "selector",
-          "value": "'input[name=\"query\"]'",
-          "context": "'input[name=\"query\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 192,
-          "type": "label",
-          "value": "name=\"query\"",
-          "context": "'input[name=\"query\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 197,
-          "type": "selector",
-          "value": "'#search'",
-          "context": "'#search', '#q', '.search-input',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 197,
-          "type": "selector",
-          "value": "'#q'",
-          "context": "'#search', '#q', '.search-input',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 197,
-          "type": "selector",
-          "value": "'.search-input'",
-          "context": "'#search', '#q', '.search-input',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 201,
-          "type": "selector",
-          "value": "'button[type=\"submit\"]'",
-          "context": "'button[type=\"submit\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 202,
-          "type": "selector",
-          "value": "'.search-submit'",
-          "context": "'.search-submit',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 203,
-          "type": "selector",
-          "value": "'.search-button'",
-          "context": "'.search-button',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 215,
-          "type": "selector",
-          "value": "'input[required]'",
-          "context": "'input[required]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 218,
-          "type": "selector",
-          "value": "'input[aria-required=\"true\"]'",
-          "context": "'input[aria-required=\"true\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 229,
-          "type": "selector",
-          "value": "'.product'",
-          "context": "'.product',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 230,
-          "type": "selector",
-          "value": "'.offer'",
-          "context": "'.offer',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 231,
-          "type": "selector",
-          "value": "'.item'",
-          "context": "'.item',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 234,
-          "type": "selector",
-          "value": "'.product-card'",
-          "context": "'.product-card',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 235,
-          "type": "selector",
-          "value": "'.product-item'",
-          "context": "'.product-item',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 236,
-          "type": "selector",
-          "value": "'.produkt'",
-          "context": "'.produkt',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 237,
-          "type": "selector",
-          "value": "'.oferta'",
-          "context": "'.oferta',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 251,
-          "type": "selector",
-          "value": "'.cart-link'",
-          "context": "'.cart-link', '.basket-link',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 251,
-          "type": "selector",
-          "value": "'.basket-link'",
-          "context": "'.cart-link', '.basket-link',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 285,
-          "type": "label",
-          "value": "'email'",
-          "context": "js_code = f\"const selectors = {get_selectors_js(FORM_SELECTORS['email'])};\"",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 296,
-          "type": "selector",
-          "value": "'input[type=\"email\"]'",
-          "context": "document.querySelector('input[type=\"email\"]') ||",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 296,
-          "type": "selector",
-          "value": "querySelector('input[type=\"",
-          "context": "document.querySelector('input[type=\"email\"]') ||",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 296,
-          "type": "label",
-          "value": "\"email\"",
-          "context": "document.querySelector('input[type=\"email\"]') ||",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 297,
-          "type": "selector",
-          "value": "querySelector('input[name*=\"",
-          "context": "document.querySelector('input[name*=\"email\"]') || ...",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_selectors.py",
-          "line": 297,
-          "type": "label",
-          "value": "\"email\"",
-          "context": "document.querySelector('input[name*=\"email\"]') || ...",
           "severity": "low",
           "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
         }
@@ -5104,270 +4135,6 @@
           "context": "if f.get(\"name\") == field_name or field_name in f.get(\"name\", \"\"):",
           "severity": "low",
           "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        }
-      ]
-    },
-    {
-      "path": "curllm_core/streamware/patterns.py",
-      "score": 43,
-      "findings": [
-        {
-          "file": "curllm_core/streamware/patterns.py",
-          "line": 22,
-          "type": "xpath",
-          "value": "//pattern",
-          "context": "split://pattern?type=jsonpath|field|batch",
-          "severity": "high",
-          "suggestion": "Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding"
-        },
-        {
-          "file": "curllm_core/streamware/patterns.py",
-          "line": 25,
-          "type": "xpath",
-          "value": "//jsonpath",
-          "context": "split://jsonpath?query=$.items[*]",
-          "severity": "high",
-          "suggestion": "Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding"
-        },
-        {
-          "file": "curllm_core/streamware/patterns.py",
-          "line": 26,
-          "type": "xpath",
-          "value": "//field",
-          "context": "split://field?name=items",
-          "severity": "high",
-          "suggestion": "Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding"
-        },
-        {
-          "file": "curllm_core/streamware/patterns.py",
-          "line": 27,
-          "type": "xpath",
-          "value": "//batch",
-          "context": "split://batch?size=10",
-          "severity": "high",
-          "suggestion": "Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding"
-        },
-        {
-          "file": "curllm_core/streamware/patterns.py",
-          "line": 56,
-          "type": "label",
-          "value": "'name'",
-          "context": "field = self.uri.get_param('name', 'items')",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/streamware/patterns.py",
-          "line": 112,
-          "type": "xpath",
-          "value": "//strategy",
-          "context": "join://strategy?type=list|dict",
-          "severity": "high",
-          "suggestion": "Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding"
-        },
-        {
-          "file": "curllm_core/streamware/patterns.py",
-          "line": 146,
-          "type": "xpath",
-          "value": "//parallel",
-          "context": "multicast://parallel?destinations=uri1,uri2,uri3",
-          "severity": "high",
-          "suggestion": "Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding"
-        },
-        {
-          "file": "curllm_core/streamware/patterns.py",
-          "line": 183,
-          "type": "xpath",
-          "value": "//condition",
-          "context": "choose://condition?field=status&routes={\"high\":\"uri1\",\"low\":\"uri2\"}",
-          "severity": "high",
-          "suggestion": "Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding"
-        },
-        {
-          "file": "curllm_core/streamware/patterns.py",
-          "line": 269,
-          "type": "xpath",
-          "value": "//condition",
-          "context": "filter://condition?field=age&min=18",
-          "severity": "high",
-          "suggestion": "Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding"
-        },
-        {
-          "file": "curllm_core/streamware/patterns.py",
-          "line": 358,
-          "type": "xpath",
-          "value": "//collect",
-          "context": "uri = f\"join://collect?type={join_type}\"",
-          "severity": "high",
-          "suggestion": "Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding"
-        },
-        {
-          "file": "curllm_core/streamware/patterns.py",
-          "line": 373,
-          "type": "xpath",
-          "value": "//parallel",
-          "context": "uri = f\"multicast://parallel?destinations={dest_str}\"",
-          "severity": "high",
-          "suggestion": "Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding"
-        },
-        {
-          "file": "curllm_core/streamware/patterns.py",
-          "line": 386,
-          "type": "xpath",
-          "value": "//high-priority\")",
-          "context": ".when(\"$.priority == 'high'\", \"kafka://high-priority\")",
-          "severity": "high",
-          "suggestion": "Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding"
-        },
-        {
-          "file": "curllm_core/streamware/patterns.py",
-          "line": 387,
-          "type": "xpath",
-          "value": "//low.log\")",
-          "context": ".when(\"$.priority == 'low'\", \"file://low.log\")",
-          "severity": "high",
-          "suggestion": "Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding"
-        },
-        {
-          "file": "curllm_core/streamware/patterns.py",
-          "line": 388,
-          "type": "xpath",
-          "value": "//default.log\")",
-          "context": ".otherwise(\"file://default.log\")",
-          "severity": "high",
-          "suggestion": "Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding"
-        },
-        {
-          "file": "curllm_core/streamware/patterns.py",
-          "line": 390,
-          "type": "xpath",
-          "value": "//router\"",
-          "context": "uri = \"choose://router\"",
-          "severity": "high",
-          "suggestion": "Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding"
-        }
-      ]
-    },
-    {
-      "path": "curllm_core/llm_config.py",
-      "score": 39,
-      "findings": [
-        {
-          "file": "curllm_core/llm_config.py",
-          "line": 37,
-          "type": "url",
-          "value": "https://api.openai.com/v1",
-          "context": "\"openai\": \"https://api.openai.com/v1\",",
-          "severity": "high",
-          "suggestion": "Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery"
-        },
-        {
-          "file": "curllm_core/llm_config.py",
-          "line": 37,
-          "type": "xpath",
-          "value": "//api.openai.com/v1\"",
-          "context": "\"openai\": \"https://api.openai.com/v1\",",
-          "severity": "high",
-          "suggestion": "Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding"
-        },
-        {
-          "file": "curllm_core/llm_config.py",
-          "line": 38,
-          "type": "url",
-          "value": "https://api.anthropic.com",
-          "context": "\"anthropic\": \"https://api.anthropic.com\",",
-          "severity": "high",
-          "suggestion": "Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery"
-        },
-        {
-          "file": "curllm_core/llm_config.py",
-          "line": 38,
-          "type": "xpath",
-          "value": "//api.anthropic.com\"",
-          "context": "\"anthropic\": \"https://api.anthropic.com\",",
-          "severity": "high",
-          "suggestion": "Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding"
-        },
-        {
-          "file": "curllm_core/llm_config.py",
-          "line": 39,
-          "type": "url",
-          "value": "https://generativelanguage.googleapis.com/v1beta",
-          "context": "\"gemini\": \"https://generativelanguage.googleapis.com/v1beta\",",
-          "severity": "high",
-          "suggestion": "Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery"
-        },
-        {
-          "file": "curllm_core/llm_config.py",
-          "line": 39,
-          "type": "xpath",
-          "value": "//generativelanguage.googleapis.com/v1beta\"",
-          "context": "\"gemini\": \"https://generativelanguage.googleapis.com/v1beta\",",
-          "severity": "high",
-          "suggestion": "Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding"
-        },
-        {
-          "file": "curllm_core/llm_config.py",
-          "line": 40,
-          "type": "url",
-          "value": "https://generativelanguage.googleapis.com/v1beta",
-          "context": "\"google\": \"https://generativelanguage.googleapis.com/v1beta\",",
-          "severity": "high",
-          "suggestion": "Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery"
-        },
-        {
-          "file": "curllm_core/llm_config.py",
-          "line": 40,
-          "type": "xpath",
-          "value": "//generativelanguage.googleapis.com/v1beta\"",
-          "context": "\"google\": \"https://generativelanguage.googleapis.com/v1beta\",",
-          "severity": "high",
-          "suggestion": "Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding"
-        },
-        {
-          "file": "curllm_core/llm_config.py",
-          "line": 41,
-          "type": "url",
-          "value": "https://api.groq.com/openai/v1",
-          "context": "\"groq\": \"https://api.groq.com/openai/v1\",",
-          "severity": "high",
-          "suggestion": "Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery"
-        },
-        {
-          "file": "curllm_core/llm_config.py",
-          "line": 41,
-          "type": "xpath",
-          "value": "//api.groq.com/openai/v1\"",
-          "context": "\"groq\": \"https://api.groq.com/openai/v1\",",
-          "severity": "high",
-          "suggestion": "Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding"
-        },
-        {
-          "file": "curllm_core/llm_config.py",
-          "line": 42,
-          "type": "url",
-          "value": "https://api.deepseek.com/v1",
-          "context": "\"deepseek\": \"https://api.deepseek.com/v1\",",
-          "severity": "high",
-          "suggestion": "Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery"
-        },
-        {
-          "file": "curllm_core/llm_config.py",
-          "line": 42,
-          "type": "xpath",
-          "value": "//api.deepseek.com/v1\"",
-          "context": "\"deepseek\": \"https://api.deepseek.com/v1\",",
-          "severity": "high",
-          "suggestion": "Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding"
-        },
-        {
-          "file": "curllm_core/llm_config.py",
-          "line": 43,
-          "type": "xpath",
-          "value": "//localhost",
-          "context": "\"ollama\": \"http://localhost:11434\",",
-          "severity": "high",
-          "suggestion": "Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding"
         }
       ]
     },
@@ -10562,237 +9329,6 @@
       ]
     },
     {
-      "path": "curllm_core/dom_toolkit/analyzers/patterns.py",
-      "score": 25,
-      "findings": [
-        {
-          "file": "curllm_core/dom_toolkit/analyzers/patterns.py",
-          "line": 45,
-          "type": "selector",
-          "value": "querySelectorAll('*'",
-          "context": "for (const el of document.querySelectorAll('*')) {",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_toolkit/analyzers/patterns.py",
-          "line": 75,
-          "type": "selector",
-          "value": "'a[href]'",
-          "context": "if (el.querySelector('a[href]')) linksCount++;",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_toolkit/analyzers/patterns.py",
-          "line": 75,
-          "type": "selector",
-          "value": "querySelector('a[href]'",
-          "context": "if (el.querySelector('a[href]')) linksCount++;",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_toolkit/analyzers/patterns.py",
-          "line": 76,
-          "type": "selector",
-          "value": "querySelector('img'",
-          "context": "if (el.querySelector('img')) imagesCount++;",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_toolkit/analyzers/patterns.py",
-          "line": 82,
-          "type": "selector",
-          "value": "querySelector('img[src]'",
-          "context": "const hasPriceImage = !!el.querySelector('img[src]') &&",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_toolkit/analyzers/patterns.py",
-          "line": 83,
-          "type": "selector",
-          "value": "querySelectorAll('img'",
-          "context": "Array.from(el.querySelectorAll('img')).some(img =>",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_toolkit/analyzers/patterns.py",
-          "line": 145,
-          "type": "selector",
-          "value": "querySelectorAll('ul, ol'",
-          "context": "for (const list of document.querySelectorAll('ul, ol')) {",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_toolkit/analyzers/patterns.py",
-          "line": 146,
-          "type": "selector",
-          "value": "querySelectorAll(':scope > li'",
-          "context": "const items = list.querySelectorAll(':scope > li');",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_toolkit/analyzers/patterns.py",
-          "line": 149,
-          "type": "selector",
-          "value": "'a[href]'",
-          "context": "const hasLinks = !!list.querySelector('a[href]');",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_toolkit/analyzers/patterns.py",
-          "line": 149,
-          "type": "selector",
-          "value": "querySelector('a[href]'",
-          "context": "const hasLinks = !!list.querySelector('a[href]');",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_toolkit/analyzers/patterns.py",
-          "line": 150,
-          "type": "selector",
-          "value": "querySelector('img'",
-          "context": "const hasImages = !!list.querySelector('img');",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_toolkit/analyzers/patterns.py",
-          "line": 171,
-          "type": "selector",
-          "value": "querySelectorAll('table'",
-          "context": "for (const table of document.querySelectorAll('table')) {",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_toolkit/analyzers/patterns.py",
-          "line": 172,
-          "type": "selector",
-          "value": "querySelectorAll('tbody > tr, tr'",
-          "context": "const rows = table.querySelectorAll('tbody > tr, tr');",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_toolkit/analyzers/patterns.py",
-          "line": 175,
-          "type": "selector",
-          "value": "'a[href]'",
-          "context": "const hasLinks = !!table.querySelector('a[href]');",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_toolkit/analyzers/patterns.py",
-          "line": 175,
-          "type": "selector",
-          "value": "querySelector('a[href]'",
-          "context": "const hasLinks = !!table.querySelector('a[href]');",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_toolkit/analyzers/patterns.py",
-          "line": 176,
-          "type": "selector",
-          "value": "querySelector('img'",
-          "context": "const hasImages = !!table.querySelector('img');",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_toolkit/analyzers/patterns.py",
-          "line": 189,
-          "type": "selector",
-          "value": "querySelectorAll('td, th'",
-          "context": "column_count: rows[0]?.querySelectorAll('td, th').length || 0",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_toolkit/analyzers/patterns.py",
-          "line": 208,
-          "type": "selector",
-          "value": "querySelectorAll('*'",
-          "context": "for (const el of document.querySelectorAll('*')) {",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_toolkit/analyzers/patterns.py",
-          "line": 239,
-          "type": "selector",
-          "value": "querySelector('img'",
-          "context": "has_images: !!el.querySelector('img'),",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_toolkit/analyzers/patterns.py",
-          "line": 240,
-          "type": "selector",
-          "value": "'a[href]'",
-          "context": "has_links: !!el.querySelector('a[href]')",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_toolkit/analyzers/patterns.py",
-          "line": 240,
-          "type": "selector",
-          "value": "querySelector('a[href]'",
-          "context": "has_links: !!el.querySelector('a[href]')",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_toolkit/analyzers/patterns.py",
-          "line": 265,
-          "type": "selector",
-          "value": "querySelectorAll('*'",
-          "context": "for (const el of document.querySelectorAll('*')) {",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_toolkit/analyzers/patterns.py",
-          "line": 286,
-          "type": "selector",
-          "value": "'a[href]'",
-          "context": "const hasLinks = siblings.some(s => s.querySelector('a[href]'));",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_toolkit/analyzers/patterns.py",
-          "line": 286,
-          "type": "selector",
-          "value": "querySelector('a[href]'",
-          "context": "const hasLinks = siblings.some(s => s.querySelector('a[href]'));",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dom_toolkit/analyzers/patterns.py",
-          "line": 287,
-          "type": "selector",
-          "value": "querySelector('img'",
-          "context": "const hasImages = siblings.some(s => s.querySelector('img'));",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        }
-      ]
-    },
-    {
       "path": "curllm_core/captcha.py",
       "score": 24,
       "findings": [
@@ -11531,201 +10067,6 @@
       ]
     },
     {
-      "path": "curllm_core/url_patterns.py",
-      "score": 21,
-      "findings": [
-        {
-          "file": "curllm_core/url_patterns.py",
-          "line": 18,
-          "type": "selector",
-          "value": "'input[type=\"search\"]'",
-          "context": "'input[type=\"search\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/url_patterns.py",
-          "line": 19,
-          "type": "selector",
-          "value": "'input[name=\"q\"]'",
-          "context": "'input[name=\"q\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/url_patterns.py",
-          "line": 19,
-          "type": "label",
-          "value": "name=\"q\"",
-          "context": "'input[name=\"q\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/url_patterns.py",
-          "line": 20,
-          "type": "selector",
-          "value": "'input[name=\"search\"]'",
-          "context": "'input[name=\"search\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/url_patterns.py",
-          "line": 20,
-          "type": "label",
-          "value": "name=\"search\"",
-          "context": "'input[name=\"search\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/url_patterns.py",
-          "line": 21,
-          "type": "selector",
-          "value": "'input[name=\"query\"]'",
-          "context": "'input[name=\"query\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/url_patterns.py",
-          "line": 21,
-          "type": "label",
-          "value": "name=\"query\"",
-          "context": "'input[name=\"query\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/url_patterns.py",
-          "line": 22,
-          "type": "selector",
-          "value": "'input[name=\"s\"]'",
-          "context": "'input[name=\"s\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/url_patterns.py",
-          "line": 22,
-          "type": "label",
-          "value": "name=\"s\"",
-          "context": "'input[name=\"s\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/url_patterns.py",
-          "line": 26,
-          "type": "selector",
-          "value": "'#search'",
-          "context": "'#search',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/url_patterns.py",
-          "line": 27,
-          "type": "selector",
-          "value": "'#searchbox'",
-          "context": "'#searchbox',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/url_patterns.py",
-          "line": 28,
-          "type": "selector",
-          "value": "'.search-input'",
-          "context": "'.search-input',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/url_patterns.py",
-          "line": 29,
-          "type": "selector",
-          "value": "'.search-field'",
-          "context": "'.search-field',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/url_patterns.py",
-          "line": 30,
-          "type": "label",
-          "value": "id=\"search-input\"",
-          "context": "'[data-testid=\"search-input\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/url_patterns.py",
-          "line": 35,
-          "type": "selector",
-          "value": "'button[type=\"submit\"]'",
-          "context": "'button[type=\"submit\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/url_patterns.py",
-          "line": 36,
-          "type": "selector",
-          "value": "'input[type=\"submit\"]'",
-          "context": "'input[type=\"submit\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/url_patterns.py",
-          "line": 37,
-          "type": "selector",
-          "value": "'.search-button'",
-          "context": "'.search-button',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/url_patterns.py",
-          "line": 38,
-          "type": "selector",
-          "value": "'.search-submit'",
-          "context": "'.search-submit',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/url_patterns.py",
-          "line": 39,
-          "type": "label",
-          "value": "id=\"search-button\"",
-          "context": "'[data-testid=\"search-button\"]',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/url_patterns.py",
-          "line": 110,
-          "type": "label",
-          "value": "'wiadomość'",
-          "context": "'wiadomość', 'message', 'obsługa klienta', 'customer service',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/url_patterns.py",
-          "line": 110,
-          "type": "label",
-          "value": "'message'",
-          "context": "'wiadomość', 'message', 'obsługa klienta', 'customer service',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        }
-      ]
-    },
-    {
       "path": "curllm_core/streamware/uri.py",
       "score": 21,
       "findings": [
@@ -11975,6 +10316,192 @@
           "type": "label",
           "value": "'imię'",
           "context": "'zapytanie', 'email', 'phone', 'telefon', 'name', 'imię'",
+          "severity": "low",
+          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
+        }
+      ]
+    },
+    {
+      "path": "curllm_core/llm_dsl/atoms.py",
+      "score": 20,
+      "findings": [
+        {
+          "file": "curllm_core/llm_dsl/atoms.py",
+          "line": 66,
+          "type": "selector",
+          "value": "querySelectorAll('*'",
+          "context": "document.querySelectorAll('*').forEach(el => {",
+          "severity": "low",
+          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
+        },
+        {
+          "file": "curllm_core/llm_dsl/atoms.py",
+          "line": 101,
+          "type": "selector",
+          "value": "querySelectorAll('input, textarea, select'",
+          "context": "document.querySelectorAll('input, textarea, select').forEach((el, idx) => {",
+          "severity": "low",
+          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
+        },
+        {
+          "file": "curllm_core/llm_dsl/atoms.py",
+          "line": 182,
+          "type": "selector",
+          "value": "querySelectorAll('button, a, [role=\"",
+          "context": "const els = document.querySelectorAll('button, a, [role=\"button\"], [onclick], input[type=\"submit\"]');",
+          "severity": "low",
+          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
+        },
+        {
+          "file": "curllm_core/llm_dsl/atoms.py",
+          "line": 246,
+          "type": "selector",
+          "value": "querySelectorAll('form'",
+          "context": "forms: document.querySelectorAll('form').length,",
+          "severity": "low",
+          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
+        },
+        {
+          "file": "curllm_core/llm_dsl/atoms.py",
+          "line": 247,
+          "type": "selector",
+          "value": "querySelectorAll('input:not([type=\"",
+          "context": "inputs: document.querySelectorAll('input:not([type=\"hidden\"])').length,",
+          "severity": "low",
+          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
+        },
+        {
+          "file": "curllm_core/llm_dsl/atoms.py",
+          "line": 248,
+          "type": "selector",
+          "value": "querySelectorAll('button, input[type=\"",
+          "context": "buttons: document.querySelectorAll('button, input[type=\"submit\"]').length,",
+          "severity": "low",
+          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
+        },
+        {
+          "file": "curllm_core/llm_dsl/atoms.py",
+          "line": 249,
+          "type": "selector",
+          "value": "'a[href]'",
+          "context": "links: document.querySelectorAll('a[href]').length,",
+          "severity": "low",
+          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
+        },
+        {
+          "file": "curllm_core/llm_dsl/atoms.py",
+          "line": 249,
+          "type": "selector",
+          "value": "querySelectorAll('a[href]'",
+          "context": "links: document.querySelectorAll('a[href]').length,",
+          "severity": "low",
+          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
+        },
+        {
+          "file": "curllm_core/llm_dsl/atoms.py",
+          "line": 250,
+          "type": "selector",
+          "value": "querySelectorAll('img'",
+          "context": "images: document.querySelectorAll('img').length,",
+          "severity": "low",
+          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
+        },
+        {
+          "file": "curllm_core/llm_dsl/atoms.py",
+          "line": 251,
+          "type": "selector",
+          "value": "querySelectorAll('table'",
+          "context": "tables: document.querySelectorAll('table').length,",
+          "severity": "low",
+          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
+        },
+        {
+          "file": "curllm_core/llm_dsl/atoms.py",
+          "line": 252,
+          "type": "selector",
+          "value": "querySelectorAll('ul, ol'",
+          "context": "lists: document.querySelectorAll('ul, ol').length,",
+          "severity": "low",
+          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
+        },
+        {
+          "file": "curllm_core/llm_dsl/atoms.py",
+          "line": 253,
+          "type": "selector",
+          "value": "querySelectorAll('h1, h2, h3'",
+          "context": "headers: document.querySelectorAll('h1, h2, h3').length,",
+          "severity": "low",
+          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
+        },
+        {
+          "file": "curllm_core/llm_dsl/atoms.py",
+          "line": 254,
+          "type": "selector",
+          "value": "querySelectorAll('nav, [role=\"",
+          "context": "navigation: document.querySelectorAll('nav, [role=\"navigation\"]').length,",
+          "severity": "low",
+          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
+        },
+        {
+          "file": "curllm_core/llm_dsl/atoms.py",
+          "line": 291,
+          "type": "selector",
+          "value": "'a[href]'",
+          "context": "document.querySelectorAll('a[href]').forEach((a, idx) => {",
+          "severity": "low",
+          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
+        },
+        {
+          "file": "curllm_core/llm_dsl/atoms.py",
+          "line": 291,
+          "type": "selector",
+          "value": "querySelectorAll('a[href]'",
+          "context": "document.querySelectorAll('a[href]').forEach((a, idx) => {",
+          "severity": "low",
+          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
+        },
+        {
+          "file": "curllm_core/llm_dsl/atoms.py",
+          "line": 349,
+          "type": "selector",
+          "value": "querySelectorAll('*'",
+          "context": "document.querySelectorAll('*').forEach(el => {",
+          "severity": "low",
+          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
+        },
+        {
+          "file": "curllm_core/llm_dsl/atoms.py",
+          "line": 480,
+          "type": "label",
+          "value": "'name'",
+          "context": "if inp.get('name'):",
+          "severity": "low",
+          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
+        },
+        {
+          "file": "curllm_core/llm_dsl/atoms.py",
+          "line": 481,
+          "type": "label",
+          "value": "'name'",
+          "context": "ctx.append(f\"name: {inp['name']}\")",
+          "severity": "low",
+          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
+        },
+        {
+          "file": "curllm_core/llm_dsl/atoms.py",
+          "line": 515,
+          "type": "label",
+          "value": "'name'",
+          "context": "if inp.get('name'):",
+          "severity": "low",
+          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
+        },
+        {
+          "file": "curllm_core/llm_dsl/atoms.py",
+          "line": 516,
+          "type": "label",
+          "value": "'name'",
+          "context": "return f\"{inp['tagName']}[name=\\\"{inp['name']}\\\"]\"",
           "severity": "low",
           "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
         }
@@ -12859,165 +11386,6 @@
           "context": "result['message'] = value",
           "severity": "low",
           "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        }
-      ]
-    },
-    {
-      "path": "curllm_core/streamware/components/extraction/llm_patterns.py",
-      "score": 17,
-      "findings": [
-        {
-          "file": "curllm_core/streamware/components/extraction/llm_patterns.py",
-          "line": 54,
-          "type": "selector",
-          "value": "querySelectorAll('img[src*=\"",
-          "context": "const priceImgs = document.querySelectorAll('img[src*=\"price\"], img[src*=\"cena\"], img[src*=\"cb_\"], img[src*=\"cn_\"]');",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/streamware/components/extraction/llm_patterns.py",
-          "line": 200,
-          "type": "selector",
-          "value": "querySelectorAll('*'",
-          "context": "document.querySelectorAll('*').forEach(el => {",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/streamware/components/extraction/llm_patterns.py",
-          "line": 213,
-          "type": "selector",
-          "value": "querySelector('img'",
-          "context": "hasImage: el.querySelector('img') !== null,",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/streamware/components/extraction/llm_patterns.py",
-          "line": 214,
-          "type": "selector",
-          "value": "querySelector('a'",
-          "context": "hasLink: el.querySelector('a') !== null",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/streamware/components/extraction/llm_patterns.py",
-          "line": 257,
-          "type": "selector",
-          "value": "\".best-class-name\"",
-          "context": "\"selector\": \".best-class-name\",",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/streamware/components/extraction/llm_patterns.py",
-          "line": 260,
-          "type": "selector",
-          "value": "\".alt1\"",
-          "context": "\"alternatives\": [\".alt1\", \".alt2\"],",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/streamware/components/extraction/llm_patterns.py",
-          "line": 260,
-          "type": "selector",
-          "value": "\".alt2\"",
-          "context": "\"alternatives\": [\".alt1\", \".alt2\"],",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/streamware/components/extraction/llm_patterns.py",
-          "line": 292,
-          "type": "label",
-          "value": "\"name\"",
-          "context": "field_name: \"name\" | \"price\" | \"url\" | \"image\" | \"description\"",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/streamware/components/extraction/llm_patterns.py",
-          "line": 310,
-          "type": "selector",
-          "value": "querySelectorAll('*'",
-          "context": "container.querySelectorAll('*').forEach(el => {",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/streamware/components/extraction/llm_patterns.py",
-          "line": 395,
-          "type": "label",
-          "value": "\"name\"",
-          "context": "\"name\": {\"selector\": str, \"type\": \"text\"},",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/streamware/components/extraction/llm_patterns.py",
-          "line": 423,
-          "type": "selector",
-          "value": "querySelector('h1'",
-          "context": "h1: document.querySelector('h1')?.textContent?.trim() || '',",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/streamware/components/extraction/llm_patterns.py",
-          "line": 437,
-          "type": "selector",
-          "value": "querySelectorAll('*'",
-          "context": "document.querySelectorAll('*').forEach(el => {",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/streamware/components/extraction/llm_patterns.py",
-          "line": 442,
-          "type": "selector",
-          "value": "querySelectorAll('.'",
-          "context": "const count = document.querySelectorAll('.' + cls).length;",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/streamware/components/extraction/llm_patterns.py",
-          "line": 487,
-          "type": "selector",
-          "value": "\".product-item\"",
-          "context": "\"container_selector\": \".product-item\",",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/streamware/components/extraction/llm_patterns.py",
-          "line": 489,
-          "type": "label",
-          "value": "\"name\"",
-          "context": "\"name\": {\"selector\": \"a.title, h2, .name\", \"type\": \"text\"},",
-          "severity": "low",
-          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
-        },
-        {
-          "file": "curllm_core/streamware/components/extraction/llm_patterns.py",
-          "line": 548,
-          "type": "selector",
-          "value": "querySelector('img'",
-          "context": "hasImage: el.querySelector('img') !== null,",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/streamware/components/extraction/llm_patterns.py",
-          "line": 549,
-          "type": "selector",
-          "value": "querySelector('a'",
-          "context": "hasLink: el.querySelector('a') !== null",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
         }
       ]
     },
@@ -16346,30 +14714,6 @@
       ]
     },
     {
-      "path": "curllm_core/config.py",
-      "score": 6,
-      "findings": [
-        {
-          "file": "curllm_core/config.py",
-          "line": 13,
-          "type": "xpath",
-          "value": "//localhost",
-          "context": "ollama_host: str = os.getenv(\"CURLLM_OLLAMA_HOST\", \"http://localhost:11434\")",
-          "severity": "high",
-          "suggestion": "Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding"
-        },
-        {
-          "file": "curllm_core/config.py",
-          "line": 15,
-          "type": "xpath",
-          "value": "//localhost",
-          "context": "browserless_url: str = os.getenv(\"BROWSERLESS_URL\", \"ws://localhost:3000\")",
-          "severity": "high",
-          "suggestion": "Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding"
-        }
-      ]
-    },
-    {
       "path": "curllm_core/semantic_query.py",
       "score": 6,
       "findings": [
@@ -17654,48 +15998,6 @@
       ]
     },
     {
-      "path": "curllm_core/dynamic/patterns.py",
-      "score": 4,
-      "findings": [
-        {
-          "file": "curllm_core/dynamic/patterns.py",
-          "line": 150,
-          "type": "selector",
-          "value": "querySelectorAll('ul, ol, div, section, article'",
-          "context": "const containers = document.querySelectorAll('ul, ol, div, section, article');",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dynamic/patterns.py",
-          "line": 200,
-          "type": "selector",
-          "value": "querySelectorAll('nav, .pagination, [class*=\"",
-          "context": "const elements = document.querySelectorAll('nav, .pagination, [class*=\"pager\"], [role=\"navigation\"]');",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dynamic/patterns.py",
-          "line": 209,
-          "type": "selector",
-          "value": "querySelectorAll('a'",
-          "context": "const links = el.querySelectorAll('a');",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        },
-        {
-          "file": "curllm_core/dynamic/patterns.py",
-          "line": 219,
-          "type": "selector",
-          "value": "querySelectorAll('a'",
-          "context": "const numberedLinks = document.querySelectorAll('a');",
-          "severity": "low",
-          "suggestion": "Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection"
-        }
-      ]
-    },
-    {
       "path": "curllm_core/rerun_cmd.py",
       "score": 3,
       "findings": [
@@ -18344,6 +16646,21 @@
           "type": "label",
           "value": "\"name\"",
           "context": "name = params.get(\"name\", \"screenshot\")",
+          "severity": "low",
+          "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
+        }
+      ]
+    },
+    {
+      "path": "curllm_core/llm_dsl/executor.py",
+      "score": 1,
+      "findings": [
+        {
+          "file": "curllm_core/llm_dsl/executor.py",
+          "line": 195,
+          "type": "label",
+          "value": "'message'",
+          "context": "'message': messages.data if messages.success else None,",
           "severity": "low",
           "suggestion": "Use curllm_core.form_fill for intelligent form field matching"
         }

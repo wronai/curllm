@@ -97,16 +97,16 @@ status:
 # Testing
 test:
 	@echo "Running unit tests (excluding integration tests that require browsers)..."
-	@PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/ --ignore=tests/integration -v
+	@python3 -m pytest tests/ --ignore=tests/integration -v -p pytest_asyncio
 
 test-integration:
 	@echo "Running integration tests (requires Playwright browsers)..."
 	@echo "If browsers not installed, run: playwright install chromium"
-	@PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/integration/ -v
+	@python3 -m pytest tests/integration/ -v -p pytest_asyncio
 
 test-all:
 	@echo "Running all tests (unit + integration)..."
-	@PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/ -v
+	@python3 -m pytest tests/ -v -p pytest_asyncio
 
 test-e2e-diff:
 	@echo "Running E2E diff test..."
