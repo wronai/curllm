@@ -38,6 +38,7 @@ def execute():
     stealth_mode = data.get('stealth_mode', False)
     captcha_solver = data.get('captcha_solver', False)
     use_bql = data.get('use_bql', False)
+    use_v2 = data.get('use_v2', False)  # LLM-driven v2 API
     headers = data.get('headers', {})
     proxy = data.get('proxy')
     session_id = data.get('session_id')
@@ -58,6 +59,7 @@ def execute():
                 proxy=proxy,
                 session_id=session_id,
                 wordpress_config=wordpress_config,
+                use_v2=use_v2,
             ))
         finally:
             try:

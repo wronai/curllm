@@ -98,6 +98,7 @@ class CurllmExecutor:
         proxy: Optional[Dict] = None,
         session_id: Optional[str] = None,
         wordpress_config: Optional[Dict] = None,
+        use_v2: bool = False,  # Use LLM-driven v2 API instead of hardcoded selectors
     ) -> Dict[str, Any]:
         # Parse optional runtime params embedded in JSON instruction
         instruction, runtime = parse_runtime_from_instruction(instruction)
@@ -610,15 +611,32 @@ class CurllmExecutor:
     def _parse_form_pairs(self, instruction: str | None) -> Dict[str, str]:
         return _parse_form_pairs_func(instruction)
 
-    async def _deterministic_form_fill(self, instruction: str, page, run_logger: RunLogger | None = None, domain_dir: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    async def _deterministic_form_fill(self, instruction: str, page, run_logger: RunLogger | None = None, domain_dir: Optional[str] = None, use_v2: bool = False) -> Optional[Dict[str, Any]]:
         """
         Fill form using deterministic approach, with optional LLM-guided fallback.
         
         Hybrid approach:
-        1. Try deterministic first (fast)
+        1. Try deterministic first (fast) - or v2 LLM-driven if use_v2=True
         2. If failed and LLM filler enabled, try LLM-guided per-field (smart)
+        
+        Args:
+            use_v2: Use LLM-driven v2 form filling (no hardcoded selectors)
         """
-        # Try deterministic approach first
+        # Use v2 LLM-driven form filling if enabled
+        if use_v2:
+            try:
+                from curllm_core.v2 import llm_form_fill
+                result = await llm_form_fill(instruction, page, self.llm, run_logger)
+                return {
+                    'filled': result.filled_fields,
+                    'submitted': result.submitted,
+                    'success': result.success,
+                }
+            except Exception as e:
+                if run_logger:
+                    run_logger.log_text(f"⚠️  V2 form fill failed: {e}, falling back to v1")
+        
+        # Try deterministic approach first (v1)
         result = await _deterministic_form_fill_func(instruction, page, run_logger, domain_dir)
         
         # If failed and LLM filler is enabled, try LLM-guided approach

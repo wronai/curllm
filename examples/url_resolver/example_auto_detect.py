@@ -18,6 +18,16 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from curllm_core.url_resolver import UrlResolver
 from browser_helper import create_browser, close_browser
 
+# Try to create LLM (optional)
+def get_llm():
+    try:
+        from curllm_core.llm_config import LLMConfig
+        config = LLMConfig()
+        return config.get_llm()
+    except Exception:
+        pass
+    return None
+
 # Przykłady z naturalnym językiem - bez podawania TaskGoal
 EXAMPLES = [
     # Shopping
@@ -98,7 +108,8 @@ async def run_example(example: dict):
         
         
         
-        resolver = UrlResolver(page=page, llm=None)
+        llm = get_llm()
+        resolver = UrlResolver(page=page, llm=llm)
         
         # Użyj resolve() z automatycznym wykrywaniem celu
         result = await resolver.resolve(example['url'], example['instruction'])

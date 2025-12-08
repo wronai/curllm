@@ -15,6 +15,17 @@ Handles:
 - Content engagement (like, comment)
 """
 
+
+
+import warnings
+warnings.warn(
+    "This module is deprecated. Use curllm_core.v2.LLMSocialOrchestrator instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
+
+
+
 import json
 import re
 from typing import Any, Dict, List, Optional

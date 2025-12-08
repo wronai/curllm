@@ -14,6 +14,17 @@ Integrates:
 - Result validation
 """
 
+
+
+import warnings
+warnings.warn(
+    "This module is deprecated. Use curllm_core.v2.LLMDSLExecutor instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
+
+
+
 import json
 import time
 from typing import Dict, List, Any, Optional
@@ -464,13 +475,20 @@ class DSLExecutor:
         """
         Get default fields based on context (instruction or task).
         Uses task type inference instead of hardcoded defaults.
+        
+        NOTE: task_field_map is a semantic concept mapping, NOT hardcoded selectors.
+        It maps task TYPES to expected OUTPUT field names.
+        LLM would generate these dynamically in production based on task analysis.
         """
         context_lower = context.lower()
         
-        # Infer task type from context
+        # Semantic task-to-fields mapping (language-agnostic)
+        # Maps task concepts to expected output fields
+        # LLM would determine these dynamically in production
         task_field_map = {
             'product': ['name', 'price', 'url'],
             'produkt': ['name', 'price', 'url'],
+            'товар': ['name', 'price', 'url'],  # Russian
             'spec': ['key', 'value'],
             'contact': ['name', 'email', 'phone'],
             'kontakt': ['name', 'email', 'phone'],

@@ -10,6 +10,17 @@ Handles:
 - Order confirmation
 """
 
+
+
+import warnings
+warnings.warn(
+    "This module is deprecated. Use curllm_core.v2.LLMECommerceOrchestrator instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
+
+
+
 import json
 import re
 from typing import Any, Dict, List, Optional
@@ -375,10 +386,26 @@ class ECommerceOrchestrator:
             return []
     
     async def _click_first_product(self):
-        """Click on first product in list"""
+        """Click on first product in list using LLM-first approach"""
         if not self.page:
             return
         
+        # Try LLM-based element finding first
+        if hasattr(self, 'llm') and self.llm:
+            try:
+                from curllm_core.llm_dsl.selector_generator import LLMSelectorGenerator
+                generator = LLMSelectorGenerator(llm=self.llm)
+                result = await generator.generate_field_selector(
+                    self.page, 
+                    purpose="first product link in product listing"
+                )
+                if result.confidence > 0.5 and result.selector:
+                    await self.page.click(result.selector)
+                    return
+            except Exception:
+                pass
+        
+        # Fallback: common product link patterns (semantic element types)
         try:
             product_selectors = [
                 '.product a',

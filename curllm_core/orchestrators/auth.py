@@ -15,6 +15,17 @@ Handles:
 - Password recovery flows
 """
 
+
+
+import warnings
+warnings.warn(
+    "This module is deprecated. Use curllm_core.v2.LLMAuthOrchestrator instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
+
+
+
 import json
 import re
 from typing import Any, Dict, List, Optional

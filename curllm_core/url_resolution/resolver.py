@@ -344,23 +344,33 @@ Respond with just the href value of the best matching link, or "none" if no matc
     
     async def find_url_for_goal(self, goal: TaskGoal) -> Optional[str]:
         """
-        Find URL for any goal type using atomic DOM helpers.
+        Find URL for any goal type using LLM-first strategy.
         
-        Delegates to dom_helpers.find_link_for_goal which uses multiple strategies:
-        - Text keyword matching
-        - URL pattern matching
-        - Aria label matching
-        - Location-based scoring
+        Priority:
+        1. LLM analysis - semantic understanding of page links
+        2. DOM helpers - statistical scoring with word overlap
+        3. Legacy patterns - fallback for compatibility
         """
         if not self.page:
             return None
         
-        # Use atomic helper for link discovery
+        # 1. LLM-first: Use LLM to find best link semantically
+        if self.llm:
+            try:
+                llm_url = await self._find_url_with_llm(goal)
+                if llm_url:
+                    self._log(f"🤖 LLM found link for {goal.value}: {llm_url}")
+                    return llm_url
+            except Exception as e:
+                logger.debug(f"LLM URL finding failed: {e}")
+        
+        # 2. Use atomic helper for link discovery (statistical)
         try:
             link = await dom_helpers.find_link_for_goal(
                 self.page, 
                 goal.value,
-                base_url=self.page.url if self.page else None
+                base_url=self.page.url if self.page else None,
+                llm=self.llm
             )
             if link:
                 self._log(f"Found link via dom_helpers: {link.url} (score: {link.score:.1f})")
@@ -368,8 +378,81 @@ Respond with just the href value of the best matching link, or "none" if no matc
         except Exception as e:
             logger.debug(f"dom_helpers.find_link_for_goal failed: {e}")
         
-        # Fallback to legacy pattern matching if dom_helpers fails
+        # 3. Fallback to legacy pattern matching if dom_helpers fails
         return await self._legacy_find_url_for_goal(goal)
+    
+    async def _find_url_with_llm(self, goal: TaskGoal) -> Optional[str]:
+        """Find URL using LLM semantic analysis."""
+        if not self.llm or not self.page:
+            return None
+        
+        # Get all links from page
+        links = await self.page.evaluate("""() => {
+            const links = [];
+            document.querySelectorAll('a[href]').forEach(a => {
+                const href = a.href;
+                if (!href || href.startsWith('javascript:')) return;
+                const text = (a.textContent || '').trim().substring(0, 100);
+                const ariaLabel = a.getAttribute('aria-label') || '';
+                const title = a.getAttribute('title') || '';
+                links.push({
+                    href: href,
+                    text: text,
+                    ariaLabel: ariaLabel,
+                    title: title
+                });
+            });
+            return links.slice(0, 50);  // Limit to first 50
+        }""")
+        
+        if not links:
+            return None
+        
+        # Goal descriptions for LLM
+        goal_descriptions = {
+            TaskGoal.FIND_CART: "shopping cart, koszyk, basket - where items are stored before checkout",
+            TaskGoal.FIND_CHECKOUT: "checkout, finalize order, payment page",
+            TaskGoal.FIND_CONTACT_FORM: "contact page, kontakt, contact form, customer service",
+            TaskGoal.FIND_LOGIN: "login, sign in, logowanie, account access",
+            TaskGoal.FIND_REGISTER: "registration, create account, sign up, rejestracja",
+            TaskGoal.FIND_PRODUCT_LIST: "product listing, category page, products overview",
+            TaskGoal.FIND_WISHLIST: "wishlist, favorites, ulubione, saved items",
+            TaskGoal.FIND_BLOG: "blog, news, articles, aktualności",
+        }
+        
+        goal_desc = goal_descriptions.get(goal, goal.value)
+        
+        # Format links for LLM
+        links_text = "\n".join([
+            f"- href: {l['href']}, text: {l['text'][:50]}, aria: {l['ariaLabel'][:30]}"
+            for l in links[:30]
+        ])
+        
+        prompt = f"""Find the best link for: {goal_desc}
+
+Links on page:
+{links_text}
+
+Return ONLY the href URL of the best matching link, or "NONE" if no match.
+No explanation, just the URL or NONE."""
+
+        try:
+            response = await self.llm.aquery(prompt)
+            response = response.strip()
+            
+            if response and response != "NONE" and response.startswith("http"):
+                return response
+            
+            # Try to extract URL from response
+            import re
+            url_match = re.search(r'https?://[^\s<>"]+', response)
+            if url_match:
+                return url_match.group(0)
+                
+        except Exception as e:
+            logger.debug(f"LLM query failed: {e}")
+        
+        return None
     
     async def _legacy_find_url_for_goal(self, goal: TaskGoal) -> Optional[str]:
         """Legacy fallback: Find URL using hardcoded patterns (deprecated)"""

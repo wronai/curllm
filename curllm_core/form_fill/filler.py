@@ -97,20 +97,27 @@ async def _get_canonical_values(page, instruction: str) -> Dict[str, str]:
     except Exception:
         pass
     
+    # Semantic concept groups (language-agnostic)
+    # LLM would determine these dynamically in production
+    field_concepts = {
+        "email": {"email", "e-mail", "mail", "correo", "poczta"},
+        "name": {"name", "imi", "nazw", "full name", "fullname", "nombre"},
+        "message": {"message", "wiadomo", "treść", "tresc", "content", "komentarz"},
+        "subject": {"subject", "temat", "asunto", "topic"},
+        "phone": {"phone", "telefon", "tel", "mobile", "komórka"},
+    }
+    
     # Then parse instruction and OVERWRITE canonical (instruction has priority)
     raw_pairs = parse_form_pairs(instruction)
     for k, v in raw_pairs.items():
         lk = k.lower()
-        if any(x in lk for x in ["email", "e-mail", "mail"]):
-            canonical["email"] = v
-        elif any(x in lk for x in ["name", "imi", "nazw", "full name", "fullname"]):
-            canonical["name"] = v
-        elif any(x in lk for x in ["message", "wiadomo", "treść", "tresc", "content"]):
-            canonical["message"] = v
-        elif any(x in lk for x in ["subject", "temat"]):
-            canonical["subject"] = v
-        elif any(x in lk for x in ["phone", "telefon", "tel"]):
-            canonical["phone"] = v
+        # Match using semantic concept groups
+        matched = False
+        for field_type, concepts in field_concepts.items():
+            if any(x in lk for x in concepts):
+                canonical[field_type] = v
+                matched = True
+                break
     
     return canonical
 

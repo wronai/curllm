@@ -21,6 +21,16 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from curllm_core.url_resolver import UrlResolver, TaskGoal
 from browser_helper import create_browser, close_browser
 
+# Try to create LLM (optional)
+def get_llm():
+    try:
+        from curllm_core.llm_config import LLMConfig
+        config = LLMConfig()
+        return config.get_llm()
+    except Exception:
+        pass
+    return None
+
 # Realne przykłady - różne strony
 EXAMPLES = [
     {
@@ -64,7 +74,8 @@ async def run_example(example: dict):
         
         
         
-        resolver = UrlResolver(page=page, llm=None)
+        llm = get_llm()
+        resolver = UrlResolver(page=page, llm=llm)
         
         # Użyj resolve_for_goal bezpośrednio dla konkretnego celu
         result = await resolver.resolve_for_goal(example['url'], example['goal'])

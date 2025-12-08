@@ -1,3 +1,19 @@
+"""
+DEPRECATED: This module is deprecated.
+
+Use the LLM-driven version instead:
+    from curllm_core.v2 import LLMHierarchicalPlanner
+
+This module will be removed in a future version.
+"""
+
+import warnings
+warnings.warn(
+    "This module is deprecated. Use curllm_core.v2.LLMHierarchicalPlanner instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
+
 #!/usr/bin/env python3
 """
 Hierarchical LLM Planner - 3-level decision tree for reduced token usage.
