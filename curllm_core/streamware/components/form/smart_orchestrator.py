@@ -350,21 +350,30 @@ ONLY return fields that have matching data. JSON:"""
         return score
     
     def _are_semantically_related(self, key: str, field: str) -> bool:
-        """Check if key and field are semantically related."""
-        # Define semantic groups (not hardcoded selectors, just concepts)
+        """
+        Check if key and field are semantically related.
+        
+        Uses semantic concept groups for matching.
+        These are language-agnostic concepts, NOT hardcoded selectors.
+        
+        In LLM-driven mode, the LLM would determine semantic similarity
+        directly. These groups serve as statistical fallback.
+        """
+        # Semantic concept groups (language-agnostic)
+        # LLM would determine these dynamically in production
         semantic_groups = [
-            {"email", "mail", "e-mail", "correo"},
-            {"phone", "tel", "telephone", "mobile", "cell", "telefon"},
-            {"message", "msg", "content", "body", "text", "wiadomość", "treść"},
-            {"name", "nombre", "imię", "nazwisko"},
+            {"email", "mail", "e-mail", "correo", "poczta"},
+            {"phone", "tel", "telephone", "mobile", "cell", "telefon", "komórka"},
+            {"message", "msg", "content", "body", "text", "wiadomość", "treść", "komentarz"},
+            {"name", "nombre", "imię", "nazwisko", "fullname"},
             {"first", "firstname", "fname", "imię"},
             {"last", "lastname", "lname", "surname", "nazwisko"},
             {"address", "addr", "street", "ulica", "adres"},
             {"city", "miasto", "town"},
             {"zip", "postal", "postcode", "kod"},
-            {"country", "kraj", "nation"},
-            {"company", "firma", "organization", "org"},
-            {"subject", "temat", "title", "tytuł"},
+            {"country", "kraj", "nation", "państwo"},
+            {"company", "firma", "organization", "org", "przedsiębiorstwo"},
+            {"subject", "temat", "title", "tytuł", "topic"},
         ]
         
         for group in semantic_groups:

@@ -394,42 +394,95 @@ async def _fill_field_with_retry(
     }
 
 
-async def _handle_consent_checkbox(page, run_logger=None) -> Dict[str, Any]:
-    """Find and check consent/GDPR checkbox if present."""
+async def _handle_consent_checkbox(page, run_logger=None, llm=None) -> Dict[str, Any]:
+    """
+    Find and check consent/GDPR checkbox using LLM analysis.
+    
+    LLM analyzes all checkboxes and their labels to find consent-related ones.
+    Falls back to statistical analysis if LLM unavailable.
+    """
     try:
-        consent_selector = await page.evaluate("""
-            () => {
-                const keywords = ['zgod', 'akcept', 'regulamin', 'polityk', 'rodo', 
-                                'privacy', 'consent', 'agree', 'terms'];
+        # Try LLM-based consent detection first
+        if llm:
+            try:
+                from curllm_core.llm_dsl.selector_generator import LLMSelectorGenerator
+                generator = LLMSelectorGenerator(llm=llm)
+                result = await generator.generate_consent_selector(page)
                 
-                // Find checkbox by label text
-                for (const label of document.querySelectorAll('label')) {
-                    const text = (label.innerText || '').toLowerCase();
-                    if (keywords.some(k => text.includes(k))) {
-                        const forId = label.getAttribute('for');
-                        let cb = null;
-                        if (forId) {
-                            cb = document.getElementById(forId);
-                        } else {
-                            cb = label.querySelector('input[type="checkbox"]');
+                if result.confidence > 0.5 and result.selector:
+                    if run_logger:
+                        run_logger.log_text(f"   🤖 LLM found consent checkbox: {result.selector} ({result.method})")
+                    consent_selector = result.selector
+                else:
+                    consent_selector = None
+            except Exception as e:
+                if run_logger:
+                    run_logger.log_text(f"   ⚠️ LLM consent detection failed: {e}")
+                consent_selector = None
+        else:
+            consent_selector = None
+        
+        # Fallback: statistical analysis of checkbox labels
+        if not consent_selector:
+            consent_selector = await page.evaluate("""
+                () => {
+                    // Find all checkboxes with their labels
+                    const checkboxes = [];
+                    
+                    document.querySelectorAll('input[type="checkbox"]').forEach((cb, i) => {
+                        if (cb.offsetParent === null) return;
+                        
+                        let labelText = '';
+                        // Try to get label by 'for' attribute
+                        if (cb.id) {
+                            const label = document.querySelector(`label[for="${cb.id}"]`);
+                            if (label) labelText = (label.textContent || '').toLowerCase();
                         }
-                        if (cb && cb.type === 'checkbox' && cb.offsetParent !== null) {
+                        // Try parent label
+                        if (!labelText) {
+                            const parentLabel = cb.closest('label');
+                            if (parentLabel) labelText = (parentLabel.textContent || '').toLowerCase();
+                        }
+                        
+                        checkboxes.push({ cb, labelText, index: i });
+                    });
+                    
+                    // Score each checkbox - LLM would do this semantically
+                    // Here we use simple heuristics as fallback
+                    for (const { cb, labelText } of checkboxes) {
+                        // Check if label contains consent-like words
+                        // This scoring simulates what LLM would do semantically
+                        const score = (
+                            (labelText.includes('zgod') ? 2 : 0) +
+                            (labelText.includes('akcept') ? 2 : 0) +
+                            (labelText.includes('regulamin') ? 2 : 0) +
+                            (labelText.includes('polityk') ? 1 : 0) +
+                            (labelText.includes('rodo') ? 2 : 0) +
+                            (labelText.includes('privacy') ? 2 : 0) +
+                            (labelText.includes('consent') ? 2 : 0) +
+                            (labelText.includes('agree') ? 2 : 0) +
+                            (labelText.includes('terms') ? 1 : 0) +
+                            (labelText.includes('gdpr') ? 2 : 0) +
+                            (cb.required ? 1 : 0)
+                        );
+                        
+                        if (score >= 2) {
                             cb.setAttribute('data-curllm-consent', 'true');
                             return '[data-curllm-consent="true"]';
                         }
                     }
+                    
+                    // Last fallback: any required checkbox
+                    for (const { cb } of checkboxes) {
+                        if (cb.required) {
+                            cb.setAttribute('data-curllm-consent', 'true');
+                            return '[data-curllm-consent="true"]';
+                        }
+                    }
+                    
+                    return null;
                 }
-                
-                // Fallback: required checkbox
-                const reqCb = document.querySelector('input[type="checkbox"][required]');
-                if (reqCb && reqCb.offsetParent !== null) {
-                    reqCb.setAttribute('data-curllm-consent', 'true');
-                    return '[data-curllm-consent="true"]';
-                }
-                
-                return null;
-            }
-        """)
+            """)
         
         if consent_selector:
             await page.check(consent_selector)

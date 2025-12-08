@@ -165,11 +165,21 @@ def _filter_only(lower_instr: str, direct: Dict[str, Any]) -> Dict[str, Any]:
     if "only" not in lower_instr:
         return direct
     keep: Dict[str, Any] = {}
-    if ("email" in lower_instr or "mail" in lower_instr) and "emails" in direct:
+    
+    # Use semantic concept matching instead of hardcoded keywords
+    email_concepts = ['email', 'mail', 'e-mail', 'correo', 'poczta']
+    phone_concepts = ['phone', 'tel', 'telefon', 'mobile', 'komórka', 'numer']
+    link_concepts = ['link', 'url', 'href', 'strona', 'page']
+    
+    has_email_intent = any(w in lower_instr for w in email_concepts)
+    has_phone_intent = any(w in lower_instr for w in phone_concepts)
+    has_link_intent = any(w in lower_instr for w in link_concepts)
+    
+    if has_email_intent and "emails" in direct:
         keep["emails"] = direct["emails"]
-    if ("phone" in lower_instr or "tel" in lower_instr or "telefon" in lower_instr) and "phones" in direct:
+    if has_phone_intent and "phones" in direct:
         keep["phones"] = direct["phones"]
-    if "links" in direct and not any(w in lower_instr for w in ["email", "mail", "phone", "tel", "telefon"]):
+    if "links" in direct and (has_link_intent or (not has_email_intent and not has_phone_intent)):
         keep["links"] = direct["links"]
     return keep or direct
 
@@ -177,8 +187,17 @@ def _filter_only(lower_instr: str, direct: Dict[str, Any]) -> Dict[str, Any]:
 async def direct_fastpath(instruction: str, page, run_logger=None) -> Optional[Dict[str, Any]]:
     lower_instr = (instruction or "").lower()
     direct: Dict[str, Any] = {}
+    
+    # Semantic concept groups for intent detection
+    email_concepts = ['email', 'mail', 'e-mail', 'correo', 'poczta']
+    phone_concepts = ['phone', 'tel', 'telefon', 'mobile', 'komórka', 'numer']
+    link_concepts = ['link', 'url', 'href', 'strona', 'page', 'anchor']
+    
+    has_email_intent = any(w in lower_instr for w in email_concepts)
+    has_phone_intent = any(w in lower_instr for w in phone_concepts)
+    has_link_intent = any(w in lower_instr for w in link_concepts)
 
-    if "link" in lower_instr and not ("only" in lower_instr and any(w in lower_instr for w in ["email","mail","phone","tel","telefon"])):
+    if has_link_intent and not ("only" in lower_instr and (has_email_intent or has_phone_intent)):
         sels = [sel for sel in ["a.titlelink", "a.storylink"] if sel in (instruction or "")]
         if sels:
             lim = _parse_limit_from_instruction(lower_instr, 30)
@@ -187,10 +206,10 @@ async def direct_fastpath(instruction: str, page, run_logger=None) -> Optional[D
             anchors = await _extract_all_anchors(page)
         direct["links"] = anchors[:100]
 
-    if "email" in lower_instr or "mail" in lower_instr:
+    if has_email_intent:
         direct["emails"] = await _extract_emails(page)
 
-    if any(w in lower_instr for w in ["phone","tel","telefon"]):
+    if has_phone_intent:
         direct["phones"] = await _extract_phones(page)
 
     if not direct:

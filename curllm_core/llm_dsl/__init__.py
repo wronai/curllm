@@ -14,6 +14,7 @@ from curllm_core.llm_dsl.executor import DSLExecutor
 from curllm_core.llm_dsl.generator import DSLQueryGenerator
 from curllm_core.llm_dsl.atoms import AtomicFunctions
 from curllm_core.llm_dsl.element_finder import LLMElementFinder, ElementMatch, find_element_by_purpose
+from curllm_core.llm_dsl.selector_generator import LLMSelectorGenerator, GeneratedSelector, generate_selector
 
 __all__ = [
     'DSLExecutor',
@@ -22,4 +23,7 @@ __all__ = [
     'LLMElementFinder',
     'ElementMatch',
     'find_element_by_purpose',
+    'LLMSelectorGenerator',
+    'GeneratedSelector',
+    'generate_selector',
 ]

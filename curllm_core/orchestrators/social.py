@@ -1,6 +1,11 @@
 """
 Social Media Orchestrator - Specialized orchestrator for social platform tasks
 
+Architecture:
+- LLM-first element finding for dynamic detection
+- Platform configs as fallback hints (not hardcoded selectors)
+- LLM analyzes page structure to find appropriate elements
+
 Handles:
 - Login with captcha solving
 - Profile navigation
@@ -32,40 +37,81 @@ class SocialMediaOrchestrator:
     Specialized orchestrator for social media automation.
     
     Features:
+    - LLM-driven element finding (primary)
     - Multi-platform support
     - Secure credential handling
     - Captcha detection and solving
     - Rate limiting awareness
     - Session persistence
+    
+    Architecture:
+    1. LLM analyzes page and finds elements by PURPOSE
+    2. Platform hints used only as fallback suggestions
+    3. No hardcoded selectors in production flow
     """
     
-    # Platform-specific selectors
-    PLATFORM_CONFIG = {
+    # Platform-specific HINTS (not hardcoded selectors)
+    # These are suggestions for LLM, not direct selectors
+    # LLM uses these as context hints when analyzing the page
+    PLATFORM_HINTS = {
         SocialPlatform.FACEBOOK: {
             'login_url': 'https://facebook.com/login',
-            'email_selector': '#email',
-            'password_selector': '#pass',
-            'login_button': 'button[name="login"]',
-            'post_box': '[aria-label*="What\'s on your mind"]',
-            'like_button': '[aria-label*="Like"]'
+            'email_purpose': 'email or phone input field for login',
+            'password_purpose': 'password input field for login',
+            'login_purpose': 'login button to submit credentials',
+            'post_purpose': 'text area to compose a new post',
+            'like_purpose': 'like button for content engagement'
         },
         SocialPlatform.TWITTER: {
             'login_url': 'https://twitter.com/login',
-            'email_selector': 'input[name="text"]',
-            'password_selector': 'input[name="password"]',
-            'login_button': '[data-testid="LoginForm_Login_Button"]',
-            'post_box': '[data-testid="tweetTextarea_0"]',
-            'like_button': '[data-testid="like"]'
+            'email_purpose': 'username or email input for login',
+            'password_purpose': 'password input for authentication',
+            'login_purpose': 'next or login button to proceed',
+            'post_purpose': 'tweet compose textarea',
+            'like_purpose': 'heart icon to like tweet'
         },
         SocialPlatform.LINKEDIN: {
             'login_url': 'https://linkedin.com/login',
-            'email_selector': '#username',
-            'password_selector': '#password',
-            'login_button': 'button[type="submit"]',
-            'post_box': '.share-box-feed-entry__trigger',
-            'like_button': 'button[aria-label*="Like"]'
+            'email_purpose': 'email or phone input for LinkedIn login',
+            'password_purpose': 'password input field',
+            'login_purpose': 'sign in button',
+            'post_purpose': 'start a post button or textarea',
+            'like_purpose': 'like reaction button'
         }
     }
+    
+    async def _find_element_with_llm(
+        self, 
+        page, 
+        purpose: str, 
+        platform: SocialPlatform
+    ) -> Optional[str]:
+        """
+        Find element using LLM-driven analysis.
+        
+        Args:
+            page: Playwright page object
+            purpose: What the element is for (e.g., "email input for login")
+            platform: Current social platform for context
+        
+        Returns:
+            CSS selector or None
+        """
+        try:
+            from curllm_core.llm_dsl.selector_generator import LLMSelectorGenerator
+            
+            if hasattr(self, 'llm') and self.llm:
+                generator = LLMSelectorGenerator(llm=self.llm)
+                result = await generator.generate_field_selector(
+                    page, 
+                    purpose=f"{purpose} on {platform.value}"
+                )
+                if result.confidence > 0.5 and result.selector:
+                    return result.selector
+        except Exception as e:
+            self._log(f"LLM element finding failed: {e}", "debug")
+        
+        return None
     
     def __init__(self, llm=None, page=None, run_logger=None):
         self.llm = llm

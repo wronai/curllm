@@ -1,0 +1,211 @@
+"""
+LLM-Driven Hierarchical Planner - No hardcoded keyword lists
+
+Uses LLM to:
+1. Decide if hierarchical planning is needed
+2. Detect simple vs complex tasks
+3. Identify multi-step requirements
+
+Replaces hardcoded keyword matching with LLM inference.
+"""
+
+import json
+import logging
+from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
+
+
+class LLMHierarchicalPlanner:
+    """
+    LLM-driven hierarchical planner.
+    
+    NO HARDCODED:
+    - Task type keywords
+    - Multi-step indicators
+    - Form detection patterns
+    """
+    
+    def __init__(self, llm=None):
+        self.llm = llm
+    
+    async def should_use_hierarchical(
+        self,
+        instruction: str,
+        page_context: Dict[str, Any]
+    ) -> bool:
+        """
+        Decide if hierarchical planner is worth the overhead using LLM.
+        """
+        if not self.llm:
+            # Fallback: use context size heuristic
+            context_size = self._estimate_context_size(page_context)
+            return context_size > 25000
+        
+        # Quick checks first
+        is_simple = await self._is_simple_task_llm(instruction, page_context)
+        if is_simple:
+            logger.info("✂️ Bypassing hierarchical: simple task")
+            return False
+        
+        is_multi = await self._is_multi_step_llm(instruction)
+        if is_multi:
+            logger.info("🔧 Using hierarchical: multi-step task")
+            return True
+        
+        # Check context size
+        context_size = self._estimate_context_size(page_context)
+        if context_size > 25000:
+            logger.info(f"🔧 Using hierarchical: large context ({context_size})")
+            return True
+        
+        return False
+    
+    async def _is_simple_task_llm(
+        self,
+        instruction: str,
+        page_context: Dict[str, Any]
+    ) -> bool:
+        """Check if task is simple using LLM."""
+        forms = page_context.get("forms", [])
+        form_count = len(forms)
+        field_count = len(forms[0].get("fields", [])) if forms else 0
+        
+        prompt = f"""Is this a simple, single-action task?
+
+Instruction: "{instruction}"
+Page info: {form_count} forms, {field_count} fields in first form
+
+Simple tasks: fill one form, click one button, extract simple data
+Complex tasks: multi-step flows, navigation, conditionals
+
+Answer ONLY: simple or complex"""
+
+        try:
+            response = await self.llm.agenerate([prompt])
+            answer = response.generations[0][0].text.strip().lower()
+            return 'simple' in answer
+        except Exception:
+            # Fallback: simple if 1 form with few fields
+            return form_count == 1 and field_count <= 10
+    
+    async def _is_multi_step_llm(self, instruction: str) -> bool:
+        """Check if instruction requires multiple steps using LLM."""
+        prompt = f"""Does this instruction require multiple sequential steps?
+
+Instruction: "{instruction}"
+
+Multi-step: "do X then Y", "first A, then B", numbered steps
+Single-step: "fill form", "click button", "extract data"
+
+Answer ONLY: multi-step or single-step"""
+
+        try:
+            response = await self.llm.agenerate([prompt])
+            answer = response.generations[0][0].text.strip().lower()
+            return 'multi' in answer
+        except Exception:
+            return False
+    
+    async def plan_strategy(
+        self,
+        instruction: str,
+        page_context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Create execution plan using LLM.
+        """
+        if not self.llm:
+            return {"strategy": "direct", "steps": []}
+        
+        strategic = self._extract_strategic_context(page_context)
+        
+        prompt = f"""Create an execution plan for this task.
+
+Instruction: "{instruction}"
+
+Page summary:
+- Title: {strategic.get('title', 'Unknown')}
+- Type: {strategic.get('page_type', 'unknown')}
+- Forms: {strategic.get('form_count', 0)}
+- Interactive elements: {strategic.get('interactive_count', 0)}
+
+Return JSON:
+{{
+    "strategy": "form_fill|extract|navigate|click",
+    "steps": [
+        {{"action": "...", "target": "...", "value": "..."}}
+    ],
+    "needs_details": ["forms", "interactive", ...]
+}}
+
+Return ONLY valid JSON."""
+
+        try:
+            response = await self.llm.agenerate([prompt])
+            answer = response.generations[0][0].text.strip()
+            
+            import re
+            if '```' in answer:
+                answer = re.sub(r'```\w*\n?', '', answer)
+            
+            return json.loads(answer)
+        except Exception:
+            return {"strategy": "direct", "steps": []}
+    
+    def _estimate_context_size(self, page_context: Dict[str, Any]) -> int:
+        """Estimate context size in characters."""
+        try:
+            return len(json.dumps(page_context))
+        except Exception:
+            return 0
+    
+    def _extract_strategic_context(
+        self, 
+        page_context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Extract high-level strategic info."""
+        forms = page_context.get("forms", [])
+        
+        return {
+            "title": page_context.get("title", ""),
+            "url": page_context.get("url", ""),
+            "page_type": self._detect_page_type(page_context),
+            "form_count": len(forms),
+            "interactive_count": len(page_context.get("interactive", [])),
+            "has_forms": len(forms) > 0,
+        }
+    
+    def _detect_page_type(self, page_context: Dict[str, Any]) -> str:
+        """Detect page type from context structure."""
+        if page_context.get("forms"):
+            return "form"
+        if page_context.get("article_candidates"):
+            return "article_list"
+        if page_context.get("products"):
+            return "product_list"
+        return "unknown"
+
+
+# =============================================================================
+# CONVENIENCE FUNCTIONS (compatible with original API)
+# =============================================================================
+
+async def should_use_hierarchical_llm(
+    instruction: str,
+    page_context: Dict[str, Any],
+    llm=None
+) -> bool:
+    """
+    LLM-driven decision on hierarchical planner usage.
+    """
+    planner = LLMHierarchicalPlanner(llm=llm)
+    return await planner.should_use_hierarchical(instruction, page_context)
+
+
+def extract_strategic_context(page_context: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Extract strategic context (stateless, no LLM needed).
+    """
+    planner = LLMHierarchicalPlanner()
+    return planner._extract_strategic_context(page_context)

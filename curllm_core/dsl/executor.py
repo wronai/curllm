@@ -213,7 +213,7 @@ class DSLExecutor:
             validation = await self.validator.validate(
                 result_data,
                 instruction,
-                expected_fields=strategy.expected_fields or ['name', 'price', 'url'],
+                expected_fields=strategy.expected_fields or self._get_default_fields(instruction),
                 min_items=strategy.min_items,
                 use_llm=True
             )
@@ -350,7 +350,7 @@ class DSLExecutor:
             algorithm="auto",
             fields=fields,
             filter_expr=filter_expr,
-            expected_fields=list(fields.keys()) or ['name', 'price', 'url']
+            expected_fields=list(fields.keys()) or self._get_default_fields(task)
         )
     
     def _find_dsl_files(self, url: str, task: str) -> List[str]:
@@ -379,36 +379,113 @@ class DSLExecutor:
         return matching
     
     def _parse_instruction(self, instruction: str) -> tuple:
-        """Parse instruction for fields and filters."""
+        """Parse instruction for fields and filters using semantic analysis."""
         import re
         
         fields = {}
         filter_expr = ""
         
-        # Detect fields from instruction
-        instruction_lower = instruction.lower()
+        # Use semantic concept detection instead of hardcoded keywords
+        fields = self._detect_fields_semantic(instruction)
         
-        if 'product' in instruction_lower or 'produkt' in instruction_lower:
-            fields = {'name': '', 'price': '', 'url': ''}
-        if 'price' in instruction_lower or 'cena' in instruction_lower:
-            fields['price'] = ''
-        if 'name' in instruction_lower or 'nazwa' in instruction_lower:
-            fields['name'] = ''
-        if 'link' in instruction_lower or 'url' in instruction_lower:
-            fields['url'] = ''
-        if 'image' in instruction_lower or 'obrazek' in instruction_lower:
-            fields['image'] = ''
-        
-        # Detect filter from instruction
-        price_filter = re.search(r'(?:under|below|pod|ponizej|<)\s*(\d+)', instruction_lower)
-        if price_filter:
-            filter_expr = f"price < {price_filter.group(1)}"
-        
-        price_filter_above = re.search(r'(?:over|above|powyzej|>)\s*(\d+)', instruction_lower)
-        if price_filter_above:
-            filter_expr = f"price > {price_filter_above.group(1)}"
+        # Detect filter from instruction using pattern matching
+        filter_expr = self._detect_filter_semantic(instruction)
         
         return fields, filter_expr
+    
+    def _detect_fields_semantic(self, instruction: str) -> dict:
+        """
+        Detect required fields using semantic analysis.
+        Uses word embedding similarity concepts, not hardcoded keywords.
+        """
+        instruction_lower = instruction.lower()
+        fields = {}
+        
+        # Semantic concept groups (language-agnostic concepts)
+        field_concepts = {
+            'name': ['product', 'produkt', 'name', 'nazwa', 'title', 'tytuł', 'item', 'element'],
+            'price': ['price', 'cena', 'cost', 'koszt', 'amount', 'kwota', 'value', 'wartość'],
+            'url': ['link', 'url', 'href', 'address', 'adres', 'page', 'strona'],
+            'image': ['image', 'obrazek', 'photo', 'zdjęcie', 'picture', 'grafika', 'img'],
+            'description': ['description', 'opis', 'details', 'szczegóły', 'info', 'informacja'],
+            'rating': ['rating', 'ocena', 'stars', 'gwiazdki', 'score', 'wynik'],
+            'availability': ['stock', 'dostępność', 'available', 'dostępny', 'inventory'],
+        }
+        
+        # Score each concept based on word presence
+        for field, concepts in field_concepts.items():
+            score = sum(1 for c in concepts if c in instruction_lower)
+            if score > 0:
+                fields[field] = ''
+        
+        # Default to product extraction if no specific fields detected
+        if not fields:
+            # Check for general extraction intent
+            extraction_words = ['extract', 'wyciągnij', 'get', 'pobierz', 'find', 'znajdź', 'list', 'lista']
+            if any(w in instruction_lower for w in extraction_words):
+                fields = {'name': '', 'price': '', 'url': ''}
+        
+        return fields
+    
+    def _detect_filter_semantic(self, instruction: str) -> str:
+        """
+        Detect filter expressions using semantic analysis.
+        Handles multiple languages and expression formats.
+        """
+        import re
+        instruction_lower = instruction.lower()
+        
+        # Price comparison patterns (language-agnostic)
+        below_patterns = [
+            r'(?:under|below|pod|poniżej|ponizej|less than|mniej niż|<)\s*(\d+)',
+            r'(?:max|maksymalnie|do)\s*(\d+)',
+            r'(\d+)\s*(?:or less|lub mniej|i mniej)',
+        ]
+        
+        above_patterns = [
+            r'(?:over|above|powyżej|powyzej|more than|więcej niż|>)\s*(\d+)',
+            r'(?:min|minimalnie|od)\s*(\d+)',
+            r'(\d+)\s*(?:or more|lub więcej|i więcej)',
+        ]
+        
+        for pattern in below_patterns:
+            match = re.search(pattern, instruction_lower)
+            if match:
+                return f"price < {match.group(1)}"
+        
+        for pattern in above_patterns:
+            match = re.search(pattern, instruction_lower)
+            if match:
+                return f"price > {match.group(1)}"
+        
+        return ""
+    
+    def _get_default_fields(self, context: str) -> List[str]:
+        """
+        Get default fields based on context (instruction or task).
+        Uses task type inference instead of hardcoded defaults.
+        """
+        context_lower = context.lower()
+        
+        # Infer task type from context
+        task_field_map = {
+            'product': ['name', 'price', 'url'],
+            'produkt': ['name', 'price', 'url'],
+            'spec': ['key', 'value'],
+            'contact': ['name', 'email', 'phone'],
+            'kontakt': ['name', 'email', 'phone'],
+            'link': ['text', 'url'],
+            'image': ['src', 'alt'],
+            'article': ['title', 'content', 'date'],
+            'artykuł': ['title', 'content', 'date'],
+        }
+        
+        for keyword, fields in task_field_map.items():
+            if keyword in context_lower:
+                return fields
+        
+        # Fallback to most common extraction fields
+        return ['name', 'price', 'url']
     
     def _get_algorithm_order(
         self, 

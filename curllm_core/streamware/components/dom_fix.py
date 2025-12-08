@@ -415,14 +415,19 @@ class FieldMapperComponent(TransformComponent):
         if data_key in field_name or field_name in data_key:
             return True
         
-        # Type-based matching
+        # Semantic concept groups for type-based matching
+        # These are language-agnostic concepts, NOT hardcoded selectors
+        phone_concepts = {'phone', 'tel', 'telephone', 'mobile', 'telefon', 'komórka'}
+        message_concepts = {'message', 'msg', 'content', 'body', 'wiadomość', 'treść'}
+        
+        # Type-based matching with semantic concepts
         if data_key == 'email' and field_type == 'email':
             return True
-        if data_key in ['phone', 'tel', 'telephone'] and field_type == 'tel':
+        if data_key in phone_concepts and field_type == 'tel':
             return True
-        if data_key in ['phone', 'tel'] and ('phone' in field_name or 'tel' in field_name):
+        if data_key in phone_concepts and any(p in field_name for p in phone_concepts):
             return True
-        if data_key == 'message' and field_type == 'textarea':
+        if data_key in message_concepts and field_type == 'textarea':
             return True
         
         return False

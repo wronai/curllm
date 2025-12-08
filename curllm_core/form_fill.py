@@ -72,7 +72,15 @@ async def _robust_fill_field(page, selector: str, value: str) -> bool:
         return False
 
 
-async def deterministic_form_fill(instruction: str, page, run_logger=None, domain_dir: Optional[str] = None) -> Optional[Dict[str, Any]]:
+async def deterministic_form_fill(instruction: str, page, run_logger=None, domain_dir: Optional[str] = None, llm=None) -> Optional[Dict[str, Any]]:
+    """
+    Fill form using LLM-driven field detection.
+    
+    Architecture:
+    1. LLM generates field concepts dynamically (if available)
+    2. Field concepts are passed to JavaScript for DOM matching
+    3. Fallback to default concepts if LLM unavailable
+    """
     try:
         # Priority: instruction > window.__curllm_canonical
         # First, get values from window.__curllm_canonical (from tool args)
@@ -80,27 +88,44 @@ async def deterministic_form_fill(instruction: str, page, run_logger=None, domai
         try:
             cc = await page.evaluate("() => (window.__curllm_canonical||null)")
             if isinstance(cc, dict):
-                for k in ["name","email","subject","phone","message"]:
-                    v = cc.get(k)
+                # Use dynamic field detection from known canonical fields
+                for k, v in cc.items():
                     if isinstance(v, str) and v.strip():
                         canonical[k] = v.strip()
         except Exception:
             pass
         
+        # Generate field concepts with LLM (or use defaults)
+        try:
+            from curllm_core.form_fill.js_scripts import generate_field_concepts_with_llm, get_default_field_concepts
+            if llm:
+                field_concepts = await generate_field_concepts_with_llm(page, llm)
+                if run_logger:
+                    run_logger.log_text("🤖 Using LLM-generated field concepts")
+            else:
+                field_concepts = get_default_field_concepts()
+        except Exception:
+            # Fallback to inline defaults
+            field_concepts = {
+                "email": ["email", "e-mail", "mail", "correo", "poczta"],
+                "name": ["name", "imi", "nazw", "full name", "fullname", "first name", "last name", "nombre"],
+                "message": ["message", "wiadomo", "treść", "tresc", "content", "komentarz", "mensaje"],
+                "subject": ["subject", "temat", "asunto", "topic"],
+                "phone": ["phone", "telefon", "tel", "mobile", "celular", "komórka"],
+            }
+        
         # Then parse instruction and OVERWRITE canonical (instruction has priority)
         raw_pairs = parse_form_pairs(instruction)
         for k, v in raw_pairs.items():
             lk = k.lower()
-            if any(x in lk for x in ["email", "e-mail", "mail"]):
-                canonical["email"] = v
-            elif any(x in lk for x in ["name", "imi", "nazw", "full name", "fullname", "first name", "last name"]):
-                canonical["name"] = v
-            elif any(x in lk for x in ["message", "wiadomo", "treść", "tresc", "content", "komentarz"]):
-                canonical["message"] = v
-            elif any(x in lk for x in ["subject", "temat"]):
-                canonical["subject"] = v
-            elif any(x in lk for x in ["phone", "telefon", "tel"]):
-                canonical["phone"] = v
+            # Use semantic matching to determine field type
+            matched_field = None
+            for field, concepts in field_concepts.items():
+                if any(x in lk for x in concepts):
+                    matched_field = field
+                    break
+            if matched_field:
+                canonical[matched_field] = v
 
         # Mark target fields in DOM and obtain stable selectors
         selectors = await page.evaluate(

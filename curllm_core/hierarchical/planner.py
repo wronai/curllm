@@ -313,21 +313,24 @@ def extract_tactical_form_context(page_context: Dict[str, Any]) -> Dict[str, Any
         required_fields = []
         has_submit = False
         
+        # Semantic concept groups for field detection (language-agnostic)
+        field_concepts = {
+            "name": ["name", "imie", "nazwisko", "fullname", "nombre", "first", "last"],
+            "email": ["email", "mail", "e-mail", "correo", "poczta"],
+            "subject": ["subject", "temat", "asunto", "topic"],
+            "phone": ["phone", "tel", "telefon", "mobile", "celular"],
+            "message": ["message", "wiadomosc", "textarea", "content", "body", "komentarz"],
+        }
+        
         for field in form.get("fields", []):
             field_name = (field.get("name") or "").lower()
             field_type = (field.get("type") or "").lower()
             
-            # Detect canonical fields
-            if any(kw in field_name for kw in ["name", "imie", "nazwisko"]):
-                field_summary["name"] = True
-            elif any(kw in field_name for kw in ["email", "mail"]):
-                field_summary["email"] = True
-            elif any(kw in field_name for kw in ["subject", "temat"]):
-                field_summary["subject"] = True
-            elif any(kw in field_name for kw in ["phone", "tel"]):
-                field_summary["phone"] = True
-            elif any(kw in field_name for kw in ["message", "wiadomosc", "textarea"]):
-                field_summary["message"] = True
+            # Detect canonical fields using semantic concepts
+            for canonical_field, concepts in field_concepts.items():
+                if any(kw in field_name for kw in concepts):
+                    field_summary[canonical_field] = True
+                    break
             
             if field_type == "submit":
                 has_submit = True
@@ -441,18 +444,21 @@ def generate_tactical_prompt(tactical_ctx: Dict[str, Any], instruction: str, str
                 if not field_visible or field_type in ["hidden", "submit"]:
                     continue  # Skip hidden and submit fields
                 
-                # Map to canonical names
+                # Semantic concept groups for field mapping (language-agnostic)
+                field_concepts = {
+                    "name": ["name", "imie", "nazwisko", "full", "nombre", "first", "last"],
+                    "email": ["email", "mail", "e-mail", "correo", "poczta"],
+                    "subject": ["subject", "temat", "asunto", "topic"],
+                    "phone": ["phone", "tel", "telefon", "mobile", "celular"],
+                    "message": ["message", "wiadomosc", "textarea", "tresc", "body", "komentarz"],
+                }
+                
+                # Map to canonical names using semantic concepts
                 canonical = None
-                if any(kw in field_name for kw in ["name", "imie", "nazwisko", "full"]):
-                    canonical = "name"
-                elif any(kw in field_name for kw in ["email", "mail"]):
-                    canonical = "email"
-                elif any(kw in field_name for kw in ["subject", "temat"]):
-                    canonical = "subject"
-                elif any(kw in field_name for kw in ["phone", "tel", "telefon"]):
-                    canonical = "phone"
-                elif any(kw in field_name for kw in ["message", "wiadomosc", "textarea", "tresc"]):
-                    canonical = "message"
+                for field_type_name, concepts in field_concepts.items():
+                    if any(kw in field_name for kw in concepts):
+                        canonical = field_type_name
+                        break
                 
                 if canonical:
                     required = f.get("required", False)

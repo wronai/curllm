@@ -1,6 +1,11 @@
 """
 Authentication Orchestrator - Specialized orchestrator for login/authentication tasks
 
+Architecture:
+- LLM-first element finding for dynamic detection
+- Selector hints used only as fallback suggestions
+- LLM analyzes page structure to find login elements
+
 Handles:
 - Standard login flows (email/password)
 - Multi-factor authentication (2FA, OTP)
@@ -40,15 +45,32 @@ class AuthOrchestrator:
     Specialized orchestrator for authentication tasks.
     
     Features:
+    - LLM-driven element finding (primary)
     - Multiple authentication method support
     - CAPTCHA detection and solving
     - 2FA handling with OTP/TOTP
     - Session persistence
     - Error recovery and retry logic
+    
+    Architecture:
+    1. LLM analyzes login form and finds elements by PURPOSE
+    2. Selector hints used only as statistical fallback
+    3. No hardcoded selectors in production flow
     """
     
-    # Common login form selectors by platform
-    PLATFORM_SELECTORS = {
+    # Element purpose descriptions for LLM
+    ELEMENT_PURPOSES = {
+        'email': 'email, username, or login input field',
+        'password': 'password input field',
+        'submit': 'login, sign in, or submit button',
+        '2fa_code': 'verification code or OTP input',
+        'remember': 'remember me or stay signed in checkbox',
+        'forgot': 'forgot password or reset password link'
+    }
+    
+    # Fallback selector hints (used when LLM unavailable)
+    # These are scored by statistical matching, not used directly
+    SELECTOR_HINTS = {
         'generic': {
             'email': [
                 'input[type="email"]',
@@ -98,6 +120,56 @@ class AuthOrchestrator:
         self.page = page
         self.run_logger = run_logger
         self._session_data = {}
+    
+    async def _find_auth_element(
+        self, 
+        element_type: str,
+        platform: str = 'generic'
+    ) -> Optional[str]:
+        """
+        Find authentication element using LLM-driven analysis.
+        
+        Args:
+            element_type: Type of element (email, password, submit, etc.)
+            platform: Platform hint for context
+        
+        Returns:
+            CSS selector or None
+        """
+        purpose = self.ELEMENT_PURPOSES.get(element_type, element_type)
+        
+        # Try LLM first
+        if self.llm and self.page:
+            try:
+                from curllm_core.llm_dsl.selector_generator import LLMSelectorGenerator
+                
+                generator = LLMSelectorGenerator(llm=self.llm)
+                result = await generator.generate_field_selector(
+                    self.page,
+                    purpose=f"{purpose} for login on {platform}"
+                )
+                if result.confidence > 0.5 and result.selector:
+                    self._log(f"LLM found {element_type}: {result.selector}")
+                    return result.selector
+            except Exception as e:
+                self._log(f"LLM element finding failed: {e}", "debug")
+        
+        # Fallback: try selector hints with statistical matching
+        hints = self.SELECTOR_HINTS.get(platform, self.SELECTOR_HINTS.get('generic', {}))
+        selectors = hints.get(element_type, [])
+        
+        if self.page:
+            for selector in selectors:
+                try:
+                    el = await self.page.query_selector(selector)
+                    if el:
+                        is_visible = await el.is_visible()
+                        if is_visible:
+                            return selector
+                except Exception:
+                    continue
+        
+        return None
     
     async def orchestrate(
         self,

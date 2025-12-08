@@ -275,19 +275,25 @@ async def orchestrate_form_fill(
                     has_data = True
                     break
                 
-                # Type-based matching
-                if data_key == 'email' and field_type == 'email':
+                # Semantic concept groups for type-based matching
+                email_concepts = {'email', 'mail', 'e-mail'}
+                message_concepts = {'message', 'msg', 'content', 'body', 'text'}
+                name_first_concepts = {'first', 'firstname', 'fname', 'imię'}
+                name_last_concepts = {'last', 'lastname', 'lname', 'nazwisko', 'surname'}
+                
+                # Type-based matching with semantic concepts
+                if data_key_lower in email_concepts and field_type == 'email':
                     has_data = True
                     break
-                if data_key == 'message' and (rf['tag'] == 'textarea' or field_type == 'textarea'):
+                if data_key_lower in message_concepts and (rf['tag'] == 'textarea' or field_type == 'textarea'):
                     has_data = True
                     break
                 
-                # First/Last name matching
-                if data_key == 'first_name' and 'first' in field_name_lower:
+                # First/Last name matching with semantic concepts
+                if data_key_lower in name_first_concepts and any(c in field_name_lower for c in name_first_concepts):
                     has_data = True
                     break
-                if data_key == 'last_name' and 'last' in field_name_lower:
+                if data_key_lower in name_last_concepts and any(c in field_name_lower for c in name_last_concepts):
                     has_data = True
                     break
         
