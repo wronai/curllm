@@ -6,9 +6,6 @@ from ..registry import register, create_component
 from ..exceptions import ComponentError
 from ...diagnostics import get_logger
 
-from .split import split
-from .join import join
-
 @register("join")
 class JoinComponent(Component):
     """

@@ -1,4 +1,6 @@
-from typing import Any, List, Callable, Optional, Iterator
+from __future__ import annotations
+
+from typing import Any, List, Callable, Optional, Iterator, TYPE_CHECKING
 import json
 from ..core import Component, StreamComponent
 from ..uri import StreamwareURI
@@ -6,8 +8,8 @@ from ..registry import register, create_component
 from ..exceptions import ComponentError
 from ...diagnostics import get_logger
 
-from .multicast_component import MulticastComponent
-from .join import join
+if TYPE_CHECKING:
+    from .multicast_component import MulticastComponent
 
 def multicast(destinations: List[str]) -> MulticastComponent:
     """

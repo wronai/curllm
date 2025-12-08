@@ -6,9 +6,6 @@ from ..registry import register, create_component
 from ..exceptions import ComponentError
 from ...diagnostics import get_logger
 
-from .split import split
-from .choose import choose
-
 @register("choose")
 class ChooseComponent(Component):
     """
