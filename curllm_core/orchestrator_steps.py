@@ -314,8 +314,32 @@ class StepExecutor:
         """Verify page state for success/error indicators"""
         expected = params.get("expected", "")
         strict = params.get("strict", False)
+        verify_type = params.get("verify_type", "submit")  # "submit" or "find"
         
         content = await self.page.evaluate("() => document.body.innerText.toLowerCase()")
+        
+        # For "find" operations, just check if we found expected content
+        if expected in ["form_fields", "forms"] or verify_type == "find":
+            # For find operations, check if the expected content type is present
+            has_form = "formularz" in content or "form" in content or "kontakt" in content
+            has_inputs = await self.page.evaluate("""
+                () => document.querySelectorAll('input, textarea').length > 0
+            """)
+            
+            is_verified = has_form or has_inputs
+            
+            self._log("step", f"  📋 Verification (find mode):")
+            self._log("step", f"     Has form indicators: {has_form}")
+            self._log("step", f"     Has input fields: {has_inputs}")
+            self._log("step", f"     Result: {'✅ VERIFIED' if is_verified else '⚠️ NOT VERIFIED'}")
+            
+            return {
+                "verified": is_verified,
+                "has_form": has_form,
+                "has_inputs": has_inputs,
+                "reason": "found_content" if is_verified else "content_not_found",
+                "expected": expected
+            }
         
         # Success indicators (PL + EN)
         success_indicators = [

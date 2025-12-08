@@ -29,6 +29,7 @@ from curllm_core.url_patterns import (
     GOAL_KEYWORDS, GOAL_URL_PATTERNS,
     detect_goal_from_instruction,
 )
+from curllm_core import dom_helpers
 
 logger = logging.getLogger(__name__)
 
@@ -342,7 +343,36 @@ Respond with just the href value of the best matching link, or "none" if no matc
         return None
     
     async def find_url_for_goal(self, goal: TaskGoal) -> Optional[str]:
-        """Find URL for any goal type"""
+        """
+        Find URL for any goal type using atomic DOM helpers.
+        
+        Delegates to dom_helpers.find_link_for_goal which uses multiple strategies:
+        - Text keyword matching
+        - URL pattern matching
+        - Aria label matching
+        - Location-based scoring
+        """
+        if not self.page:
+            return None
+        
+        # Use atomic helper for link discovery
+        try:
+            link = await dom_helpers.find_link_for_goal(
+                self.page, 
+                goal.value,
+                base_url=self.page.url if self.page else None
+            )
+            if link:
+                self._log(f"Found link via dom_helpers: {link.url} (score: {link.score:.1f})")
+                return link.url
+        except Exception as e:
+            logger.debug(f"dom_helpers.find_link_for_goal failed: {e}")
+        
+        # Fallback to legacy pattern matching if dom_helpers fails
+        return await self._legacy_find_url_for_goal(goal)
+    
+    async def _legacy_find_url_for_goal(self, goal: TaskGoal) -> Optional[str]:
+        """Legacy fallback: Find URL using hardcoded patterns (deprecated)"""
         
         # Define patterns and keywords for each goal
         goal_patterns = {
@@ -669,42 +699,26 @@ Respond with just the href value of the best matching link, or "none" if no matc
         )
     
     async def _analyze_page_match(self, instruction: str) -> PageMatchResult:
-        """Analyze if current page content matches user intent"""
+        """
+        Analyze if current page content matches user intent.
         
+        Uses atomic DOM helpers for page type detection and search discovery.
+        """
         if not self.page:
             return PageMatchResult(matches_intent=False, confidence=0, reasoning="No page available")
         
         try:
-            # Get page info
+            # Use atomic helper for page analysis
+            page_analysis = await dom_helpers.analyze_page_type(self.page)
+            
+            # Find search input using atomic helper
+            search_input = await dom_helpers.find_search_input(self.page)
+            
+            # Get additional page data (text content, categories)
             page_data = await self.page.evaluate("""
                 () => {
                     const body = document.body;
-                    const text = body ? body.innerText.slice(0, 10000) : '';
-                    
-                    // Count product-like elements
-                    const productSelectors = [
-                        '.product', '.offer', '.item', '[data-product]',
-                        '.product-card', '.product-item', '.produkt'
-                    ];
-                    let productCount = 0;
-                    productSelectors.forEach(sel => {
-                        productCount += document.querySelectorAll(sel).length;
-                    });
-                    
-                    // Find search input
-                    const searchSelectors = [
-                        'input[type="search"]', 'input[name="q"]', 'input[name="search"]',
-                        'input[placeholder*="szukaj" i]', 'input[placeholder*="search" i]',
-                        '#search', '.search-input'
-                    ];
-                    let searchInput = null;
-                    for (const sel of searchSelectors) {
-                        const el = document.querySelector(sel);
-                        if (el && el.offsetParent !== null) {
-                            searchInput = sel;
-                            break;
-                        }
-                    }
+                    const text = body ? body.innerText.slice(0, 3000) : '';
                     
                     // Find category links
                     const links = Array.from(document.querySelectorAll('a[href]'));
@@ -723,19 +737,13 @@ Respond with just the href value of the best matching link, or "none" if no matc
                         }));
                     
                     return {
-                        title: document.title,
-                        url: location.href,
-                        textPreview: text.slice(0, 3000),
-                        productCount: productCount,
-                        searchSelector: searchInput,
-                        categoryLinks: categoryLinks,
-                        hasSearchForm: !!searchInput
+                        textPreview: text,
+                        categoryLinks: categoryLinks
                     };
                 }
             """)
             
             # Analyze with keywords
-            instr_lower = instruction.lower()
             text_lower = page_data.get('textPreview', '').lower()
             
             # Extract key terms from instruction
@@ -745,22 +753,14 @@ Respond with just the href value of the best matching link, or "none" if no matc
             matches = sum(1 for term in key_terms if term.lower() in text_lower)
             match_ratio = matches / len(key_terms) if key_terms else 0
             
-            product_count = page_data.get('productCount', 0)
+            # Use stats from page_analysis
+            stats = page_analysis.get('stats', {})
+            product_count = stats.get('products', 0)
+            page_type = page_analysis.get('type', 'other')
+            base_confidence = page_analysis.get('confidence', 0.3)
             
-            # Determine page type
-            if product_count > 5:
-                page_type = "category"
-            elif product_count > 0:
-                page_type = "product"
-            elif "search" in page_data.get('url', '').lower() or "wynik" in text_lower:
-                page_type = "search_results"
-            elif page_data.get('url', '').rstrip('/').endswith(urlparse(page_data.get('url', '')).hostname):
-                page_type = "home"
-            else:
-                page_type = "other"
-            
-            # Calculate confidence
-            confidence = min(1.0, match_ratio * 0.5 + (0.3 if product_count > 0 else 0) + (0.2 if matches > 2 else 0))
+            # Calculate combined confidence
+            confidence = min(1.0, base_confidence * 0.6 + match_ratio * 0.4)
             
             # Determine if it matches
             matches_intent = (
@@ -774,11 +774,11 @@ Respond with just the href value of the best matching link, or "none" if no matc
                 confidence=confidence,
                 found_items=product_count,
                 page_type=page_type,
-                search_available=page_data.get('hasSearchForm', False),
-                search_selector=page_data.get('searchSelector'),
+                search_available=search_input is not None,
+                search_selector=search_input.selector if search_input else None,
                 categories_found=page_data.get('categoryLinks', []),
                 suggested_search_term=key_terms[0] if key_terms else None,
-                reasoning=f"Found {product_count} products, {matches}/{len(key_terms)} keywords matched"
+                reasoning=f"Page type: {page_type}, {product_count} products, {matches}/{len(key_terms)} keywords matched"
             )
             
         except Exception as e:
@@ -866,61 +866,27 @@ Search term:"""
         return unique[:5]
     
     async def _try_search_navigation(self, search_term: str) -> bool:
-        """Try to use site search to find content"""
+        """
+        Try to use site search to find content using atomic DOM helpers.
         
+        Uses dom_helpers.execute_search which handles:
+        - Finding search input via multiple strategies
+        - Filling and submitting the form
+        - Handling both Enter key and button click submission
+        """
         if not self.page:
             return False
         
         try:
-            # Find search input
-            search_input = None
-            for selector in SEARCH_SELECTORS:
-                try:
-                    el = await self.page.query_selector(selector)
-                    if el and await el.is_visible():
-                        search_input = el
-                        break
-                except Exception:
-                    continue
+            # Use atomic helper for search
+            success = await dom_helpers.execute_search(self.page, search_term)
             
-            if not search_input:
-                self._log("No search input found")
-                return False
-            
-            # Clear and fill search
-            await search_input.fill("")
-            await search_input.fill(search_term)
-            await self.page.wait_for_timeout(500)
-            
-            # Try to submit
-            submitted = False
-            
-            # Try Enter key first
-            try:
-                await search_input.press("Enter")
-                await self.page.wait_for_load_state("domcontentloaded", timeout=10000)
-                submitted = True
-            except Exception:
-                pass
-            
-            # Try clicking search button if Enter didn't work
-            if not submitted:
-                for selector in SEARCH_SUBMIT_SELECTORS:
-                    try:
-                        btn = await self.page.query_selector(selector)
-                        if btn and await btn.is_visible():
-                            await btn.click()
-                            await self.page.wait_for_load_state("domcontentloaded", timeout=10000)
-                            submitted = True
-                            break
-                    except Exception:
-                        continue
-            
-            if submitted:
+            if success:
                 self._log(f"Search submitted: {search_term}")
                 return True
-            
-            return False
+            else:
+                self._log("No search input found or search failed")
+                return False
             
         except Exception as e:
             self._log(f"Search navigation failed: {e}", "error")
