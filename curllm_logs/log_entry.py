@@ -209,7 +209,7 @@ class ResultInfo:
                 "type": self.error_type,
             } if self.error_message else None,
             "files": {
-                "screenshots": self.screenshots,
+                "screenshots": [s.to_dict() if hasattr(s, 'to_dict') else s for s in self.screenshots],
                 "downloads": self.downloads,
             },
         }

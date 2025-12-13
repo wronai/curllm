@@ -118,11 +118,16 @@ async def main():
         return 0
     
     # Create config
+    # Resolve log_dir relative to current working directory (not script location)
+    log_dir = args.log_dir
+    if not os.path.isabs(log_dir):
+        log_dir = os.path.join(os.getcwd(), log_dir)
+    
     config = OrchestratorConfig(
         headless=not args.visible,
         stealth_mode=not args.no_stealth,
         timeout_seconds=args.timeout,
-        log_dir=args.log_dir,
+        log_dir=log_dir,
         dry_run=args.dry_run
     )
     

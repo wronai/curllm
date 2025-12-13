@@ -141,7 +141,7 @@ class LogSession:
             "steps": [s.to_dict() for s in self.steps],
             "domains_visited": self.domains_visited,
             "urls_visited": self.urls_visited,
-            "screenshots": self.screenshots,
+            "screenshots": [s.to_dict() if hasattr(s, 'to_dict') else s for s in self.screenshots],
             "result": self.result.to_dict() if self.result else None,
             "entries": [e.to_dict() for e in self.entries],
         }

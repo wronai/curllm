@@ -1014,7 +1014,7 @@ run_orchestrator() {
     fi
     
     # Run the orchestrator
-    cd "$SCRIPT_DIR"
+    # cd "$SCRIPT_DIR"  <-- Removed to preserve CWD
     python3 -m curllm_core.cli_orchestrator "${ORCH_ARGS[@]}" "$command"
     return $?
 }

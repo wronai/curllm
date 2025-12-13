@@ -2,17 +2,17 @@
 HARDCODED VALUES ANALYSIS REPORT
 ================================================================================
 
-Total files with hardcoded values: 155
-Total findings: 1854
-  - High severity: 201
+Total files with hardcoded values: 174
+Total findings: 1899
+  - High severity: 217
   - Medium severity: 2
-  - Low severity: 1651
+  - Low severity: 1680
 
 FINDINGS BY TYPE:
 ----------------------------------------
-  label: 890 occurrences
-  selector: 766 occurrences
-  xpath: 145 occurrences
+  label: 902 occurrences
+  selector: 783 occurrences
+  xpath: 161 occurrences
   url: 51 occurrences
   regex: 2 occurrences
 
@@ -24,20 +24,20 @@ TOP 20 FILES TO REFACTOR (by score):
    4. curllm_core/orchestrators/auth.py (score: 60, findings: 60)
    5. curllm_core/form_fill/filler.py (score: 57, findings: 57)
    6. curllm_core/proxy.py (score: 45, findings: 15)
-   7. curllm_core/streamware/components/form/smart_orchestrator.py (score: 45, findings: 45)
+   7. curllm_core/streamware/components/form/smart_orchestrator/smart_form_orchestrator.py (score: 45, findings: 45)
    8. curllm_core/extraction/extractor.py (score: 45, findings: 45)
-   9. curllm_core/dsl/executor.py (score: 43, findings: 39)
+   9. curllm_core/dsl/executor.py (score: 44, findings: 40)
   10. curllm_core/streamware/components/form/orchestrator.py (score: 41, findings: 41)
   11. curllm_core/hierarchical/planner.py (score: 39, findings: 39)
   12. curllm_core/streamware/components/currency/translator.py (score: 38, findings: 36)
   13. curllm_core/dynamic/selectors.py (score: 38, findings: 38)
-  14. curllm_core/iterative_extractor.py (score: 33, findings: 29)
-  15. curllm_core/orchestrators/ecommerce.py (score: 32, findings: 32)
-  16. curllm_core/streamware/components/dom_fix.py (score: 31, findings: 23)
-  17. curllm_core/element_finder/finder.py (score: 31, findings: 31)
-  18. curllm_core/orchestrators/form.py (score: 31, findings: 31)
-  19. curllm_core/streamware/flow.py (score: 30, findings: 10)
-  20. curllm_core/streamware/components/captcha/solve.py (score: 30, findings: 14)
+  14. curllm_core/planning/planner.py (score: 35, findings: 35)
+  15. curllm_core/iterative_extractor.py (score: 33, findings: 29)
+  16. curllm_core/orchestrators/ecommerce.py (score: 32, findings: 32)
+  17. curllm_core/streamware/components/dom_fix.py (score: 31, findings: 23)
+  18. curllm_core/element_finder/finder/llm_element_finder/llm_element_finder.py (score: 31, findings: 31)
+  19. curllm_core/orchestrators/form.py (score: 31, findings: 31)
+  20. curllm_core/streamware/flow.py (score: 30, findings: 10)
 
 HIGH SEVERITY FINDINGS:
 ----------------------------------------
@@ -72,87 +72,87 @@ HIGH SEVERITY FINDINGS:
   Value: querySelectorAll('.forminator-error-message, .wpcf7-not-valid-tip, .error-messag...
   Suggestion: Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection
 
-  File: curllm_core/orchestrators/social.py:58
+  File: curllm_core/orchestrators/social.py:69
   Type: url
   Value: https://facebook.com/login...
   Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
 
-  File: curllm_core/orchestrators/social.py:58
+  File: curllm_core/orchestrators/social.py:69
   Type: xpath
   Value: //facebook.com/login'...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/orchestrators/social.py:66
+  File: curllm_core/orchestrators/social.py:77
   Type: url
   Value: https://twitter.com/login...
   Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
 
-  File: curllm_core/orchestrators/social.py:66
+  File: curllm_core/orchestrators/social.py:77
   Type: xpath
   Value: //twitter.com/login'...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/orchestrators/social.py:74
+  File: curllm_core/orchestrators/social.py:85
   Type: url
   Value: https://linkedin.com/login...
   Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
 
-  File: curllm_core/orchestrators/social.py:74
+  File: curllm_core/orchestrators/social.py:85
   Type: xpath
   Value: //linkedin.com/login'...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/orchestrators/social.py:567
+  File: curllm_core/orchestrators/social.py:578
   Type: selector
   Value: querySelector('.h-captcha, [data-hcaptcha-sitekey]'...
   Suggestion: Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection
 
-  File: curllm_core/orchestrators/social.py:613
+  File: curllm_core/orchestrators/social.py:624
   Type: url
   Value: https://twitter.com/...
   Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
 
-  File: curllm_core/orchestrators/social.py:613
+  File: curllm_core/orchestrators/social.py:624
   Type: xpath
   Value: //twitter.com/...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/orchestrators/social.py:614
+  File: curllm_core/orchestrators/social.py:625
   Type: url
   Value: https://instagram.com/...
   Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
 
-  File: curllm_core/orchestrators/social.py:614
+  File: curllm_core/orchestrators/social.py:625
   Type: xpath
   Value: //instagram.com/...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/orchestrators/social.py:615
+  File: curllm_core/orchestrators/social.py:626
   Type: url
   Value: https://facebook.com/...
   Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
 
-  File: curllm_core/orchestrators/social.py:615
+  File: curllm_core/orchestrators/social.py:626
   Type: xpath
   Value: //facebook.com/...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/orchestrators/social.py:616
+  File: curllm_core/orchestrators/social.py:627
   Type: url
   Value: https://linkedin.com/in/...
   Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
 
-  File: curllm_core/orchestrators/social.py:616
+  File: curllm_core/orchestrators/social.py:627
   Type: xpath
   Value: //linkedin.com/in/...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/orchestrators/social.py:617
+  File: curllm_core/orchestrators/social.py:628
   Type: url
   Value: https://tiktok.com/...
   Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
 
-  File: curllm_core/orchestrators/social.py:617
+  File: curllm_core/orchestrators/social.py:628
   Type: xpath
   Value: //tiktok.com/@...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
@@ -232,12 +232,12 @@ HIGH SEVERITY FINDINGS:
   Value: //..."...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/dsl/executor.py:702
+  File: curllm_core/dsl/executor.py:720
   Type: xpath
   Value: //i...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/dsl/executor.py:1011
+  File: curllm_core/dsl/executor.py:1029
   Type: selector
   Value: querySelectorAll(':scope > span, :scope > strong, :scope > b, :scope > em'...
   Suggestion: Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection
@@ -277,52 +277,52 @@ HIGH SEVERITY FINDINGS:
   Value: //map...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/streamware/flow.py:22
+  File: curllm_core/streamware/flow.py:23
   Type: url
   Value: http://api.example.com/data...
   Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
 
-  File: curllm_core/streamware/flow.py:22
+  File: curllm_core/streamware/flow.py:23
   Type: xpath
   Value: //api.example.com/data")...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/streamware/flow.py:22
+  File: curllm_core/streamware/flow.py:23
   Type: xpath
   Value: //json"...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/streamware/flow.py:22
+  File: curllm_core/streamware/flow.py:23
   Type: xpath
   Value: //write"...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/streamware/flow.py:26
+  File: curllm_core/streamware/flow.py:27
   Type: xpath
   Value: //consume...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/streamware/flow.py:26
+  File: curllm_core/streamware/flow.py:27
   Type: xpath
   Value: //json"...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/streamware/flow.py:245
+  File: curllm_core/streamware/flow.py:250
   Type: url
   Value: http://api.example.com/data...
   Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
 
-  File: curllm_core/streamware/flow.py:245
+  File: curllm_core/streamware/flow.py:250
   Type: xpath
   Value: //api.example.com/data")...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/streamware/flow.py:245
+  File: curllm_core/streamware/flow.py:250
   Type: xpath
   Value: //json"...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/streamware/flow.py:245
+  File: curllm_core/streamware/flow.py:250
   Type: xpath
   Value: //write"...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
@@ -377,51 +377,6 @@ HIGH SEVERITY FINDINGS:
   Value: querySelector('.wpcf7-mail-sent-ok, .success-message, .elementor-message-success...
   Suggestion: Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection
 
-  File: curllm_core/hierarchical_planner_v2.py:156
-  Type: xpath
-  Value: //capture...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/hierarchical_planner_v2.py:174
-  Type: xpath
-  Value: //extract...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/hierarchical_planner_v2.py:184
-  Type: xpath
-  Value: //decide...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/hierarchical_planner_v2.py:230
-  Type: xpath
-  Value: //check...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/hierarchical_planner_v2.py:284
-  Type: xpath
-  Value: //map...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/hierarchical_planner_v2.py:291
-  Type: xpath
-  Value: //capture'...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/hierarchical_planner_v2.py:292
-  Type: xpath
-  Value: //extract'...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/hierarchical_planner_v2.py:293
-  Type: xpath
-  Value: //map'...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
-  File: curllm_core/hierarchical_planner_v2.py:294
-  Type: xpath
-  Value: //decide'...
-  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
-
   File: curllm_core/llm_factory.py:59
   Type: xpath
   Value: //docs.litellm.ai/docs/providers...
@@ -465,6 +420,51 @@ HIGH SEVERITY FINDINGS:
   File: curllm_core/llm_factory.py:359
   Type: xpath
   Value: //docs.litellm.ai/docs/providers...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/deprecated/hierarchical_planner_v2.py:156
+  Type: xpath
+  Value: //capture...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/deprecated/hierarchical_planner_v2.py:174
+  Type: xpath
+  Value: //extract...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/deprecated/hierarchical_planner_v2.py:184
+  Type: xpath
+  Value: //decide...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/deprecated/hierarchical_planner_v2.py:230
+  Type: xpath
+  Value: //check...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/deprecated/hierarchical_planner_v2.py:284
+  Type: xpath
+  Value: //map...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/deprecated/hierarchical_planner_v2.py:291
+  Type: xpath
+  Value: //capture'...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/deprecated/hierarchical_planner_v2.py:292
+  Type: xpath
+  Value: //extract'...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/deprecated/hierarchical_planner_v2.py:293
+  Type: xpath
+  Value: //map'...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/deprecated/hierarchical_planner_v2.py:294
+  Type: xpath
+  Value: //decide'...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
   File: curllm_core/streamware/components/decision.py:22
@@ -512,32 +512,32 @@ HIGH SEVERITY FINDINGS:
   Value: //api.example.com/endpoint...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/streamware/components/web.py:110
+  File: curllm_core/streamware/components/web.py:111
   Type: url
   Value: https://example.com...
   Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
 
-  File: curllm_core/streamware/components/web.py:110
+  File: curllm_core/streamware/components/web.py:111
   Type: xpath
   Value: //get...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/streamware/components/web.py:110
+  File: curllm_core/streamware/components/web.py:111
   Type: xpath
   Value: //example.com...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/streamware/components/web.py:111
+  File: curllm_core/streamware/components/web.py:112
   Type: url
   Value: https://api.example.com/data...
   Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
 
-  File: curllm_core/streamware/components/web.py:111
+  File: curllm_core/streamware/components/web.py:112
   Type: xpath
   Value: //post...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/streamware/components/web.py:111
+  File: curllm_core/streamware/components/web.py:112
   Type: xpath
   Value: //api.example.com/data...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
@@ -582,42 +582,42 @@ HIGH SEVERITY FINDINGS:
   Value: //2captcha.com/res.php...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/streamware/components/curllm.py:25
+  File: curllm_core/streamware/components/curllm.py:27
   Type: url
   Value: https://example.com...
   Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
 
-  File: curllm_core/streamware/components/curllm.py:25
+  File: curllm_core/streamware/components/curllm.py:27
   Type: xpath
   Value: //action...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/streamware/components/curllm.py:25
+  File: curllm_core/streamware/components/curllm.py:27
   Type: xpath
   Value: //example.com...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/streamware/components/curllm.py:286
+  File: curllm_core/streamware/components/curllm.py:278
   Type: xpath
   Value: //action...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/streamware/components/curllm.py:329
+  File: curllm_core/streamware/components/curllm.py:321
   Type: xpath
   Value: //browse...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/streamware/components/curllm.py:353
+  File: curllm_core/streamware/components/curllm.py:345
   Type: xpath
   Value: //extract...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/streamware/components/curllm.py:375
+  File: curllm_core/streamware/components/curllm.py:367
   Type: xpath
   Value: //fill_form...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/streamware/components/curllm.py:396
+  File: curllm_core/streamware/components/curllm.py:388
   Type: xpath
   Value: //bql"...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
@@ -627,37 +627,37 @@ HIGH SEVERITY FINDINGS:
   Value: querySelector('h2, h3, h4, .name, .title, [class*="...
   Suggestion: Use curllm_core.element_finder.LLMElementFinder.find_element() for dynamic element detection
 
-  File: curllm_core/streamware/llm_bridge.py:114
+  File: curllm_core/streamware/llm_bridge.py:115
   Type: xpath
   Value: //"...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/streamware/llm_bridge.py:135
+  File: curllm_core/streamware/llm_bridge.py:136
   Type: xpath
   Value: //decide...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/streamware/llm_bridge.py:154
+  File: curllm_core/streamware/llm_bridge.py:155
   Type: xpath
   Value: //extract...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/streamware/llm_bridge.py:170
+  File: curllm_core/streamware/llm_bridge.py:171
   Type: xpath
   Value: //check...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/streamware/llm_bridge.py:187
+  File: curllm_core/streamware/llm_bridge.py:188
   Type: xpath
   Value: //decide...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/streamware/llm_bridge.py:230
+  File: curllm_core/streamware/llm_bridge.py:231
   Type: xpath
   Value: //"...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/streamware/llm_bridge.py:249
+  File: curllm_core/streamware/llm_bridge.py:250
   Type: xpath
   Value: //"...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
@@ -740,6 +740,11 @@ HIGH SEVERITY FINDINGS:
   File: curllm_core/llm_heuristics.py:94
   Type: xpath
   Value: //.test(path))...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/url_resolution/resolver.py:449
+  Type: xpath
+  Value: //[...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
   File: curllm_core/streamware/components/file.py:24
@@ -872,22 +877,42 @@ HIGH SEVERITY FINDINGS:
   Value: //ollama.ai")...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/server.py:143
+  File: curllm_core/streamware/patterns/split_component.py:18
+  Type: xpath
+  Value: //pattern...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/streamware/patterns/split_component.py:21
+  Type: xpath
+  Value: //jsonpath...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/streamware/patterns/split_component.py:22
+  Type: xpath
+  Value: //field...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/streamware/patterns/split_component.py:23
+  Type: xpath
+  Value: //batch...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/server.py:146
   Type: url
   Value: http://example.com...
   Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
 
-  File: curllm_core/server.py:143
+  File: curllm_core/server.py:146
   Type: xpath
   Value: //example.com)...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/server.py:150
+  File: curllm_core/server.py:153
   Type: url
   Value: http://example.com...
   Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
 
-  File: curllm_core/server.py:150
+  File: curllm_core/server.py:153
   Type: xpath
   Value: //example.com'...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
@@ -912,24 +937,44 @@ HIGH SEVERITY FINDINGS:
   Value: //shop.pl")...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/streamware/helpers.py:70
+  File: curllm_core/streamware/helpers/pipeline.py:20
   Type: url
   Value: http://api.example.com/data...
   Suggestion: Use curllm_core.url_resolution.UrlResolver.find_url_for_goal() for dynamic URL discovery
 
-  File: curllm_core/streamware/helpers.py:70
+  File: curllm_core/streamware/helpers/pipeline.py:20
   Type: xpath
   Value: //api.example.com/data"...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/streamware/helpers.py:71
+  File: curllm_core/streamware/helpers/pipeline.py:21
   Type: xpath
   Value: //jsonpath...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
-  File: curllm_core/streamware/helpers.py:72
+  File: curllm_core/streamware/helpers/pipeline.py:22
   Type: xpath
   Value: //write...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/streamware/patterns/choose.py:23
+  Type: xpath
+  Value: //high-priority")...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/streamware/patterns/choose.py:24
+  Type: xpath
+  Value: //low.log")...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/streamware/patterns/choose.py:25
+  Type: xpath
+  Value: //default.log")...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/streamware/patterns/choose.py:27
+  Type: xpath
+  Value: //router"...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
 
   File: curllm_core/streamware/components/extraction/selector.py:45
@@ -1045,4 +1090,39 @@ HIGH SEVERITY FINDINGS:
   File: curllm_core/streamware/registry.py:70
   Type: xpath
   Value: //browse...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/streamware/components/decision_llm/llm_decision_component.py:14
+  Type: xpath
+  Value: //plan...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/streamware/patterns/multicast_component.py:18
+  Type: xpath
+  Value: //parallel...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/streamware/patterns/filter_component.py:16
+  Type: xpath
+  Value: //condition...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/streamware/patterns/join_component.py:15
+  Type: xpath
+  Value: //strategy...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/streamware/patterns/multicast.py:25
+  Type: xpath
+  Value: //parallel...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/streamware/patterns/choose_component.py:18
+  Type: xpath
+  Value: //condition...
+  Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
+
+  File: curllm_core/streamware/patterns/join.py:24
+  Type: xpath
+  Value: //collect...
   Suggestion: Use curllm_core.dom.find_elements_by_role() or LLMElementFinder for dynamic element finding
