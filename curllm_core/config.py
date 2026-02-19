@@ -6,6 +6,17 @@ from typing import Optional
 
 try:
     from getv import EnvStore
+    # Load app defaults first (getv use curllm llm/ollama PROFILE)
+    try:
+        from getv import AppDefaults
+        from getv.integrations.pydantic_env import load_profile_into_env
+        _defaults = AppDefaults("curllm")
+        for _cat in ("llm", "ollama"):
+            _prof = _defaults.get(_cat)
+            if _prof:
+                load_profile_into_env(_cat, _prof)
+    except Exception:
+        pass
     _store = EnvStore(Path.cwd() / ".env", auto_create=False)
     for _k, _v in _store.items():
         if _k not in os.environ:
