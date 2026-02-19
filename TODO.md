@@ -521,6 +521,36 @@ curllm "Wejdź na prototypowanie.pl i wyślij wiadomość przez formularz z zapy
 
 
 wykonaj make test i napraw błędy
+
+skorzystaj z migration_plan.md aby upewnić się w jakim kierunku przeprowadzana jest refakoryzacja 
+stwórz dokumentacje  dla refaktoryzacji, która będzie  realizowała automatyczną, dynamiczną detekcje url w danej domenie do podstron
+i dla poszukiwania odpowiedniego selectora z wykorzystaniem LLM z użyciem: 
+curllm_core/llm_dsl/
+├── selector_generator.py   # LLMSelectorGenerator - dynamiczne selektory
+├── element_finder.py       # LLMElementFinder - elementy po PURPOSE
+└── ...
+
+curllm_core/form_fill/js_scripts.py
+└── generate_field_concepts_with_llm()  # LLM generuje keywords
+└── find_form_fields_with_llm()         # Main entry point
+
+
+┌─────────────────────────────────────────────────────────────────┐
+│                    PRZED → PO                                    │
+├─────────────────────────────────────────────────────────────────┤
+│ PRZED: if data_key in ['phone', 'tel']:                         │
+│ PO:    if data_key in phone_concepts:                           │
+│                                                                  │
+│ PRZED: PLATFORM_SELECTORS = {'email': '#email'}                 │
+│ PO:    ELEMENT_PURPOSES = {'email': 'email input field'}        │
+│        + _find_auth_element() with LLM                          │
+│                                                                  │
+│ PRZED: findField(['email', 'mail'], ...)  // hardcoded JS       │
+│ PO:    concepts = await generate_field_concepts_with_llm(page)  │
+│        result = await page.evaluate(PARAMETRIZED_JS, concepts)  │
+└─────────────────────────────────────────────────────────────────┘
+
+
 currllm nie powinien używać hardkodowanych selectorów, url, etykiet oraz innych hardkodowanych zmiennych, tylko funkcje, algorytmy ,
 statystyki i LLM w celu realziacji zadań, stwórz skrypt, który stworzy listę plików do refaktoryzacji
 sprawdzi pliki, czy nie ma tam hardkodowanych regexów czy selectorów i użyj już istniejących funkcji
@@ -558,35 +588,82 @@ Użytkownik: "Znajdź formularz kontaktowy"
     │     - Zachowane dla kompatybilności                      │
     │     - Będzie stopniowo usuwane                          │
     └─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                    LLM-DSL SELECTOR GENERATION                       │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  User: "Znajdź checkbox do zgody RODO"                              │
+│                          ↓                                           │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │  1. LLMSelectorGenerator.generate_consent_selector()        │    │
+│  │     - Pobiera wszystkie checkboxy z etykietami              │    │
+│  │     - Wysyła do LLM z promptem                              │    │
+│  │     - LLM analizuje semantycznie i zwraca selector          │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+│                          ↓                                           │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │  2. Statistical Fallback (jeśli LLM niedostępny)            │    │
+│  │     - Scoring bazujący na słowach w etykietach              │    │
+│  │     - NIE hardkodowane if/elif - dynamiczny scoring         │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+│                          ↓                                           │
+│  Result: GeneratedSelector(selector="...", confidence=0.9)          │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+
+Chce żeby LLM generował selektory dynamicznie, a nie używał pre-definiowanych list.
+
+┌────────────────────────────────────────────────────────────────────────┐
+│                    CURLLM LLM-DSL ARCHITECTURE                          │
+├────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  ┌──────────────────┐    ┌──────────────────┐    ┌─────────────────┐   │
+│  │ LLMSelectorGen   │    │ LLMElementFinder │    │ generate_field  │   │
+│  │ .generate_*()    │    │ .find_element()  │    │ _concepts()     │   │
+│  └────────┬─────────┘    └────────┬─────────┘    └────────┬────────┘   │
+│           │                       │                       │             │
+│           └───────────────────────┼───────────────────────┘             │
+│                                   ↓                                     │
+│                    ┌──────────────────────────────┐                     │
+│                    │   LLM Prompt Generation      │                     │
+│                    │   - Page context             │                     │
+│                    │   - Purpose description      │                     │
+│                    │   - Element analysis         │                     │
+│                    └──────────────────────────────┘                     │
+│                                   ↓                                     │
+│                    ┌──────────────────────────────┐                     │
+│                    │   Generated Selectors        │                     │
+│                    │   - Confidence score         │                     │
+│                    │   - Reasoning                │                     │
+│                    └──────────────────────────────┘                     │
+│                                                                         │
+└────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────┐
+│  find_url_for_goal()                             │
+├─────────────────────────────────────────────────┤
+│  1. _find_url_with_llm()     ← LLM semantic     │
+│  2. dom_helpers.find_link()  ← Statistical      │
+│  3. _legacy_find_url()       ← Pattern fallback │
+└─────────────────────────────────────────────────┘
+
+# 1. Generate selector with LLM
+generator = LLMSelectorGenerator(llm=my_llm)
+result = await generator.generate_consent_selector(page)
+
+# 2. Find element by purpose
+finder = LLMElementFinder(llm=my_llm, page=page)
+result = await finder.find_element("email input field")
+
+# 3. Find form fields
+selectors = await find_form_fields_with_llm(page, llm=my_llm)
+await page.fill(selectors['email'], "test@example.com")
+
+# 4. Semantic concepts (fallback)
+phone_concepts = {'phone', 'tel', 'telefon', 'mobile'}
+if data_key in phone_concepts:
 
 
-### Before (Hardcoded)
-```python
-# Hardcoded selector
-element = document.querySelector('input[name="email"]')
 
-# Hardcoded keyword list
-for field in ["name", "email", "phone"]:
-    # ...
-```
-
-### After (LLM-DSL)
-```python
-# LLM-driven element finding
-element = await dsl.execute("find_element", {
-    "purpose": "email_input",
-    "context": page_context
-})
-
-# LLM-driven field detection
-fields = await dsl.execute("analyze_form", {
-    "form_context": form_html,
-    "detect_purposes": True
-})
-for field in fields.data:
-    # ...
-```
-
-
-
+Stosuj poprawe ale tylko z DSL LLM bez hardkodowanych selektorów, tylko generowanych w oparciu o LLM
 

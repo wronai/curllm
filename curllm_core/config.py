@@ -3,9 +3,19 @@ from dataclasses import dataclass
 import os
 from pathlib import Path
 from typing import Optional
-from dotenv import load_dotenv
 
-load_dotenv()
+try:
+    from getv import EnvStore
+    _store = EnvStore(Path.cwd() / ".env", auto_create=False)
+    for _k, _v in _store.items():
+        if _k not in os.environ:
+            os.environ[_k] = _v
+except ImportError:
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except ImportError:
+        pass
 
 @dataclass
 class Config:
