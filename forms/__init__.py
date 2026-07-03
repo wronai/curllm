@@ -8,4 +8,4 @@ and LLM for intelligent field mapping.
 from .app import BulkFormFiller, FormResult, BulkFormResult
 
 __all__ = ["BulkFormFiller", "FormResult", "BulkFormResult"]
-__version__ = "1.0.41"
+__version__ = "1.0.42"

@@ -110,8 +110,10 @@ def test_05_search_results():
         results = page.query_selector_all('.result')
         assert len(results) == 4
         
-        # Get first result title (use first-of-type since .result is not first-child of body)
-        first_title = page.text_content('.result:first-of-type h3')
+        # Get first result title. Note: `.result:first-of-type` never matches
+        # here — :first-of-type filters by element type (div), and the first
+        # sibling div is `.result-count`. text_content uses the first match.
+        first_title = page.text_content('.result h3')
         assert 'Laptop' in first_title or 'Best' in first_title
         
         browser.close()

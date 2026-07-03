@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "curllm"
-version = "1.0.41"
+version = "1.0.42"
 description = "curllm - Intelligent browser automation with local LLMs (Qwen, Llama, Mistral) for data extraction and form automation using a dynamic LLM-DSL architecture without hardcoded selectors."
 readme = "README.md"
 license = "Apache-2.0"

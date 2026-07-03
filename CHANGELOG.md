@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [1.0.42] - 2026-07-03
+
+### Docs
+- Update README.md
+
+### Test
+- Update tests/integration/conftest.py
+- Update tests/integration/test_03_to_10.py
+
+### Other
+- Update project/planfile-tickets.yaml
+
 ## [1.0.41] - 2026-06-29
 
 ### Docs

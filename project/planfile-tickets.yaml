@@ -1,5 +1,4 @@
 source: code2llm
-# generated in 0.73s
 schema: code2llm.planfile_tickets.v1
 project_root: /home/tom/github/wronai/curllm
 tickets:
@@ -15937,5 +15936,23 @@ tickets:
   files:
   - extension/extension.js
   dedupe_key: 'code2llm:smell:god_function:extension/extension.js:1:God Module: extension.extension'
+- signal: slow_test_warning
+  title: Address high test suite startup overhead
+  description: 'The test suite startup and collection overhead is high: 3.99s.
+
+
+    This overhead is spent on imports, collection, and test environment initialization.
+
+    Analyze fixtures with broad scopes, reduce heavy imports on test collection, and
+    optimize pytest-xdist startup settings to decrease the delay before tests start
+    running.'
+  priority: high
+  labels:
+  - llm-ready
+  - test-optimization
+  - startup-overhead
+  files:
+  - pyproject.toml
+  dedupe_key: test-optimization:general:startup-overhead
 applied: []
 skipped: []
