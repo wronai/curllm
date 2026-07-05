@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "curllm"
-version = "1.0.42"
+version = "1.0.43"
 description = "curllm - Intelligent browser automation with local LLMs (Qwen, Llama, Mistral) for data extraction and form automation using a dynamic LLM-DSL architecture without hardcoded selectors."
 readme = "README.md"
 license = "Apache-2.0"
@@ -75,6 +75,13 @@ markers = [
     "asyncio: mark test as async",
     "slow: mark test as slow running",
 ]
+# curlx_pkg is an independent sub-project with its own pyproject.toml and
+# .venv (its own `curlx` package installed only there). Collecting its
+# tests from the root pytest run fails collection for the *entire* suite
+# with ModuleNotFoundError: No module named 'curlx', since `curlx` is never
+# installed in the root venv. Run curlx_pkg's own tests from within
+# curlx_pkg using its own .venv instead.
+norecursedirs = ["curlx_pkg", ".venv", "venv", "node_modules", "build", "dist"]
 
 [tool.pfix]
 # Self-healing Python configuration

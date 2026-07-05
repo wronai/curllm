@@ -83,3 +83,910 @@ sprint:
       priority: normal
       sprint: current
       status: open
+    STARTER-003:
+      blocked_by: []
+      blocks: []
+      created_at: '2026-07-05T21:31:53.509561+00:00'
+      description: '[OPERATOR] Kalibracja czatu OS injectora (auto)
+
+
+        brak kalibracji chatu dla auto — task koru:ide-os:calibrate IDE=auto
+
+
+        Wykonaj w IDE, potem zamknij ticket: `task tickets:done -- <id>` lub planfile
+        ticket done.
+
+
+        Weryfikacja (opcjonalnie): `task koru:ide-os:calibrate IDE=auto`'
+      execution:
+        attempt: 0
+        max_attempts: 1
+        queue: operator
+        state: waiting_input
+      executor:
+        kind: human
+        mode: interactive
+      files: []
+      history:
+      - action: created
+        message: '[OPERATOR] Kalibracja czatu OS injectora (auto)
+
+
+          brak kalibracji chatu dla auto — task koru:ide-os:calibrate IDE=auto
+
+
+          Wykonaj w IDE, potem zamknij ticket: `task tickets:done -- <id>` lub planfile
+          ticket done.
+
+
+          Weryfikacja (opcjonalnie): `task koru:ide-os:calibrate IDE=auto`'
+        source: koru task
+        timestamp: '2026-07-05T21:31:53.509561+00:00'
+      - action: update
+        changes:
+        - execution
+        - inputs
+        - outputs
+        execution_state: waiting_input
+        previous_execution_state: ready
+        source: planfile.store
+        timestamp: '2026-07-05T21:37:03.743089+00:00'
+      id: STARTER-003
+      inputs:
+        api_headers: {}
+        api_method: GET
+        api_timeout_seconds: 30.0
+        env_keys: []
+        prompt: 'Run the OS-injector chat calibration interactively at the GUI. It
+          prints "place mouse over chat input", counts down 5s, then captures the
+          MOUSE cursor position and saves it to ~/.koru/ide-os-injector.json. The
+          `task` (go-task) binary is NOT installed here, so run the underlying command
+          directly:  /home/tom/github/semcod/koru/.venv/bin/python -m koru.cli autopilot
+          calibrate --ide auto --project /home/tom/github/semcod/curllm   Steps: focus
+          PyCharm (auto resolves to jetbrains), open its AI chat panel, hover the
+          mouse over the chat input field, keep it still through the 5s countdown,
+          then confirm the printed chat_x/chat_y actually land on the input field.
+          Re-run with a different --ide (e.g. qoder) if calibrating that one instead.'
+      labels:
+      - koru
+      - nl-task
+      - llm-ready
+      - operator
+      - auto-pipeline
+      - step:os_calibrate
+      name: '[OPERATOR] Kalibracja czatu OS injectora (auto) brak kalibracji chatu
+        dla auto — task koru:ide-os:calibrate IDE=auto ...'
+      outputs:
+        artifacts: []
+        notes:
+        - 'Verified the task is real but is a human-interactive, mouse-capture op
+          — cannot be done headless. go-task `task` binary is absent (only `planfile`/`koru`
+          exist); underlying op is `python -m koru.cli autopilot calibrate --ide <ide>`
+          (Taskfile.yml:299, interactive:true). action_calibrate() in src/koru/autopilot/calibrate_cli.py
+          waits --delay-seconds (default 5) then calls oi.capture_mouse_xy() and writes
+          the profile to ~/.koru/ide-os-injector.json; there is no --dry-run and no
+          way to pass x/y programmatically, so a headless run would capture an arbitrary
+          cursor pos and silently overwrite the profile with bogus coords (automation
+          would then click the wrong screen location). Env is live: Wayland DISPLAY=:0,
+          detect_running_ides=[qoder, jetbrains], --ide auto resolves to jetbrains
+          (auto:profile). Needs a human at the GUI to position the mouse.'
+      priority: high
+      source:
+        context:
+          dedupe_key: koru-operator-pipeline:operator-kalibracja-czatu-os-injectora-auto-brak-kalibracji-chatu-dla-auto-task-koru-ide-os-calibrate-ide-auto-...
+          detail: brak kalibracji chatu dla auto — task koru:ide-os:calibrate IDE=auto
+          input: '[OPERATOR] Kalibracja czatu OS injectora (auto)
+
+
+            brak kalibracji chatu dla auto — task koru:ide-os:calibrate IDE=auto
+
+
+            Wykonaj w IDE, potem zamknij ticket: `task tickets:done -- <id>` lub planfile
+            ticket done.
+
+
+            Weryfikacja (opcjonalnie): `task koru:ide-os:calibrate IDE=auto`'
+          step_id: os_calibrate
+          task_command: task koru:ide-os:calibrate IDE=auto
+        timestamp: '2026-07-05T21:31:53.509561+00:00'
+        tool: koru-operator-pipeline
+      sprint: current
+      status: open
+      sync: {}
+      updated_at: '2026-07-05T21:37:03.743060+00:00'
+    STARTER-004:
+      blocked_by: []
+      blocks: []
+      created_at: '2026-07-05T21:32:12.395791+00:00'
+      description: '`project/analysis.toon.yaml` reports **16** duplicated classes.
+        Extract shared helpers/modules; re-run the source.context.evidence.regenerate_command
+        to refresh.'
+      execution:
+        attempt: 0
+        max_attempts: 1
+        queue: default
+        state: ready
+      executor:
+        kind: human
+        mode: interactive
+      files:
+      - project/analysis.toon.yaml
+      history:
+      - action: created
+        message: '`project/analysis.toon.yaml` reports **16** duplicated classes.
+          Extract shared helpers/modules; re-run the source.context.evidence.regenerate_command
+          to refresh.'
+        source: koru task
+        timestamp: '2026-07-05T21:32:12.395791+00:00'
+      id: STARTER-004
+      inputs:
+        api_headers: {}
+        api_method: GET
+        api_timeout_seconds: 30.0
+        env_keys: []
+        prompt: '`project/analysis.toon.yaml` reports **16** duplicated classes. Extract
+          shared helpers/modules; re-run the source.context.evidence.regenerate_command
+          to refresh.'
+      labels:
+      - koru
+      - nl-task
+      - llm-ready
+      - code2llm
+      - duplication
+      - refactor
+      - scan
+      name: Remove 16 duplicated classes (code2llm analysis)
+      outputs:
+        artifacts: []
+        notes: []
+      priority: high
+      source:
+        context:
+          dedupe_key: koru-scan:code2llm_dup:project/analysis.toon.yaml
+          evidence:
+            artifact:
+              mtime_ns: 1780765549805194319
+              path: project/analysis.toon.yaml
+              sha256: e8c19fef624d22573196825094668c54aca6304391bae981eb95f80fe0de709b
+              size_bytes: 54203
+            kind: code2llm_analysis
+            regenerate_command: code2llm /home/tom/github/semcod/curllm -f all -o
+              /home/tom/github/semcod/curllm/project --no-chunk --exclude '*.md' --planfile-apply
+              --planfile-source koru-project-discovery --planfile-sprint current --planfile-project
+              /home/tom/github/semcod/curllm --planfile-limit 20
+            schema: koru.ticket_evidence.v1
+            staleness_check: Regenerate the artifact and compare artifact.sha256 before
+              assuming this ticket still reflects the current code.
+          input: '`project/analysis.toon.yaml` reports **16** duplicated classes.
+            Extract shared helpers/modules; re-run the source.context.evidence.regenerate_command
+            to refresh.'
+          signal: code2llm_dup
+        timestamp: '2026-07-05T21:32:12.395791+00:00'
+        tool: koru-scan
+      sprint: current
+      status: open
+      sync: {}
+      updated_at: '2026-07-05T21:32:12.395791+00:00'
+    STARTER-005:
+      blocked_by: []
+      blocks: []
+      created_at: '2026-07-05T21:32:12.438042+00:00'
+      description: '`project/analysis.toon.yaml` flags `captcha/captcha_solver.py`
+        as a god module (768 lines, 6 classes, 16 methods). Split into focused submodules
+        by responsibility.'
+      execution:
+        attempt: 0
+        max_attempts: 1
+        queue: default
+        state: ready
+      executor:
+        kind: human
+        mode: interactive
+      files:
+      - captcha/captcha_solver.py
+      - project/analysis.toon.yaml
+      history:
+      - action: created
+        message: '`project/analysis.toon.yaml` flags `captcha/captcha_solver.py` as
+          a god module (768 lines, 6 classes, 16 methods). Split into focused submodules
+          by responsibility.'
+        source: koru task
+        timestamp: '2026-07-05T21:32:12.438042+00:00'
+      id: STARTER-005
+      inputs:
+        api_headers: {}
+        api_method: GET
+        api_timeout_seconds: 30.0
+        env_keys: []
+        prompt: '`project/analysis.toon.yaml` flags `captcha/captcha_solver.py` as
+          a god module (768 lines, 6 classes, 16 methods). Split into focused submodules
+          by responsibility.'
+      labels:
+      - koru
+      - nl-task
+      - llm-ready
+      - code2llm
+      - god-module
+      - refactor
+      - scan
+      name: 'Split god module: captcha/captcha_solver.py'
+      outputs:
+        artifacts: []
+        notes: []
+      priority: high
+      source:
+        context:
+          dedupe_key: semcod:code2llm:refactor:captcha/captcha_solver.py
+          evidence:
+            artifact:
+              mtime_ns: 1780765549805194319
+              path: project/analysis.toon.yaml
+              sha256: e8c19fef624d22573196825094668c54aca6304391bae981eb95f80fe0de709b
+              size_bytes: 54203
+            kind: code2llm_analysis
+            regenerate_command: code2llm /home/tom/github/semcod/curllm -f all -o
+              /home/tom/github/semcod/curllm/project --no-chunk --exclude '*.md' --planfile-apply
+              --planfile-source koru-project-discovery --planfile-sprint current --planfile-project
+              /home/tom/github/semcod/curllm --planfile-limit 20
+            schema: koru.ticket_evidence.v1
+            staleness_check: Regenerate the artifact and compare artifact.sha256 before
+              assuming this ticket still reflects the current code.
+          input: '`project/analysis.toon.yaml` flags `captcha/captcha_solver.py` as
+            a god module (768 lines, 6 classes, 16 methods). Split into focused submodules
+            by responsibility.'
+          signal: code2llm_god
+        timestamp: '2026-07-05T21:32:12.438042+00:00'
+        tool: koru-scan
+      sprint: current
+      status: open
+      sync: {}
+      updated_at: '2026-07-05T21:32:12.438042+00:00'
+    STARTER-006:
+      blocked_by: []
+      blocks: []
+      created_at: '2026-07-05T21:32:12.500401+00:00'
+      description: '`project/analysis.toon.yaml` flags `curllm_core/planning/planner.py`
+        as a god module (546 lines, 5 classes, 13 methods). Split into focused submodules
+        by responsibility.'
+      execution:
+        attempt: 0
+        max_attempts: 1
+        queue: default
+        state: ready
+      executor:
+        kind: human
+        mode: interactive
+      files:
+      - curllm_core/planning/planner.py
+      - project/analysis.toon.yaml
+      history:
+      - action: created
+        message: '`project/analysis.toon.yaml` flags `curllm_core/planning/planner.py`
+          as a god module (546 lines, 5 classes, 13 methods). Split into focused submodules
+          by responsibility.'
+        source: koru task
+        timestamp: '2026-07-05T21:32:12.500401+00:00'
+      id: STARTER-006
+      inputs:
+        api_headers: {}
+        api_method: GET
+        api_timeout_seconds: 30.0
+        env_keys: []
+        prompt: '`project/analysis.toon.yaml` flags `curllm_core/planning/planner.py`
+          as a god module (546 lines, 5 classes, 13 methods). Split into focused submodules
+          by responsibility.'
+      labels:
+      - koru
+      - nl-task
+      - llm-ready
+      - code2llm
+      - god-module
+      - refactor
+      - scan
+      name: 'Split god module: curllm_core/planning/planner.py'
+      outputs:
+        artifacts: []
+        notes: []
+      priority: high
+      source:
+        context:
+          dedupe_key: semcod:code2llm:refactor:curllm_core/planning/planner.py
+          evidence:
+            artifact:
+              mtime_ns: 1780765549805194319
+              path: project/analysis.toon.yaml
+              sha256: e8c19fef624d22573196825094668c54aca6304391bae981eb95f80fe0de709b
+              size_bytes: 54203
+            kind: code2llm_analysis
+            regenerate_command: code2llm /home/tom/github/semcod/curllm -f all -o
+              /home/tom/github/semcod/curllm/project --no-chunk --exclude '*.md' --planfile-apply
+              --planfile-source koru-project-discovery --planfile-sprint current --planfile-project
+              /home/tom/github/semcod/curllm --planfile-limit 20
+            schema: koru.ticket_evidence.v1
+            staleness_check: Regenerate the artifact and compare artifact.sha256 before
+              assuming this ticket still reflects the current code.
+          input: '`project/analysis.toon.yaml` flags `curllm_core/planning/planner.py`
+            as a god module (546 lines, 5 classes, 13 methods). Split into focused
+            submodules by responsibility.'
+          signal: code2llm_god
+        timestamp: '2026-07-05T21:32:12.500401+00:00'
+        tool: koru-scan
+      sprint: current
+      status: open
+      sync: {}
+      updated_at: '2026-07-05T21:32:12.500401+00:00'
+    STARTER-007:
+      blocked_by: []
+      blocks: []
+      created_at: '2026-07-05T21:32:12.560285+00:00'
+      description: '`project/analysis.toon.yaml` flags `analyze_deps` in LAYERS as
+        a large/hot module (313 lines, 0 classes, 8 methods, CC=17). Extract cohesive
+        submodules around stable responsibilities and add focused regression tests
+        before broad edits.'
+      execution:
+        attempt: 0
+        max_attempts: 1
+        queue: default
+        state: ready
+      executor:
+        kind: human
+        mode: interactive
+      files:
+      - project/analysis.toon.yaml
+      history:
+      - action: created
+        message: '`project/analysis.toon.yaml` flags `analyze_deps` in LAYERS as a
+          large/hot module (313 lines, 0 classes, 8 methods, CC=17). Extract cohesive
+          submodules around stable responsibilities and add focused regression tests
+          before broad edits.'
+        source: koru task
+        timestamp: '2026-07-05T21:32:12.560285+00:00'
+      id: STARTER-007
+      inputs:
+        api_headers: {}
+        api_method: GET
+        api_timeout_seconds: 30.0
+        env_keys: []
+        prompt: '`project/analysis.toon.yaml` flags `analyze_deps` in LAYERS as a
+          large/hot module (313 lines, 0 classes, 8 methods, CC=17). Extract cohesive
+          submodules around stable responsibilities and add focused regression tests
+          before broad edits.'
+      labels:
+      - koru
+      - nl-task
+      - llm-ready
+      - code2llm
+      - architecture
+      - large-module
+      - refactor
+      - scan
+      name: 'Split large module: analyze_deps'
+      outputs:
+        artifacts: []
+        notes: []
+      priority: high
+      source:
+        context:
+          dedupe_key: koru-scan:code2llm_layer_hotspot:project/analysis.toon.yaml
+          evidence:
+            artifact:
+              mtime_ns: 1780765549805194319
+              path: project/analysis.toon.yaml
+              sha256: e8c19fef624d22573196825094668c54aca6304391bae981eb95f80fe0de709b
+              size_bytes: 54203
+            kind: code2llm_analysis
+            regenerate_command: code2llm /home/tom/github/semcod/curllm -f all -o
+              /home/tom/github/semcod/curllm/project --no-chunk --exclude '*.md' --planfile-apply
+              --planfile-source koru-project-discovery --planfile-sprint current --planfile-project
+              /home/tom/github/semcod/curllm --planfile-limit 20
+            schema: koru.ticket_evidence.v1
+            staleness_check: Regenerate the artifact and compare artifact.sha256 before
+              assuming this ticket still reflects the current code.
+          input: '`project/analysis.toon.yaml` flags `analyze_deps` in LAYERS as a
+            large/hot module (313 lines, 0 classes, 8 methods, CC=17). Extract cohesive
+            submodules around stable responsibilities and add focused regression tests
+            before broad edits.'
+          signal: code2llm_layer_hotspot
+        timestamp: '2026-07-05T21:32:12.560285+00:00'
+        tool: koru-scan
+      sprint: current
+      status: open
+      sync: {}
+      updated_at: '2026-07-05T21:32:12.560285+00:00'
+    STARTER-008:
+      blocked_by: []
+      blocks: []
+      created_at: '2026-07-05T21:32:12.833922+00:00'
+      description: "`pytest --collect-only` fails before collecting any test:\n\n
+        \   ModuleNotFoundError: No module named 'curlx'\n\nLikely cause: missing
+        `[tool.pytest.ini_options] pythonpath = [\"src\"]` (or equivalent) in `pyproject.toml`,
+        or an editable install missing.\n\nFull traceback snippet:\n```\ncurllm_core/orchestrators/__init__.py:23:
+        DeprecationWarning: This module is deprecated. Use curllm_core.v2.LLMECommerceOrchestrator
+        instead.\n    from .ecommerce import ECommerceOrchestrator\n\ncurllm_core/orchestrators/__init__.py:24\n
+        \ /home/tom/github/semcod/curllm/curllm_core/orchestrators/__init__.py:24:
+        DeprecationWarning: This module is deprecated. Use curllm_core.v2.LLMSocialOrchestrator
+        instead.\n    from .social import SocialMediaOrchestrator\n\ncurllm_core/orchestrators/__init__.py:26\n
+        \ /home/tom/github/semcod/curllm/curllm_core/orchestrators/__init__.py:26:
+        DeprecationWarning: This module is deprecated. Use curllm_core.v2.LLMAuthOrchestrator
+        instead.\n    from .auth import AuthOrchestrator\n\ncurllm_core/hierarchical/__init__.py:8\n
+        \ /home/tom/github/semcod/curllm/curllm_core/hierarchical/__init__.py:8: DeprecationWarning:
+        This module is deprecated. Use curllm_core.v2.LLMHierarchicalPlanner instead.\n
+        \   from curllm_core.hierarchical.planner import (\n\ncurllm_core/dsl/__init__.py:31\n
+        \ /home/tom/github/semcod/curllm/curllm_core/dsl/__init__.py:31: DeprecationWarning:
+        This module is deprecated. Use curllm_core.v2.LLMDSLExecutor instead.\n    from
+        .executor import DSLExecutor\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n===========================
+        short test summary info ============================\nERROR curlx_pkg/tests/test_cli.py\n!!!!!!!!!!!!!!!!!!!!
+        Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n445 tests collected,
+        1 error in 11.90s\n```"
+      execution:
+        attempt: 0
+        finished_at: '2026-07-05T21:55:10.454737Z'
+        max_attempts: 1
+        queue: default
+        state: done
+      executor:
+        kind: human
+        mode: interactive
+      files: []
+      history:
+      - action: created
+        message: "`pytest --collect-only` fails before collecting any test:\n\n    ModuleNotFoundError:
+          No module named 'curlx'\n\nLikely cause: missing `[tool.pytest.ini_options]
+          pythonpath = [\"src\"]` (or equivalent) in `pyproject.toml`, or an editable
+          install missing.\n\nFull traceback snippet:\n```\ncurllm_core/orchestrators/__init__.py:23:
+          DeprecationWarning: This module is deprecated. Use curllm_core.v2.LLMECommerceOrchestrator
+          instead.\n    from .ecommerce import ECommerceOrchestrator\n\ncurllm_core/orchestrators/__init__.py:24\n
+          \ /home/tom/github/semcod/curllm/curllm_core/orchestrators/__init__.py:24:
+          DeprecationWarning: This module is deprecated. Use curllm_core.v2.LLMSocialOrchestrator
+          instead.\n    from .social import SocialMediaOrchestrator\n\ncurllm_core/orchestrators/__init__.py:26\n
+          \ /home/tom/github/semcod/curllm/curllm_core/orchestrators/__init__.py:26:
+          DeprecationWarning: This module is deprecated. Use curllm_core.v2.LLMAuthOrchestrator
+          instead.\n    from .auth import AuthOrchestrator\n\ncurllm_core/hierarchical/__init__.py:8\n
+          \ /home/tom/github/semcod/curllm/curllm_core/hierarchical/__init__.py:8:
+          DeprecationWarning: This module is deprecated. Use curllm_core.v2.LLMHierarchicalPlanner
+          instead.\n    from curllm_core.hierarchical.planner import (\n\ncurllm_core/dsl/__init__.py:31\n
+          \ /home/tom/github/semcod/curllm/curllm_core/dsl/__init__.py:31: DeprecationWarning:
+          This module is deprecated. Use curllm_core.v2.LLMDSLExecutor instead.\n
+          \   from .executor import DSLExecutor\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n===========================
+          short test summary info ============================\nERROR curlx_pkg/tests/test_cli.py\n!!!!!!!!!!!!!!!!!!!!
+          Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n445 tests collected,
+          1 error in 11.90s\n```"
+        source: koru task
+        timestamp: '2026-07-05T21:32:12.833922+00:00'
+      - action: update
+        changes:
+        - outputs
+        source: planfile.store
+        timestamp: '2026-07-05T21:55:09.667671+00:00'
+      - action: update
+        changes:
+        - execution
+        - status
+        execution_state: done
+        previous_execution_state: ready
+        previous_status: open
+        source: planfile.store
+        status: done
+        timestamp: '2026-07-05T21:55:10.462724+00:00'
+      id: STARTER-008
+      inputs:
+        api_headers: {}
+        api_method: GET
+        api_timeout_seconds: 30.0
+        env_keys: []
+        prompt: "`pytest --collect-only` fails before collecting any test:\n\n    ModuleNotFoundError:
+          No module named 'curlx'\n\nLikely cause: missing `[tool.pytest.ini_options]
+          pythonpath = [\"src\"]` (or equivalent) in `pyproject.toml`, or an editable
+          install missing.\n\nFull traceback snippet:\n```\ncurllm_core/orchestrators/__init__.py:23:
+          DeprecationWarning: This module is deprecated. Use curllm_core.v2.LLMECommerceOrchestrator
+          instead.\n    from .ecommerce import ECommerceOrchestrator\n\ncurllm_core/orchestrators/__init__.py:24\n
+          \ /home/tom/github/semcod/curllm/curllm_core/orchestrators/__init__.py:24:
+          DeprecationWarning: This module is deprecated. Use curllm_core.v2.LLMSocialOrchestrator
+          instead.\n    from .social import SocialMediaOrchestrator\n\ncurllm_core/orchestrators/__init__.py:26\n
+          \ /home/tom/github/semcod/curllm/curllm_core/orchestrators/__init__.py:26:
+          DeprecationWarning: This module is deprecated. Use curllm_core.v2.LLMAuthOrchestrator
+          instead.\n    from .auth import AuthOrchestrator\n\ncurllm_core/hierarchical/__init__.py:8\n
+          \ /home/tom/github/semcod/curllm/curllm_core/hierarchical/__init__.py:8:
+          DeprecationWarning: This module is deprecated. Use curllm_core.v2.LLMHierarchicalPlanner
+          instead.\n    from curllm_core.hierarchical.planner import (\n\ncurllm_core/dsl/__init__.py:31\n
+          \ /home/tom/github/semcod/curllm/curllm_core/dsl/__init__.py:31: DeprecationWarning:
+          This module is deprecated. Use curllm_core.v2.LLMDSLExecutor instead.\n
+          \   from .executor import DSLExecutor\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n===========================
+          short test summary info ============================\nERROR curlx_pkg/tests/test_cli.py\n!!!!!!!!!!!!!!!!!!!!
+          Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n445 tests collected,
+          1 error in 11.90s\n```"
+      labels:
+      - koru
+      - nl-task
+      - llm-ready
+      - ci
+      - bug
+      - scan
+      name: Fix package import path for pytest collection
+      outputs:
+        artifacts: []
+        notes:
+        - 'Root cause: curlx_pkg is an independent sub-project with its own pyproject.toml/.venv;
+          nothing excluded it from root pytest collection. Fixed via norecursedirs
+          in pyproject.toml. Verified: root collection succeeds (445 tests, 0 errors),
+          curlx_pkg''s own tests still pass standalone, full non-e2e suite passes
+          (387 passed). 2 new tests.'
+      priority: high
+      source:
+        context:
+          dedupe_key: koru-scan:pytest_collect:fix package import path for pytest
+            collection
+          input: "`pytest --collect-only` fails before collecting any test:\n\n    ModuleNotFoundError:
+            No module named 'curlx'\n\nLikely cause: missing `[tool.pytest.ini_options]
+            pythonpath = [\"src\"]` (or equivalent) in `pyproject.toml`, or an editable
+            install missing.\n\nFull traceback snippet:\n```\ncurllm_core/orchestrators/__init__.py:23:
+            DeprecationWarning: This module is deprecated. Use curllm_core.v2.LLMECommerceOrchestrator
+            instead.\n    from .ecommerce import ECommerceOrchestrator\n\ncurllm_core/orchestrators/__init__.py:24\n
+            \ /home/tom/github/semcod/curllm/curllm_core/orchestrators/__init__.py:24:
+            DeprecationWarning: This module is deprecated. Use curllm_core.v2.LLMSocialOrchestrator
+            instead.\n    from .social import SocialMediaOrchestrator\n\ncurllm_core/orchestrators/__init__.py:26\n
+            \ /home/tom/github/semcod/curllm/curllm_core/orchestrators/__init__.py:26:
+            DeprecationWarning: This module is deprecated. Use curllm_core.v2.LLMAuthOrchestrator
+            instead.\n    from .auth import AuthOrchestrator\n\ncurllm_core/hierarchical/__init__.py:8\n
+            \ /home/tom/github/semcod/curllm/curllm_core/hierarchical/__init__.py:8:
+            DeprecationWarning: This module is deprecated. Use curllm_core.v2.LLMHierarchicalPlanner
+            instead.\n    from curllm_core.hierarchical.planner import (\n\ncurllm_core/dsl/__init__.py:31\n
+            \ /home/tom/github/semcod/curllm/curllm_core/dsl/__init__.py:31: DeprecationWarning:
+            This module is deprecated. Use curllm_core.v2.LLMDSLExecutor instead.\n
+            \   from .executor import DSLExecutor\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n===========================
+            short test summary info ============================\nERROR curlx_pkg/tests/test_cli.py\n!!!!!!!!!!!!!!!!!!!!
+            Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n445 tests
+            collected, 1 error in 11.90s\n```"
+          signal: pytest_collect
+        timestamp: '2026-07-05T21:32:12.833922+00:00'
+        tool: koru-scan
+      sprint: current
+      status: done
+      sync: {}
+      updated_at: '2026-07-05T21:55:10.462669+00:00'
+    STARTER-009:
+      blocked_by: []
+      blocks: []
+      created_at: '2026-07-05T21:32:12.918276+00:00'
+      description: '`project/analysis.toon.yaml` reports `_parse_actions_from_llm`
+        with CC=19 (limit=15). Extract sub-functions, simplify conditionals, or split
+        into strategy pattern.'
+      execution:
+        attempt: 0
+        max_attempts: 1
+        queue: default
+        state: ready
+      executor:
+        kind: human
+        mode: interactive
+      files:
+      - project/analysis.toon.yaml
+      history:
+      - action: created
+        message: '`project/analysis.toon.yaml` reports `_parse_actions_from_llm` with
+          CC=19 (limit=15). Extract sub-functions, simplify conditionals, or split
+          into strategy pattern.'
+        source: koru task
+        timestamp: '2026-07-05T21:32:12.918276+00:00'
+      id: STARTER-009
+      inputs:
+        api_headers: {}
+        api_method: GET
+        api_timeout_seconds: 30.0
+        env_keys: []
+        prompt: '`project/analysis.toon.yaml` reports `_parse_actions_from_llm` with
+          CC=19 (limit=15). Extract sub-functions, simplify conditionals, or split
+          into strategy pattern.'
+      labels:
+      - koru
+      - nl-task
+      - llm-ready
+      - code2llm
+      - complexity
+      - refactor
+      - scan
+      name: 'Reduce cyclomatic complexity: _parse_actions_from_llm (CC=19, limit=15)'
+      outputs:
+        artifacts: []
+        notes: []
+      priority: normal
+      source:
+        context:
+          dedupe_key: koru-scan:code2llm_cc:project/analysis.toon.yaml
+          evidence:
+            artifact:
+              mtime_ns: 1780765549805194319
+              path: project/analysis.toon.yaml
+              sha256: e8c19fef624d22573196825094668c54aca6304391bae981eb95f80fe0de709b
+              size_bytes: 54203
+            kind: code2llm_analysis
+            regenerate_command: code2llm /home/tom/github/semcod/curllm -f all -o
+              /home/tom/github/semcod/curllm/project --no-chunk --exclude '*.md' --planfile-apply
+              --planfile-source koru-project-discovery --planfile-sprint current --planfile-project
+              /home/tom/github/semcod/curllm --planfile-limit 20
+            schema: koru.ticket_evidence.v1
+            staleness_check: Regenerate the artifact and compare artifact.sha256 before
+              assuming this ticket still reflects the current code.
+          input: '`project/analysis.toon.yaml` reports `_parse_actions_from_llm` with
+            CC=19 (limit=15). Extract sub-functions, simplify conditionals, or split
+            into strategy pattern.'
+          signal: code2llm_cc
+        timestamp: '2026-07-05T21:32:12.918276+00:00'
+        tool: koru-scan
+      sprint: current
+      status: open
+      sync: {}
+      updated_at: '2026-07-05T21:32:12.918276+00:00'
+    STARTER-010:
+      blocked_by: []
+      blocks: []
+      created_at: '2026-07-05T21:32:14.037004+00:00'
+      description: 'REFACTOR item from `project/analysis.toon.yaml`: **rm duplicates**
+        (-16 dup classes). Execute this refactor step; re-run the source.context.evidence.regenerate_command
+        to verify.'
+      execution:
+        attempt: 0
+        max_attempts: 1
+        queue: default
+        state: ready
+      executor:
+        kind: human
+        mode: interactive
+      files:
+      - project/analysis.toon.yaml
+      history:
+      - action: created
+        message: 'REFACTOR item from `project/analysis.toon.yaml`: **rm duplicates**
+          (-16 dup classes). Execute this refactor step; re-run the source.context.evidence.regenerate_command
+          to verify.'
+        source: koru task
+        timestamp: '2026-07-05T21:32:14.037004+00:00'
+      id: STARTER-010
+      inputs:
+        api_headers: {}
+        api_method: GET
+        api_timeout_seconds: 30.0
+        env_keys: []
+        prompt: 'REFACTOR item from `project/analysis.toon.yaml`: **rm duplicates**
+          (-16 dup classes). Execute this refactor step; re-run the source.context.evidence.regenerate_command
+          to verify.'
+      labels:
+      - koru
+      - nl-task
+      - llm-ready
+      - code2llm
+      - refactor
+      - scan
+      name: 'code2llm refactor: rm duplicates'
+      outputs:
+        artifacts: []
+        notes: []
+      priority: normal
+      source:
+        context:
+          dedupe_key: semcod:code2llm:refactor:project/analysis.toon.yaml
+          evidence:
+            artifact:
+              mtime_ns: 1780765549805194319
+              path: project/analysis.toon.yaml
+              sha256: e8c19fef624d22573196825094668c54aca6304391bae981eb95f80fe0de709b
+              size_bytes: 54203
+            kind: code2llm_analysis
+            regenerate_command: code2llm /home/tom/github/semcod/curllm -f all -o
+              /home/tom/github/semcod/curllm/project --no-chunk --exclude '*.md' --planfile-apply
+              --planfile-source koru-project-discovery --planfile-sprint current --planfile-project
+              /home/tom/github/semcod/curllm --planfile-limit 20
+            schema: koru.ticket_evidence.v1
+            staleness_check: Regenerate the artifact and compare artifact.sha256 before
+              assuming this ticket still reflects the current code.
+          input: 'REFACTOR item from `project/analysis.toon.yaml`: **rm duplicates**
+            (-16 dup classes). Execute this refactor step; re-run the source.context.evidence.regenerate_command
+            to verify.'
+          signal: code2llm_refactor
+        timestamp: '2026-07-05T21:32:14.037004+00:00'
+        tool: koru-scan
+      sprint: current
+      status: open
+      sync: {}
+      updated_at: '2026-07-05T21:32:14.037004+00:00'
+    STARTER-011:
+      blocked_by: []
+      blocks: []
+      created_at: '2026-07-05T21:32:14.325993+00:00'
+      description: '`regix` is installed but no `regix.yaml` config exists in the
+        project root. Bootstrap with `task template:install:regix` (in koru) or follow
+        `workflows/on-change-gates.md`.
+
+
+        Role: regression metrics gate (CC / MI / coverage delta).'
+      execution:
+        attempt: 0
+        max_attempts: 1
+        queue: default
+        state: ready
+      executor:
+        kind: human
+        mode: interactive
+      files: []
+      history:
+      - action: created
+        message: '`regix` is installed but no `regix.yaml` config exists in the project
+          root. Bootstrap with `task template:install:regix` (in koru) or follow `workflows/on-change-gates.md`.
+
+
+          Role: regression metrics gate (CC / MI / coverage delta).'
+        source: koru task
+        timestamp: '2026-07-05T21:32:14.325993+00:00'
+      id: STARTER-011
+      inputs:
+        api_headers: {}
+        api_method: GET
+        api_timeout_seconds: 30.0
+        env_keys: []
+        prompt: '`regix` is installed but no `regix.yaml` config exists in the project
+          root. Bootstrap with `task template:install:regix` (in koru) or follow `workflows/on-change-gates.md`.
+
+
+          Role: regression metrics gate (CC / MI / coverage delta).'
+      labels:
+      - koru
+      - nl-task
+      - llm-ready
+      - bootstrap
+      - gates
+      - scan
+      name: Bootstrap regix on-change gate
+      outputs:
+        artifacts: []
+        notes: []
+      priority: normal
+      source:
+        context:
+          dedupe_key: koru-scan:missing_gate:bootstrap regix on-change gate
+          input: '`regix` is installed but no `regix.yaml` config exists in the project
+            root. Bootstrap with `task template:install:regix` (in koru) or follow
+            `workflows/on-change-gates.md`.
+
+
+            Role: regression metrics gate (CC / MI / coverage delta).'
+          signal: missing_gate
+        timestamp: '2026-07-05T21:32:14.325993+00:00'
+        tool: koru-scan
+      sprint: current
+      status: open
+      sync: {}
+      updated_at: '2026-07-05T21:32:14.325993+00:00'
+    STARTER-012:
+      blocked_by: []
+      blocks: []
+      created_at: '2026-07-05T21:32:14.419760+00:00'
+      description: '`testql` is installed but no `testql-scenarios` config exists
+        in the project root. Bootstrap with `task template:install:testql` (in koru)
+        or follow `workflows/on-change-gates.md`.
+
+
+        Role: behavioural HTTP probes (TOON YAML scenarios).'
+      execution:
+        attempt: 0
+        max_attempts: 1
+        queue: default
+        state: ready
+      executor:
+        kind: human
+        mode: interactive
+      files: []
+      history:
+      - action: created
+        message: '`testql` is installed but no `testql-scenarios` config exists in
+          the project root. Bootstrap with `task template:install:testql` (in koru)
+          or follow `workflows/on-change-gates.md`.
+
+
+          Role: behavioural HTTP probes (TOON YAML scenarios).'
+        source: koru task
+        timestamp: '2026-07-05T21:32:14.419760+00:00'
+      id: STARTER-012
+      inputs:
+        api_headers: {}
+        api_method: GET
+        api_timeout_seconds: 30.0
+        env_keys: []
+        prompt: '`testql` is installed but no `testql-scenarios` config exists in
+          the project root. Bootstrap with `task template:install:testql` (in koru)
+          or follow `workflows/on-change-gates.md`.
+
+
+          Role: behavioural HTTP probes (TOON YAML scenarios).'
+      labels:
+      - koru
+      - nl-task
+      - llm-ready
+      - bootstrap
+      - gates
+      - scan
+      name: Bootstrap testql on-change gate
+      outputs:
+        artifacts: []
+        notes: []
+      priority: normal
+      source:
+        context:
+          dedupe_key: koru-scan:missing_gate:bootstrap testql on-change gate
+          input: '`testql` is installed but no `testql-scenarios` config exists in
+            the project root. Bootstrap with `task template:install:testql` (in koru)
+            or follow `workflows/on-change-gates.md`.
+
+
+            Role: behavioural HTTP probes (TOON YAML scenarios).'
+          signal: missing_gate
+        timestamp: '2026-07-05T21:32:14.419760+00:00'
+        tool: koru-scan
+      sprint: current
+      status: open
+      sync: {}
+      updated_at: '2026-07-05T21:32:14.419760+00:00'
+    STARTER-013:
+      blocked_by: []
+      blocks: []
+      created_at: '2026-07-05T21:32:14.530119+00:00'
+      description: '`wup` is installed but no `wup.yaml` config exists in the project
+        root. Bootstrap with `task template:install:wup` (in koru) or follow `workflows/on-change-gates.md`.
+
+
+        Role: intelligent file watcher (3-layer: detect → quick → full).'
+      execution:
+        attempt: 0
+        max_attempts: 1
+        queue: default
+        state: ready
+      executor:
+        kind: human
+        mode: interactive
+      files: []
+      history:
+      - action: created
+        message: '`wup` is installed but no `wup.yaml` config exists in the project
+          root. Bootstrap with `task template:install:wup` (in koru) or follow `workflows/on-change-gates.md`.
+
+
+          Role: intelligent file watcher (3-layer: detect → quick → full).'
+        source: koru task
+        timestamp: '2026-07-05T21:32:14.530119+00:00'
+      id: STARTER-013
+      inputs:
+        api_headers: {}
+        api_method: GET
+        api_timeout_seconds: 30.0
+        env_keys: []
+        prompt: '`wup` is installed but no `wup.yaml` config exists in the project
+          root. Bootstrap with `task template:install:wup` (in koru) or follow `workflows/on-change-gates.md`.
+
+
+          Role: intelligent file watcher (3-layer: detect → quick → full).'
+      labels:
+      - koru
+      - nl-task
+      - llm-ready
+      - bootstrap
+      - gates
+      - scan
+      name: Bootstrap wup on-change gate
+      outputs:
+        artifacts: []
+        notes: []
+      priority: normal
+      source:
+        context:
+          dedupe_key: koru-scan:missing_gate:bootstrap wup on-change gate
+          input: '`wup` is installed but no `wup.yaml` config exists in the project
+            root. Bootstrap with `task template:install:wup` (in koru) or follow `workflows/on-change-gates.md`.
+
+
+            Role: intelligent file watcher (3-layer: detect → quick → full).'
+          signal: missing_gate
+        timestamp: '2026-07-05T21:32:14.530119+00:00'
+        tool: koru-scan
+      sprint: current
+      status: open
+      sync: {}
+      updated_at: '2026-07-05T21:32:14.530119+00:00'

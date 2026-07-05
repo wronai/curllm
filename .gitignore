@@ -354,6 +354,14 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+.cursor/
+
+# koru/planfile runtime artefacts (generated)
+.koru/
+.nlp2dsl/
+.planfile/sprints/*.fast.json
+local.dev.txt
+curlx_pkg/local.dev.txt
 
 # Marimo
 marimo/_static/
