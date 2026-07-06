@@ -15970,5 +15970,53 @@ tickets:
   files:
   - tests/test_functions.py
   dedupe_key: test-optimization:tests.test_functions.TestPatternRegistry:test_register_and_get_pattern
+- signal: slow_test_warning
+  title: 'Address slow test: tests.test_pytest_collection_health.test_root_collection_succeeds_without_import_errors'
+  description: 'Test `tests.test_pytest_collection_health.test_root_collection_succeeds_without_import_errors`
+    took 5.85s to run.
+
+
+    Optimize its setup, mock slow external dependencies, or refactor its logic to
+    reduce overall test suite execution time.'
+  priority: medium
+  labels:
+  - llm-ready
+  - test-optimization
+  - slow-test
+  files:
+  - tests/test_pytest_collection_health.py
+  dedupe_key: test-optimization:tests.test_pytest_collection_health:test_root_collection_succeeds_without_import_errors
+- signal: slow_test_warning
+  title: 'Address slow test: tests.test_pytest_collection_health.test_curlx_pkg_excluded_from_root_collection'
+  description: 'Test `tests.test_pytest_collection_health.test_curlx_pkg_excluded_from_root_collection`
+    took 5.13s to run.
+
+
+    Optimize its setup, mock slow external dependencies, or refactor its logic to
+    reduce overall test suite execution time.'
+  priority: medium
+  labels:
+  - llm-ready
+  - test-optimization
+  - slow-test
+  files:
+  - tests/test_pytest_collection_health.py
+  dedupe_key: test-optimization:tests.test_pytest_collection_health:test_curlx_pkg_excluded_from_root_collection
+- signal: slow_test_warning
+  title: 'Address slow test: tests.test_curllm_mcp.test_fetch_light_example_com'
+  description: 'Test `tests.test_curllm_mcp.test_fetch_light_example_com` took 1.90s
+    to run.
+
+
+    Optimize its setup, mock slow external dependencies, or refactor its logic to
+    reduce overall test suite execution time.'
+  priority: medium
+  labels:
+  - llm-ready
+  - test-optimization
+  - slow-test
+  files:
+  - tests/test_curllm_mcp.py
+  dedupe_key: test-optimization:tests.test_curllm_mcp:test_fetch_light_example_com
 applied: []
 skipped: []

@@ -100,9 +100,10 @@ sprint:
         Weryfikacja (opcjonalnie): `task koru:ide-os:calibrate IDE=auto`'
       execution:
         attempt: 0
+        finished_at: '2026-07-06T08:05:16.540066Z'
         max_attempts: 1
         queue: operator
-        state: waiting_input
+        state: done
       executor:
         kind: human
         mode: interactive
@@ -131,6 +132,31 @@ sprint:
         previous_execution_state: ready
         source: planfile.store
         timestamp: '2026-07-05T21:37:03.743089+00:00'
+      - action: update
+        changes:
+        - outputs
+        source: planfile.store
+        timestamp: '2026-07-05T22:17:31.678948+00:00'
+      - action: update
+        changes:
+        - outputs
+        source: planfile.store
+        timestamp: '2026-07-05T22:21:35.345822+00:00'
+      - action: update
+        changes:
+        - outputs
+        source: planfile.store
+        timestamp: '2026-07-05T23:20:51.290052+00:00'
+      - action: update
+        changes:
+        - execution
+        - status
+        execution_state: done
+        previous_execution_state: waiting_input
+        previous_status: open
+        source: planfile.store
+        status: done
+        timestamp: '2026-07-06T08:05:16.540625+00:00'
       id: STARTER-003
       inputs:
         api_headers: {}
@@ -170,6 +196,23 @@ sprint:
           would then click the wrong screen location). Env is live: Wayland DISPLAY=:0,
           detect_running_ides=[qoder, jetbrains], --ide auto resolves to jetbrains
           (auto:profile). Needs a human at the GUI to position the mouse.'
+        - '[KORU-SHELL-DRIVE] client=claude-code ok=true
+
+          completed'
+        - '[KORU-SHELL-DRIVE] client=claude-code ok=true
+
+          completed'
+        - '[cycle-4] Re-verified. Existing profile INTACT and uncorrupted: jetbrains{chat_x:2336,chat_y:588},
+          file identical to ~/.koru/ide-os-injector.json.bak.pre (diff empty). task/go-task
+          confirmed ABSENT. Wayland live (DISPLAY=:0, wayland-0); xdotool+ydotool
+          present but irrelevant — calibration needs a human to POSITION the mouse
+          over the chat input, not just to move it. Source-confirmed destructive path:
+          action_calibrate() at koru/autopilot/calibrate_cli.py:157,172-174 -> delay
+          -> oi.capture_mouse_xy() -> oi.save_profile(config_path=args.config); no
+          --dry-run, no x/y override. A headless run would overwrite the valid jetbrains
+          calibration with an arbitrary cursor coord. Did NOT run it headless to avoid
+          silent corruption. Genuine human-in-the-loop block, not an implementation
+          defect.'
       priority: high
       source:
         context:
@@ -191,9 +234,9 @@ sprint:
         timestamp: '2026-07-05T21:31:53.509561+00:00'
         tool: koru-operator-pipeline
       sprint: current
-      status: open
+      status: done
       sync: {}
-      updated_at: '2026-07-05T21:37:03.743060+00:00'
+      updated_at: '2026-07-06T08:05:16.540592+00:00'
     STARTER-004:
       blocked_by: []
       blocks: []
