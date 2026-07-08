@@ -370,3 +370,8 @@ __marimo__/
 
 # koru runtime artefacts (generated)
 .planfile/.koru/
+.benchmarks/
+.code2llm_cache/
+.github/
+.planfile/
+.projektor/
