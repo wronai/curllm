@@ -788,8 +788,8 @@ requires-dist = [
     { name = "python-dotenv" },
     { name = "pyyaml" },
     { name = "requests" },
-    { name = "testql", marker = "python_full_version >= '3.11' and python_full_version < '3.14' and extra == 'browser'", specifier = ">=1.2.63" },
-    { name = "testql", marker = "python_full_version >= '3.11' and python_full_version < '3.14' and extra == 'testql'", specifier = ">=1.2.63" },
+    { name = "testql", marker = "python_full_version >= '3.11' and python_full_version < '3.14' and extra == 'browser'", specifier = ">=1.2.64" },
+    { name = "testql", marker = "python_full_version >= '3.11' and python_full_version < '3.14' and extra == 'testql'", specifier = ">=1.2.64" },
     { name = "websockets" },
 ]
 provides-extras = ["mcp", "testql", "browser"]
@@ -3711,7 +3711,7 @@ wheels = [
 
 [[package]]
 name = "testql"
-version = "1.2.63"
+version = "1.2.64"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click", marker = "python_full_version >= '3.11' and python_full_version < '3.14'" },
@@ -3726,9 +3726,9 @@ dependencies = [
     { name = "rich", marker = "python_full_version >= '3.11' and python_full_version < '3.14'" },
     { name = "websockets", marker = "python_full_version >= '3.11' and python_full_version < '3.14'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c2/ea/02574e9adcc5999e2e8d4f3adcb0bfe8385bf7d62e10404606e3f4beaca5/testql-1.2.63.tar.gz", hash = "sha256:ddb31d27c9713c5cbc53c4f0b185d6412acd78268fbf140a90454709c4cd0701", size = 406262, upload-time = "2026-07-20T07:47:21.852Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1b/cb/f340d44005088d95c30fbd4015dc4063ba7f13c0e08b413fb01fcff50831/testql-1.2.64.tar.gz", hash = "sha256:938f0808cb220c75e9497648ef261dbcafb407a9a422a1d2c91c8b87d02352bc", size = 406763, upload-time = "2026-07-20T09:38:44.902Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/55/e0/d87c7912c7170af009af944d2105016f24953feb9d72c13518d9d35162f6/testql-1.2.63-py3-none-any.whl", hash = "sha256:3876af6538fe727cb63fa3174b1e6d6bec04d285c8e1effab6e3f54dbe9c4cef", size = 395903, upload-time = "2026-07-20T07:47:19.839Z" },
+    { url = "https://files.pythonhosted.org/packages/2c/18/59870ca85bda442866863f41fbe154adeb6e7fdd8aefd29e5a11259b2b55/testql-1.2.64-py3-none-any.whl", hash = "sha256:2c858601d7e5e91a16696cd59aaee07dff31b04e57ec93931d8d8a6d7bdf3a33", size = 396020, upload-time = "2026-07-20T09:38:42.884Z" },
 ]
 
 [[package]]

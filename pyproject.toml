@@ -45,10 +45,10 @@ mcp = [
   "mcp>=1.0.0",
 ]
 testql = [
-  "testql>=1.2.63; python_version >= '3.11' and python_version < '3.14'",
+  "testql>=1.2.64; python_version >= '3.11' and python_version < '3.14'",
 ]
 browser = [
-  "testql>=1.2.63; python_version >= '3.11' and python_version < '3.14'",
+  "testql>=1.2.64; python_version >= '3.11' and python_version < '3.14'",
   "playwright>=1.40.0",
 ]
 
