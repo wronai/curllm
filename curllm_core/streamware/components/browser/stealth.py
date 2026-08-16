@@ -1,51 +1,22 @@
-"""
-Stealth Mode - Anti-detection for browser automation.
-"""
+"""Re-export canonical StealthConfig; keep streamware stealth helpers."""
+from curllm_core.stealth import StealthConfig
+
+__all__ = [
+    "StealthConfig",
+    "STEALTH_SCRIPT",
+    "apply_stealth",
+    "get_stealth_headers",
+    "human_delay",
+    "human_type",
+    "human_scroll",
+    "human_move_mouse",
+]
+
 import asyncio
 import random
 from typing import List
 
 
-class StealthConfig:
-    """
-    Anti-detection configuration for Playwright/Chromium.
-    
-    Bypasses common bot detection:
-    - WebDriver flag
-    - Navigator properties
-    - Chrome runtime
-    - Plugin/language fingerprints
-    """
-    
-    def get_chrome_args(self) -> List[str]:
-        """Get Chrome launch arguments for stealth."""
-        return [
-            '--disable-blink-features=AutomationControlled',
-            '--disable-dev-shm-usage',
-            '--disable-web-security',
-            '--disable-features=IsolateOrigins,site-per-process',
-            '--disable-setuid-sandbox',
-            '--no-first-run',
-            '--no-default-browser-check',
-            '--window-size=1920,1080',
-            '--start-maximized',
-            f'--user-agent={self.get_user_agent()}',
-        ]
-
-    def get_user_agent(self) -> str:
-        """Get realistic user agent string."""
-        return (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/131.0.0.0 Safari/537.36"
-        )
-
-    async def apply_to_context(self, context):
-        """Apply stealth scripts to browser context."""
-        await apply_stealth(context)
-
-
-# Stealth JavaScript to inject
 STEALTH_SCRIPT = """
 // Advanced anti-detection
 
@@ -61,7 +32,7 @@ Object.defineProperty(navigator, 'plugins', {
         {name: 'Native Client', filename: 'internal-nacl-plugin', description: ''}
     ] 
 });
-Object.defineProperty(navigator.plugins, 'length', { get: () => 3 });
+Object.defineProperty(navigator, 'plugins', 'length', { get: () => 3 });
 
 // 3. Mock languages
 Object.defineProperty(navigator, 'languages', { get: () => ['pl-PL', 'pl', 'en-US', 'en'] });
@@ -141,12 +112,7 @@ HTMLCanvasElement.prototype.toDataURL = function(type) {
 
 
 async def apply_stealth(context) -> None:
-    """
-    Apply stealth scripts to browser context.
-    
-    Args:
-        context: Playwright browser context
-    """
+    """Apply stealth scripts to browser context."""
     await context.add_init_script(STEALTH_SCRIPT)
 
 
@@ -181,7 +147,7 @@ async def human_type(page, selector: str, text: str, delay_per_char: int = 50) -
         await human_delay(100, 300)
         for char in text:
             await el.type(char, delay=random.randint(30, delay_per_char + 50))
-            if random.random() < 0.05:  # 5% chance of small pause
+            if random.random() < 0.05:
                 await human_delay(200, 500)
 
 
