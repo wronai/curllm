@@ -40,7 +40,8 @@ curllm-mcp
       "cwd": "/home/tom/github/wronai/curllm",
       "env": {
         "CURLLM_API_HOST": "http://localhost:8810",
-        "OLLAMA_HOST": "http://localhost:11434"
+        "OLLAMA_HOST": "http://localhost:11434",
+        "CURLLM_MCP_ALLOW_EXECUTE": "1"
       }
     }
   }
@@ -49,7 +50,12 @@ curllm-mcp
 
 ## Tryby wykonania
 
-- **Domyślnie** (`curllm_execute`): in-process `CurllmExecutor` (Playwright + Ollama).
+- **Domyślnie**: automatyzacja Playwright (`execute`, `extract`, `fill_form`) jest
+  zablokowana. Wymaga świadomego ustawienia `CURLLM_MCP_ALLOW_EXECUTE=1`.
+- **Sieć prywatna**: URL-e loopback, prywatne i link-local są blokowane. Dostęp
+  do nich wymaga osobnego `CURLLM_MCP_ALLOW_PRIVATE_NETWORK=1`; URL-e z danymi
+  logowania pozostają zabronione.
+- **In-process** (`curllm_execute`): `CurllmExecutor` (Playwright + Ollama).
 - **Przez REST** (`use_api=true` lub `CURLLM_MCP_USE_API=1`): proxy do `POST /api/execute`.
 - **Lekki fetch** (`curllm_fetch_light`): tylko HTTP — bez LLM i przeglądarki.
 

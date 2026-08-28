@@ -42,7 +42,7 @@ Issues = "https://github.com/wronai/curllm/issues"
 
 [project.optional-dependencies]
 mcp = [
-  "mcp>=1.0.0",
+  "mcp>=1.0.0,<2",
 ]
 testql = [
   "testql>=1.2.64; python_version >= '3.11' and python_version < '3.14'",
